@@ -1,7 +1,37 @@
+# Rust build artifacts
 /target
+
+# Python
 /.venv
 __pycache__
 *.pyc
-.env
 *.egg-info
+.eggs/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+
+# OS
 .DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# UDR runtime data (not source controlled)
+/data/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Misc
+*.zip
+*.log
