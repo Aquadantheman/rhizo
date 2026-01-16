@@ -8,7 +8,6 @@ Requires:
 """
 
 import os
-import sys
 import tempfile
 import shutil
 
@@ -16,10 +15,8 @@ import pytest
 import pyarrow as pa
 import pandas as pd
 
-# Add python package to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
-
 # Try to import - will fail if dependencies aren't installed
+# Note: conftest.py adds python/ to sys.path
 try:
     import udr
     from udr_query import TableWriter, TableReader, QueryEngine

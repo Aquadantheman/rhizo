@@ -1,0 +1,8 @@
+{
+  "include": ["python", "tests", "examples"],
+  "extraPaths": ["python"],
+  "pythonVersion": "3.9",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": "none"
+}
