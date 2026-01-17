@@ -24,7 +24,7 @@ UDR is building the next generation of data infrastructure—one system that rep
 | Phase 2: Catalog | ✅ Complete | Versioned tables with time travel |
 | Phase 3: Query Layer | ✅ Complete | DuckDB + SQL + time travel queries |
 | Phase 4: Branching | ✅ Complete | Git-like branches with zero-copy semantics |
-| Phase 5: Transactions | 🚧 In Progress | Cross-table ACID (Core complete, QueryEngine integration next) |
+| Phase 5: Transactions | ✅ Complete | Cross-table ACID with recovery & robustness |
 | Phase 6: Changelog | ⏳ Planned | Unified batch/stream |
 | Phase 7: Production | ⏳ Planned | Real workload migration |
 | Phase 8: Release | ⏳ Planned | Documentation and publication |
@@ -199,7 +199,7 @@ Branch:
 
 ---
 
-## 🚧 IN PROGRESS
+## ✅ RECENTLY COMPLETED
 
 ### Phase 5: Cross-Table Transactions
 
@@ -275,15 +275,50 @@ with engine.transaction() as tx:
 # Rolls back on exception
 ```
 
-#### Phase 5.2: Recovery & Robustness (Next)
+#### Phase 5.2: Recovery & Robustness ✅ COMPLETE
 
 **Goal:** Production-grade crash recovery
 
-**Planned:**
-- [ ] Python-level recovery integration
-- [ ] Crash during write phase recovery
-- [ ] Crash during commit phase recovery
-- [ ] Epoch recovery tests
+**What We Built:**
+- [x] Python-level recovery integration via `PyTransactionManager.recover()` and `recover_and_apply()`
+- [x] Consistency verification via `verify_consistency()` method
+- [x] Auto-recovery option on `PyTransactionManager.__init__(auto_recover=True)`
+- [x] QueryEngine convenience methods: `verify_integrity()` and `recover()`
+- [x] Comprehensive recovery test suite (22 Python tests)
+
+**Key Features:**
+- `recover()` - Scan transaction log, identify incomplete transactions (read-only)
+- `recover_and_apply()` - Mark pending transactions as aborted (for startup)
+- `verify_consistency()` - Check transaction log integrity
+- `auto_recover` parameter - Automatically run recovery on TransactionManager init
+
+**Key Files:**
+- `udr_core/src/transaction/manager.rs` - Added recover(), recover_and_apply(), verify_consistency()
+- `udr_python/src/lib.rs` - Updated Python bindings with recovery methods
+- `python/udr_query/engine.py` - Added verify_integrity() and recover() convenience methods
+- `tests/test_recovery.py` - 22 recovery integration tests
+
+**Test Count:** 22 new Python tests (131 total Python, 241 total)
+
+**Example API:**
+```python
+# Auto-recovery on startup
+tx_manager = udr.PyTransactionManager(
+    tx_path, catalog_path, branch_path,
+    auto_recover=True  # Automatically clean up after crash
+)
+
+# Manual recovery via QueryEngine
+engine = QueryEngine(store, catalog, transaction_manager=tx_manager)
+report = engine.recover()
+if not report["is_clean"]:
+    print(f"Recovered transactions: {report['rolled_back']}")
+
+# Verify system integrity
+health = engine.verify_integrity()
+if not health["is_healthy"]:
+    print(f"Issues found: {health['issues']}")
+```
 
 ---
 
@@ -461,7 +496,7 @@ from udr_query import TableWriter, TableReader, QueryEngine
 
 **Test Counts:**
 - Rust: 110 tests (22 core + 17 branch + 71 transaction)
-- Python: 109 tests (20 core + 26 query layer + 20 branching + 15 branch-query + 28 transactions)
+- Python: 131 tests (20 core + 26 query layer + 20 branching + 15 branch-query + 28 transactions + 22 recovery)
 
 ---
 

@@ -482,12 +482,14 @@ impl PyTransactionManager {
     ///     base_path: Path for transaction storage
     ///     catalog_path: Path to catalog directory
     ///     branch_path: Optional path to branch manager directory
+    ///     auto_recover: If True, run recovery on startup (default: False)
     #[new]
-    #[pyo3(signature = (base_path, catalog_path, branch_path=None))]
+    #[pyo3(signature = (base_path, catalog_path, branch_path=None, auto_recover=false))]
     fn new(
         base_path: &str,
         catalog_path: &str,
         branch_path: Option<&str>,
+        auto_recover: bool,
     ) -> PyResult<Self> {
         let catalog = Arc::new(FileCatalog::new(catalog_path).map_err(catalog_err_to_py)?);
         let branch_manager = match branch_path {
@@ -497,6 +499,11 @@ impl PyTransactionManager {
 
         let inner = TransactionManager::new(base_path, catalog, branch_manager)
             .map_err(tx_err_to_py)?;
+
+        // Optionally run recovery on startup
+        if auto_recover {
+            inner.recover_and_apply().map_err(tx_err_to_py)?;
+        }
 
         Ok(Self { inner: Arc::new(inner) })
     }
@@ -597,17 +604,49 @@ impl PyTransactionManager {
         self.inner.active_count().map_err(tx_err_to_py)
     }
 
-    /// Perform recovery after crash/restart.
+    /// Perform recovery after crash/restart (read-only).
+    ///
+    /// Scans the transaction log to identify:
+    /// - Committed transactions (preserved)
+    /// - Pending transactions (will be marked for rollback)
+    /// - Any inconsistencies
+    ///
+    /// This is read-only; use recover_and_apply() to mark pending
+    /// transactions as aborted.
     ///
     /// Returns:
     ///     PyRecoveryReport with recovery details
     fn recover(&self) -> PyResult<PyRecoveryReport> {
-        // We need access to the log for recovery, but TransactionManager
-        // owns it internally. For now, we'll create a new log for recovery.
-        // In a real implementation, we'd expose recovery through the manager.
-        Err(PyRuntimeError::new_err(
-            "Recovery should be performed by recreating TransactionManager"
-        ))
+        self.inner
+            .recover()
+            .map(|r| r.into())
+            .map_err(tx_err_to_py)
+    }
+
+    /// Perform recovery and apply rollbacks.
+    ///
+    /// Like recover(), but also marks pending transactions as aborted.
+    /// Call this on startup to ensure clean state.
+    ///
+    /// Returns:
+    ///     PyRecoveryReport with recovery details including applied rollbacks
+    fn recover_and_apply(&self) -> PyResult<PyRecoveryReport> {
+        self.inner
+            .recover_and_apply()
+            .map(|r| r.into())
+            .map_err(tx_err_to_py)
+    }
+
+    /// Verify consistency of the transaction system.
+    ///
+    /// Returns a list of any issues found. Empty list means consistent.
+    ///
+    /// Returns:
+    ///     List of issue descriptions (empty if consistent)
+    fn verify_consistency(&self) -> PyResult<Vec<String>> {
+        self.inner
+            .verify_consistency()
+            .map_err(tx_err_to_py)
     }
 }
 

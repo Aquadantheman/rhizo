@@ -717,6 +717,97 @@ class QueryEngine:
 
         return list(table_names)
 
+    # =========================================================================
+    # Integrity & Recovery Operations
+    # =========================================================================
+
+    def verify_integrity(self) -> Dict[str, Any]:
+        """
+        Verify the integrity of the UDR storage system.
+
+        Checks:
+        - Transaction log consistency (if transaction_manager configured)
+        - More checks can be added in the future (chunk integrity, catalog consistency)
+
+        Returns:
+            Dict with:
+                - is_healthy: True if no issues found
+                - issues: List of issue descriptions
+                - transaction_issues: List of transaction-specific issues (if applicable)
+
+        Example:
+            >>> result = engine.verify_integrity()
+            >>> if not result["is_healthy"]:
+            ...     print(f"Issues found: {result['issues']}")
+        """
+        result: Dict[str, Any] = {
+            "is_healthy": True,
+            "issues": [],
+            "transaction_issues": [],
+        }
+
+        # Check transaction system consistency
+        if self.transaction_manager is not None:
+            try:
+                tx_issues = self.transaction_manager.verify_consistency()
+                if tx_issues:
+                    result["is_healthy"] = False
+                    result["issues"].extend(tx_issues)
+                    result["transaction_issues"] = tx_issues
+            except Exception as e:
+                result["is_healthy"] = False
+                result["issues"].append(f"Transaction verification failed: {e}")
+
+        return result
+
+    def recover(self, apply: bool = True) -> Dict[str, Any]:
+        """
+        Run recovery to clean up incomplete transactions.
+
+        This should be called on startup after a crash or unclean shutdown.
+        Scans the transaction log and either marks pending transactions
+        as aborted (if apply=True) or just reports what would be done.
+
+        Args:
+            apply: If True, mark pending transactions as aborted.
+                   If False, just report what would be recovered (dry run).
+
+        Returns:
+            Dict with recovery results:
+                - is_clean: True if no issues found
+                - replayed: List of transaction IDs that were replayed
+                - rolled_back: List of transaction IDs that were rolled back
+                - warnings: List of warning messages
+                - errors: List of error messages
+
+        Raises:
+            RuntimeError: If transaction_manager is not configured
+
+        Example:
+            >>> # On startup
+            >>> report = engine.recover()
+            >>> if not report["is_clean"]:
+            ...     print(f"Recovered from crash: {report}")
+        """
+        if self.transaction_manager is None:
+            raise RuntimeError("Cannot recover: transaction_manager not configured")
+
+        if apply:
+            report = self.transaction_manager.recover_and_apply()
+        else:
+            report = self.transaction_manager.recover()
+
+        return {
+            "is_clean": report.is_clean,
+            "last_committed_epoch": report.last_committed_epoch,
+            "replayed": list(report.replayed),
+            "rolled_back": list(report.rolled_back),
+            "already_aborted": list(report.already_aborted),
+            "already_committed": list(report.already_committed),
+            "warnings": list(report.warnings),
+            "errors": list(report.errors),
+        }
+
     def close(self) -> None:
         """Close the DuckDB connection."""
         self._conn.close()

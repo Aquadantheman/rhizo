@@ -12,6 +12,7 @@ use super::epoch::*;
 use super::error::TransactionError;
 use super::log::TransactionLog;
 use super::conflict::{ConflictDetector, TableLevelConflictDetector};
+use super::recovery::RecoveryReport;
 use crate::catalog::{FileCatalog, TableVersion};
 use crate::branch::BranchManager;
 
@@ -289,6 +290,40 @@ impl TransactionManager {
             .map_err(|_| TransactionError::LockError("recent_committed".to_string()))?;
         recent.clear();
         Ok(())
+    }
+
+    // === Recovery Methods ===
+
+    /// Perform recovery after crash/restart
+    ///
+    /// Scans the transaction log to identify:
+    /// - Committed transactions (preserved)
+    /// - Pending transactions (marked for rollback)
+    /// - Any inconsistencies
+    ///
+    /// This is a read-only operation; use `recover_and_apply` to actually
+    /// mark pending transactions as aborted.
+    pub fn recover(&self) -> Result<RecoveryReport, TransactionError> {
+        use super::recovery::RecoveryManager;
+        let recovery = RecoveryManager::new(&self.log);
+        recovery.recover()
+    }
+
+    /// Perform recovery and apply rollbacks
+    ///
+    /// Like `recover()`, but also marks pending transactions as aborted.
+    /// This is typically called on startup to ensure clean state.
+    pub fn recover_and_apply(&self) -> Result<RecoveryReport, TransactionError> {
+        use super::recovery::RecoveryManager;
+        let recovery = RecoveryManager::new(&self.log);
+        recovery.recover_and_apply()
+    }
+
+    /// Verify consistency of the transaction system
+    ///
+    /// Returns a list of any issues found. Empty list means consistent.
+    pub fn verify_consistency(&self) -> Result<Vec<String>, TransactionError> {
+        super::recovery::verify_consistency(&self.log)
     }
 
     // === Private helpers ===
