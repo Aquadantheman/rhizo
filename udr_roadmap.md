@@ -25,7 +25,7 @@ UDR is building the next generation of data infrastructure—one system that rep
 | Phase 3: Query Layer | ✅ Complete | DuckDB + SQL + time travel queries |
 | Phase 4: Branching | ✅ Complete | Git-like branches with zero-copy semantics |
 | Phase 5: Transactions | ✅ Complete | Cross-table ACID with recovery & robustness |
-| Phase 6: Changelog | ⏳ Planned | Unified batch/stream |
+| Phase 6: Changelog | ✅ Complete | Unified batch/stream via subscriptions |
 | Phase 7: Production | ⏳ Planned | Real workload migration |
 | Phase 8: Release | ⏳ Planned | Documentation and publication |
 
@@ -322,32 +322,89 @@ if not health["is_healthy"]:
 
 ---
 
-## ⏳ PLANNED PHASES
+## ✅ RECENTLY COMPLETED
 
 ### Phase 6: Changelog & Subscriptions
+
+**Status:** Complete
 
 **Goal:** Unified batch and streaming via changelog
 
 **Why This Matters:**
-- Batch query: "What is the state at version V?"
-- Stream query: "What changed since version V?"
-- Same data model, same guarantees
+- Batch query: "What is the state at version V?" → `engine.query()`
+- Stream query: "What changed since version V?" → `engine.get_changes()`
+- Continuous stream: "Notify me of changes" → `engine.subscribe()`
+- Same data model, same guarantees, no separate Kafka needed
 
-**Key Components:**
-1. `ChangelogEntry` for each commit
-2. `Subscriber` API for change notifications
-3. `diff_versions()` for computing deltas
+**What We Built:**
+
+#### Phase 6.0: Core Changelog API (Rust)
+- [x] `ChangelogEntry` struct with table changes
+- [x] `TableChange` struct tracking old/new versions
+- [x] `ChangelogQuery` builder with filtering (tx_id, timestamp, tables, branch)
+- [x] `TransactionLog.list_committed_transactions()` and `latest_committed_tx_id()`
+- [x] `TransactionManager.get_changelog()` and `latest_tx_id()`
+- [x] 17 new Rust tests (127 total)
+
+**Key Files:**
+- `udr_core/src/changelog/entry.rs` - ChangelogEntry, TableChange
+- `udr_core/src/changelog/query.rs` - ChangelogQuery builder
+- `udr_core/src/changelog/tests.rs` - Comprehensive tests
+
+#### Phase 6.1: Python Bindings
+- [x] `PyChangelogEntry` with helper methods (changed_tables, contains_table, get_change)
+- [x] `PyTableChange` with is_new_table()
+- [x] `PyTransactionManager.get_changelog()` and `latest_tx_id()`
+- [x] Type stubs in `udr.pyi`
+
+#### Phase 6.2: Subscriber API (Python)
+- [x] `Subscriber` class with multiple interfaces:
+  - `poll()` - Non-blocking check for new events
+  - `__iter__()` - Blocking iterator for continuous processing
+  - `subscribe(callback)` - Blocking callback interface
+  - `start_background(callback)` / `stop()` - Background thread processing
+- [x] `ChangeEvent` dataclass for per-table change notifications
+- [x] QueryEngine integration: `get_changes()`, `subscribe()`, `latest_tx_id()`
+- [x] 24 new Python tests (155 total)
+
+**Key Files:**
+- `python/udr_query/subscriber.py` - Subscriber class, ChangeEvent
+- `python/udr_query/engine.py` - get_changes(), subscribe(), latest_tx_id()
+- `tests/test_changelog.py` - Comprehensive tests
+
+#### Phase 6.3: Demo & Documentation
+- [x] `examples/changelog_demo.py` - Interactive demo showing all patterns
+- [x] Updated README and roadmap
+
+**Test Count:** 127 Rust tests, 155 Python tests (282 total)
 
 **Example API:**
 ```python
-def on_change(entry):
-    for change in entry.changes:
-        if change.table_name == "parcels":
-            print(f"Parcels: v{change.old_version} → v{change.new_version}")
+# BATCH: What is the current state?
+result = engine.query("SELECT * FROM orders WHERE status = 'pending'")
 
-subscriber = udr.Subscriber(changelog, from_commit=100)
-subscriber.subscribe(on_change)
+# CHANGE QUERY: What changed since last check?
+changes = engine.get_changes(since_tx_id=checkpoint)
+for entry in changes:
+    for change in entry['changes']:
+        print(f"{change['table_name']}: v{change['old_version']} -> v{change['new_version']}")
+
+# STREAMING: Continuous change notifications
+for event in engine.subscribe(tables=["orders"]):
+    print(f"Change: {event.table_name} v{event.new_version}")
+    process_event(event)
+
+# BACKGROUND: Event-driven processing
+def on_change(event):
+    trigger_downstream(event)
+
+subscriber = engine.subscribe()
+subscriber.start_background(on_change)
 ```
+
+---
+
+## ⏳ PLANNED PHASES
 
 ### Phase 7: Production Migration
 
@@ -495,8 +552,8 @@ from udr_query import TableWriter, TableReader, QueryEngine
 ```
 
 **Test Counts:**
-- Rust: 110 tests (22 core + 17 branch + 71 transaction)
-- Python: 131 tests (20 core + 26 query layer + 20 branching + 15 branch-query + 28 transactions + 22 recovery)
+- Rust: 127 tests (22 core + 17 branch + 71 transaction + 17 changelog)
+- Python: 155 tests (20 core + 26 query + 20 branching + 15 branch-query + 28 transactions + 22 recovery + 24 changelog)
 
 ---
 

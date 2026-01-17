@@ -35,7 +35,7 @@ UDR eliminates this fragmentation through five foundational innovations:
 | Phase 3: Query | ✅ Complete | DuckDB integration with SQL + time travel |
 | Phase 4: Branching | ✅ Complete | Git-like branching with zero-copy semantics |
 | Phase 5: Transactions | ✅ Complete | Cross-table ACID with recovery & robustness |
-| Phase 6: Changelog | 🔄 In Progress | Unified batch/stream via subscriptions |
+| Phase 6: Changelog | ✅ Complete | Unified batch/stream via subscriptions |
 
 ## Architecture
 
@@ -367,13 +367,17 @@ Based on the technical whitepaper analysis:
 
 See [udr_roadmap.md](./udr_roadmap.md) for the complete development roadmap.
 
-**Current work (Phase 6: Changelog & Subscriptions):**
-- ✅ ChangelogEntry and TableChange structs (Rust)
-- ✅ ChangelogQuery builder with filtering
-- ✅ Python bindings (PyChangelogEntry, PyTableChange)
-- ✅ Subscriber API with polling and background processing
-- ✅ QueryEngine integration (get_changes, subscribe, latest_tx_id)
-- ⏳ Demo script and integration tests
+**Phase 6 Complete - Unified Batch/Stream:**
+- ✅ ChangelogEntry and TableChange (Rust + Python bindings)
+- ✅ ChangelogQuery builder with filtering (tx_id, timestamp, tables, branch)
+- ✅ Subscriber API with polling, iterator, and background processing
+- ✅ QueryEngine: `get_changes()`, `subscribe()`, `latest_tx_id()`
+- ✅ Interactive demo: `python examples/changelog_demo.py`
+
+**Next milestone (Phase 7: Production Migration):**
+- Run real workloads on UDR
+- Validate performance at scale
+- Migration tooling and guides
 
 ## References
 
