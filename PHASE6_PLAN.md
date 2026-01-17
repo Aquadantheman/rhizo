@@ -836,40 +836,40 @@ class PyTransactionManager:
 
 ## Part 6: Implementation Phases
 
-### Phase 6.0: Core Changelog API (Rust)
+### Phase 6.0: Core Changelog API (Rust) ✅ COMPLETE
 
 **Goal:** Expose transaction log as queryable changelog
 
-**Files to create:**
-1. `udr_core/src/changelog/mod.rs` - Module exports
-2. `udr_core/src/changelog/entry.rs` - ChangelogEntry, TableChange
-3. `udr_core/src/changelog/query.rs` - ChangelogQuery builder
-4. `udr_core/src/changelog/manager.rs` - ChangelogManager
+**Files created:**
+1. ✅ `udr_core/src/changelog/mod.rs` - Module exports
+2. ✅ `udr_core/src/changelog/entry.rs` - ChangelogEntry, TableChange
+3. ✅ `udr_core/src/changelog/query.rs` - ChangelogQuery builder
+4. ✅ `udr_core/src/changelog/tests.rs` - Comprehensive tests
 
-**Files to modify:**
-1. `udr_core/src/transaction/log.rs` - Add list_committed_transactions()
-2. `udr_core/src/lib.rs` - Export changelog module
+**Files modified:**
+1. ✅ `udr_core/src/transaction/log.rs` - Added list_committed_transactions(), latest_committed_tx_id(), list_committed_since()
+2. ✅ `udr_core/src/transaction/manager.rs` - Added get_changelog(), latest_tx_id()
+3. ✅ `udr_core/src/lib.rs` - Export changelog module
 
-**Estimated tests:** 15-20 Rust tests
+**Tests:** 17 new Rust tests (127 total)
 - List committed transactions
 - Query filtering (tx_id, timestamp, tables, branch)
 - ChangelogEntry creation from TransactionRecord
 - Latest tx_id tracking
 
-### Phase 6.1: Python Bindings
+### Phase 6.1: Python Bindings ✅ COMPLETE
 
 **Goal:** Python access to changelog
 
-**Files to modify:**
-1. `udr_python/src/lib.rs` - Add PyChangelogEntry, PyTableChange, PyTransactionManager methods
+**Files modified:**
+1. ✅ `udr_python/src/lib.rs` - Added PyChangelogEntry, PyTableChange, get_changelog(), latest_tx_id()
+2. ✅ `python/udr.pyi` - Added type stubs
 
-**Files to modify:**
-1. `python/udr.pyi` - Add type stubs
-
-**Estimated tests:** 10-15 Python tests
-- Get changelog entries
-- Filtering works correctly
-- Latest tx_id tracking
+**Tests:** Python bindings verified (131 tests passing)
+- get_changelog() with all filter options
+- latest_tx_id() method
+- PyChangelogEntry helper methods (changed_tables, contains_table, get_change, change_count)
+- PyTableChange.is_new_table() method
 
 ### Phase 6.2: Subscriber API (Python)
 
@@ -962,10 +962,10 @@ class TestQueryEngineIntegration:
 ## Part 8: Success Criteria
 
 ### Must Have
-- [ ] ChangelogEntry struct with table changes
-- [ ] Query changelog since tx_id/timestamp
-- [ ] Filter by tables and branch
-- [ ] Python bindings for changelog
+- [x] ChangelogEntry struct with table changes
+- [x] Query changelog since tx_id/timestamp
+- [x] Filter by tables and branch
+- [x] Python bindings for changelog
 - [ ] Subscriber with polling
 - [ ] `engine.get_changes()` method
 - [ ] `engine.subscribe()` method
@@ -974,7 +974,7 @@ class TestQueryEngineIntegration:
 - [ ] Background subscriber thread
 - [ ] Callback interface
 - [ ] ChangeEvent helper class
-- [ ] Comprehensive tests
+- [x] Comprehensive tests (17 Rust tests, Python bindings verified)
 
 ### Nice to Have (Future)
 - [ ] Push notifications (WebSocket/gRPC)

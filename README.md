@@ -2,7 +2,7 @@
 
 **A next-generation data infrastructure that unifies transactional, analytical, and streaming workloads through content-addressable storage, cross-table ACID transactions, and Git-like versioning.**
 
-[![Rust Tests](https://img.shields.io/badge/tests-110%20passed-brightgreen)]()
+[![Rust Tests](https://img.shields.io/badge/tests-127%20passed-brightgreen)]()
 [![Python Tests](https://img.shields.io/badge/python%20tests-131%20passed-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
@@ -35,7 +35,7 @@ UDR eliminates this fragmentation through five foundational innovations:
 | Phase 3: Query | ✅ Complete | DuckDB integration with SQL + time travel |
 | Phase 4: Branching | ✅ Complete | Git-like branching with zero-copy semantics |
 | Phase 5: Transactions | ✅ Complete | Cross-table ACID with recovery & robustness |
-| Phase 6: Changelog | ⏳ Planned | Unified batch/stream via subscriptions |
+| Phase 6: Changelog | 🔄 In Progress | Unified batch/stream via subscriptions |
 
 ## Architecture
 
@@ -264,7 +264,7 @@ latest = catalog.get_version("users")  # Gets latest
 ## Testing
 
 ```bash
-# Run all Rust tests (110 tests)
+# Run all Rust tests (127 tests)
 cargo test --all
 
 # Run Python tests (131 tests)
@@ -294,14 +294,17 @@ unifieddataruntime/
 │       │   ├── branch.rs        # Branch, BranchDiff structs
 │       │   ├── manager.rs       # BranchManager (create, merge, diff)
 │       │   └── error.rs         # BranchError types
-│       └── transaction/         # Cross-table ACID (Phase 5)
-│           ├── types.rs         # TxId, TransactionRecord, WriteGranularity
-│           ├── epoch.rs         # EpochConfig, EpochMetadata
-│           ├── error.rs         # TransactionError types
-│           ├── log.rs           # TransactionLog (persistent WAL)
-│           ├── conflict.rs      # ConflictDetector trait, TableLevelConflictDetector
-│           ├── manager.rs       # TransactionManager (coordinator)
-│           └── recovery.rs      # RecoveryManager, RecoveryReport
+│       ├── transaction/         # Cross-table ACID (Phase 5)
+│       │   ├── types.rs         # TxId, TransactionRecord, WriteGranularity
+│       │   ├── epoch.rs         # EpochConfig, EpochMetadata
+│       │   ├── error.rs         # TransactionError types
+│       │   ├── log.rs           # TransactionLog (persistent WAL)
+│       │   ├── conflict.rs      # ConflictDetector trait, TableLevelConflictDetector
+│       │   ├── manager.rs       # TransactionManager (coordinator)
+│       │   └── recovery.rs      # RecoveryManager, RecoveryReport
+│       └── changelog/           # Changelog & Subscriptions (Phase 6)
+│           ├── entry.rs         # ChangelogEntry, TableChange
+│           └── query.rs         # ChangelogQuery builder
 │
 ├── udr_python/                   # PyO3 bindings
 │   └── src/lib.rs               # Python interface
@@ -362,11 +365,12 @@ Based on the technical whitepaper analysis:
 
 See [udr_roadmap.md](./udr_roadmap.md) for the complete development roadmap.
 
-**Next milestone (Phase 6: Changelog & Subscriptions):**
-- ChangelogEntry for each commit
-- Subscriber API for change notifications
-- Query changes since version/timestamp
-- Unified batch/stream semantics
+**Current work (Phase 6: Changelog & Subscriptions):**
+- ✅ ChangelogEntry and TableChange structs (Rust)
+- ✅ ChangelogQuery builder with filtering
+- ✅ Python bindings (PyChangelogEntry, PyTableChange)
+- ⏳ Subscriber API for change notifications
+- ⏳ QueryEngine integration (get_changes, subscribe)
 
 ## References
 

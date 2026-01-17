@@ -349,6 +349,54 @@ impl TransactionLog {
         Ok(config)
     }
 
+    // === Changelog Support ===
+
+    /// List all committed transactions in order.
+    ///
+    /// Scans all epochs and returns committed transactions sorted by tx_id.
+    /// This is used by the changelog module to provide streaming access.
+    pub fn list_committed_transactions(&self) -> Result<Vec<TransactionRecord>, TransactionError> {
+        let epochs = self.list_epochs()?;
+        let mut committed = Vec::new();
+
+        for epoch_id in epochs {
+            let tx_ids = self.list_transactions_in_epoch(epoch_id)?;
+
+            for tx_id in tx_ids {
+                match self.read_transaction_from_epoch(tx_id, epoch_id) {
+                    Ok(tx) => {
+                        if tx.is_committed() {
+                            committed.push(tx);
+                        }
+                    }
+                    Err(_) => continue, // Skip unreadable transactions
+                }
+            }
+        }
+
+        // Sort by tx_id for consistent ordering
+        committed.sort_by_key(|tx| tx.tx_id);
+
+        Ok(committed)
+    }
+
+    /// Get the latest committed transaction ID, if any.
+    pub fn latest_committed_tx_id(&self) -> Result<Option<TxId>, TransactionError> {
+        let committed = self.list_committed_transactions()?;
+        Ok(committed.last().map(|tx| tx.tx_id))
+    }
+
+    /// List committed transactions since a specific tx_id (exclusive).
+    ///
+    /// Returns transactions with tx_id > since_tx_id.
+    pub fn list_committed_since(
+        &self,
+        since_tx_id: TxId,
+    ) -> Result<Vec<TransactionRecord>, TransactionError> {
+        let committed = self.list_committed_transactions()?;
+        Ok(committed.into_iter().filter(|tx| tx.tx_id > since_tx_id).collect())
+    }
+
     // === Private Helpers ===
 
     fn epoch_dir(&self, epoch_id: EpochId) -> PathBuf {

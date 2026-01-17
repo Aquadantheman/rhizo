@@ -449,6 +449,94 @@ impl TransactionManager {
 
         Ok(())
     }
+
+    // =========================================================================
+    // Changelog Methods
+    // =========================================================================
+
+    /// Query changelog entries matching the given criteria.
+    ///
+    /// This provides the streaming interface for the unified batch/stream model.
+    pub fn get_changelog(
+        &self,
+        query: crate::changelog::ChangelogQuery,
+    ) -> Result<Vec<crate::changelog::ChangelogEntry>, TransactionError> {
+        use crate::changelog::ChangelogEntry;
+        use std::collections::HashMap;
+
+        // Get committed transactions from log
+        let committed = self.log.list_committed_transactions()?;
+
+        let mut entries = Vec::new();
+        let mut previous_versions: HashMap<String, u64> = HashMap::new();
+
+        for tx in committed {
+            // Filter by tx_id
+            if let Some(since_tx) = query.since_tx_id {
+                if tx.tx_id <= since_tx {
+                    // Still need to track versions for later entries
+                    for w in &tx.writes {
+                        previous_versions.insert(w.table_name.clone(), w.new_version);
+                    }
+                    continue;
+                }
+            }
+
+            // Filter by timestamp
+            if let Some(since_ts) = query.since_timestamp {
+                if let Some(committed_at) = tx.committed_at {
+                    if committed_at < since_ts {
+                        for w in &tx.writes {
+                            previous_versions.insert(w.table_name.clone(), w.new_version);
+                        }
+                        continue;
+                    }
+                }
+            }
+
+            // Filter by branch
+            if let Some(ref branch) = query.branch {
+                if &tx.branch != branch {
+                    // Track versions even for non-matching branches
+                    for w in &tx.writes {
+                        previous_versions.insert(w.table_name.clone(), w.new_version);
+                    }
+                    continue;
+                }
+            }
+
+            // Filter by tables
+            let include = if let Some(ref tables) = query.tables {
+                tx.writes.iter().any(|w| tables.contains(&w.table_name))
+            } else {
+                true
+            };
+
+            if include {
+                let entry = ChangelogEntry::from_transaction(&tx, &previous_versions);
+                entries.push(entry);
+
+                // Check limit
+                if let Some(limit) = query.limit {
+                    if entries.len() >= limit {
+                        break;
+                    }
+                }
+            }
+
+            // Track versions for future entries
+            for w in &tx.writes {
+                previous_versions.insert(w.table_name.clone(), w.new_version);
+            }
+        }
+
+        Ok(entries)
+    }
+
+    /// Get the latest committed transaction ID.
+    pub fn latest_tx_id(&self) -> Result<Option<u64>, TransactionError> {
+        self.log.latest_committed_tx_id()
+    }
 }
 
 #[cfg(test)]

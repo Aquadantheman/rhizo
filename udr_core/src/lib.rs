@@ -2,6 +2,7 @@ pub mod chunk_store;
 pub mod catalog;
 pub mod branch;
 pub mod transaction;
+pub mod changelog;
 
 pub use chunk_store::{ChunkStore, ChunkStoreError};
 pub use catalog::{FileCatalog, TableVersion, CatalogError};
@@ -14,3 +15,4 @@ pub use transaction::{
     TransactionManager,
     RecoveryReport, RecoveryManager,
 };
+pub use changelog::{ChangelogEntry, TableChange, ChangelogQuery};

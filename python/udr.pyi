@@ -123,3 +123,34 @@ class PyTransactionManager:
     def recover(self) -> PyRecoveryReport: ...
     def recover_and_apply(self) -> PyRecoveryReport: ...
     def verify_consistency(self) -> List[str]: ...
+    def get_changelog(
+        self,
+        since_tx_id: Optional[int] = None,
+        since_timestamp: Optional[int] = None,
+        tables: Optional[List[str]] = None,
+        branch: Optional[str] = None,
+        limit: Optional[int] = None,
+    ) -> List["PyChangelogEntry"]: ...
+    def latest_tx_id(self) -> Optional[int]: ...
+
+class PyTableChange:
+    """A single table change within a committed transaction."""
+    table_name: str
+    old_version: Optional[int]
+    new_version: int
+    chunk_hashes: List[str]
+
+    def is_new_table(self) -> bool: ...
+
+class PyChangelogEntry:
+    """Entry in the changelog representing a committed transaction."""
+    tx_id: int
+    epoch_id: int
+    committed_at: int
+    branch: str
+    changes: List[PyTableChange]
+
+    def changed_tables(self) -> List[str]: ...
+    def contains_table(self, table_name: str) -> bool: ...
+    def get_change(self, table_name: str) -> Optional[PyTableChange]: ...
+    def change_count(self) -> int: ...

@@ -6,6 +6,7 @@ use udr_core::{
     Branch, BranchDiff, BranchError, BranchManager,
     TransactionManager, TransactionRecord, TransactionError,
     TableWrite, RecoveryReport,
+    ChangelogEntry, TableChange, ChangelogQuery,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -469,6 +470,119 @@ impl From<RecoveryReport> for PyRecoveryReport {
     }
 }
 
+// =============================================================================
+// Changelog Types
+// =============================================================================
+
+/// A single table change within a commit.
+#[pyclass]
+#[derive(Clone)]
+struct PyTableChange {
+    #[pyo3(get)]
+    table_name: String,
+    #[pyo3(get)]
+    old_version: Option<u64>,
+    #[pyo3(get)]
+    new_version: u64,
+    #[pyo3(get)]
+    chunk_hashes: Vec<String>,
+}
+
+impl From<&TableChange> for PyTableChange {
+    fn from(tc: &TableChange) -> Self {
+        Self {
+            table_name: tc.table_name.clone(),
+            old_version: tc.old_version,
+            new_version: tc.new_version,
+            chunk_hashes: tc.chunk_hashes.clone(),
+        }
+    }
+}
+
+#[pymethods]
+impl PyTableChange {
+    /// Check if this is a new table (no previous version).
+    fn is_new_table(&self) -> bool {
+        self.old_version.is_none()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "PyTableChange(table={}, old_version={:?}, new_version={})",
+            self.table_name, self.old_version, self.new_version
+        )
+    }
+}
+
+/// Entry in the changelog representing a committed transaction.
+#[pyclass]
+#[derive(Clone)]
+struct PyChangelogEntry {
+    #[pyo3(get)]
+    tx_id: u64,
+    #[pyo3(get)]
+    epoch_id: u64,
+    #[pyo3(get)]
+    committed_at: i64,
+    #[pyo3(get)]
+    branch: String,
+    changes: Vec<PyTableChange>,
+}
+
+impl From<ChangelogEntry> for PyChangelogEntry {
+    fn from(entry: ChangelogEntry) -> Self {
+        Self {
+            tx_id: entry.tx_id,
+            epoch_id: entry.epoch_id,
+            committed_at: entry.committed_at,
+            branch: entry.branch,
+            changes: entry.changes.iter().map(PyTableChange::from).collect(),
+        }
+    }
+}
+
+#[pymethods]
+impl PyChangelogEntry {
+    /// Get list of table changes in this entry.
+    #[getter]
+    fn changes(&self) -> Vec<PyTableChange> {
+        self.changes.clone()
+    }
+
+    /// Get list of changed table names.
+    fn changed_tables(&self) -> Vec<String> {
+        self.changes.iter().map(|c| c.table_name.clone()).collect()
+    }
+
+    /// Check if a specific table was changed.
+    fn contains_table(&self, table_name: &str) -> bool {
+        self.changes.iter().any(|c| c.table_name == table_name)
+    }
+
+    /// Get the change for a specific table, if present.
+    fn get_change(&self, table_name: &str) -> Option<PyTableChange> {
+        self.changes.iter()
+            .find(|c| c.table_name == table_name)
+            .cloned()
+    }
+
+    /// Number of tables changed in this entry.
+    fn change_count(&self) -> usize {
+        self.changes.len()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "PyChangelogEntry(tx_id={}, branch={}, changes={})",
+            self.tx_id, self.branch, self.changes.len()
+        )
+    }
+}
+
+// =============================================================================
+// Transaction Manager
+// =============================================================================
+
 #[pyclass]
 struct PyTransactionManager {
     inner: Arc<TransactionManager>,
@@ -648,18 +762,91 @@ impl PyTransactionManager {
             .verify_consistency()
             .map_err(tx_err_to_py)
     }
+
+    // =========================================================================
+    // Changelog Methods
+    // =========================================================================
+
+    /// Get changelog entries matching query criteria.
+    ///
+    /// This is the API for querying committed changes, enabling the
+    /// unified batch/stream model:
+    /// - Batch: "What is the state?" (use QueryEngine.query())
+    /// - Stream: "What changed?" (use this method)
+    ///
+    /// Args:
+    ///     since_tx_id: Start from this transaction (exclusive)
+    ///     since_timestamp: Start from this Unix timestamp
+    ///     tables: Filter to specific tables
+    ///     branch: Filter to specific branch
+    ///     limit: Maximum entries to return
+    ///
+    /// Returns:
+    ///     List of PyChangelogEntry objects
+    #[pyo3(signature = (since_tx_id=None, since_timestamp=None, tables=None, branch=None, limit=None))]
+    fn get_changelog(
+        &self,
+        since_tx_id: Option<u64>,
+        since_timestamp: Option<i64>,
+        tables: Option<Vec<String>>,
+        branch: Option<String>,
+        limit: Option<usize>,
+    ) -> PyResult<Vec<PyChangelogEntry>> {
+        // Build query
+        let mut query = ChangelogQuery::new();
+        if let Some(tx_id) = since_tx_id {
+            query = query.since_tx(tx_id);
+        }
+        if let Some(ts) = since_timestamp {
+            query = query.since_time(ts);
+        }
+        if let Some(t) = tables {
+            query = query.for_tables(t);
+        }
+        if let Some(b) = branch {
+            query = query.on_branch(&b);
+        }
+        if let Some(l) = limit {
+            query = query.with_limit(l);
+        }
+
+        // Execute query
+        let entries = self.inner.get_changelog(query).map_err(tx_err_to_py)?;
+
+        Ok(entries.into_iter().map(PyChangelogEntry::from).collect())
+    }
+
+    /// Get the latest committed transaction ID.
+    ///
+    /// Returns None if no transactions have been committed yet.
+    ///
+    /// Returns:
+    ///     Latest transaction ID or None
+    fn latest_tx_id(&self) -> PyResult<Option<u64>> {
+        self.inner.latest_tx_id().map_err(tx_err_to_py)
+    }
 }
 
 #[pymodule]
 fn udr(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // Core storage
     m.add_class::<PyChunkStore>()?;
     m.add_class::<PyTableVersion>()?;
     m.add_class::<PyCatalog>()?;
+
+    // Branching
     m.add_class::<PyBranch>()?;
     m.add_class::<PyBranchDiff>()?;
     m.add_class::<PyBranchManager>()?;
+
+    // Transactions
     m.add_class::<PyTransactionManager>()?;
     m.add_class::<PyTransactionInfo>()?;
     m.add_class::<PyRecoveryReport>()?;
+
+    // Changelog
+    m.add_class::<PyTableChange>()?;
+    m.add_class::<PyChangelogEntry>()?;
+
     Ok(())
 }
