@@ -1,5 +1,5 @@
 """
-UDR Query Layer - SQL queries over versioned, content-addressable data.
+Armillaria Query Layer - SQL queries over versioned, content-addressable data.
 
 This module provides:
 - TableWriter: Write DataFrames as chunked Parquet files

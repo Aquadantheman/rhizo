@@ -57,11 +57,11 @@ class ChunkWriteResult:
 
 class TableWriter:
     """
-    Writes data to UDR as versioned, content-addressable Parquet chunks.
+    Writes data to Armillaria as versioned, content-addressable Parquet chunks.
 
     Example:
-        >>> from udr import PyChunkStore, PyCatalog
-        >>> from udr_query import TableWriter
+        >>> from armillaria import PyChunkStore, PyCatalog
+        >>> from armillaria_query import TableWriter
         >>>
         >>> store = PyChunkStore("./data/chunks")
         >>> catalog = PyCatalog("./data/catalog")
@@ -138,10 +138,10 @@ class TableWriter:
         version = self._get_next_version(table_name)
 
         # Import here to avoid circular dependency
-        import udr
+        import armillaria
 
         # Create and commit the version
-        table_version = udr.PyTableVersion(table_name, version, chunk_hashes)
+        table_version = armillaria.PyTableVersion(table_name, version, chunk_hashes)
         # Note: metadata handling would require extending PyTableVersion
 
         committed_version = self.catalog.commit(table_version)

@@ -11,21 +11,21 @@ import shutil
 import pytest
 import pandas as pd
 
-import udr
-from udr_query import QueryEngine
+import armillaria
+from armillaria_query import QueryEngine
 
 
 @pytest.fixture
 def temp_storage():
     """Create temporary storage directories for testing."""
-    base_dir = tempfile.mkdtemp(prefix="udr_branch_query_test_")
+    base_dir = tempfile.mkdtemp(prefix="armillaria_branch_query_test_")
     chunks_dir = os.path.join(base_dir, "chunks")
     catalog_dir = os.path.join(base_dir, "catalog")
     branches_dir = os.path.join(base_dir, "branches")
 
-    store = udr.PyChunkStore(chunks_dir)
-    catalog = udr.PyCatalog(catalog_dir)
-    branches = udr.PyBranchManager(branches_dir)
+    store = armillaria.PyChunkStore(chunks_dir)
+    catalog = armillaria.PyCatalog(catalog_dir)
+    branches = armillaria.PyBranchManager(branches_dir)
 
     yield store, catalog, branches, base_dir
 

@@ -1,5 +1,5 @@
 """
-Transaction support for UDR QueryEngine.
+Transaction support for Armillaria QueryEngine.
 
 Provides ACID transactions across multiple tables with:
 - Buffered writes (not visible until commit)

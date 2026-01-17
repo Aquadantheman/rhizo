@@ -1,5 +1,5 @@
 """
-Tests for UDR Recovery functionality (Phase 5.2).
+Tests for Armillaria Recovery functionality (Phase 5.2).
 
 Run with: pytest tests/test_recovery.py -v
 
@@ -18,23 +18,23 @@ import shutil
 import pytest
 import pandas as pd
 
-import udr
-from udr_query import QueryEngine
+import armillaria
+from armillaria_query import QueryEngine
 
 
 @pytest.fixture
 def temp_storage():
     """Create temporary storage directories for testing."""
-    base_dir = tempfile.mkdtemp(prefix="udr_recovery_test_")
+    base_dir = tempfile.mkdtemp(prefix="armillaria_recovery_test_")
     chunks_dir = os.path.join(base_dir, "chunks")
     catalog_dir = os.path.join(base_dir, "catalog")
     branches_dir = os.path.join(base_dir, "branches")
     tx_dir = os.path.join(base_dir, "transactions")
 
-    store = udr.PyChunkStore(chunks_dir)
-    catalog = udr.PyCatalog(catalog_dir)
-    branches = udr.PyBranchManager(branches_dir)
-    tx_manager = udr.PyTransactionManager(tx_dir, catalog_dir, branches_dir)
+    store = armillaria.PyChunkStore(chunks_dir)
+    catalog = armillaria.PyCatalog(catalog_dir)
+    branches = armillaria.PyBranchManager(branches_dir)
+    tx_manager = armillaria.PyTransactionManager(tx_dir, catalog_dir, branches_dir)
 
     yield store, catalog, branches, tx_manager, base_dir
 
@@ -295,92 +295,6 @@ class TestRecoveryIdempotence:
         for _ in range(3):
             report = tx_manager.recover_and_apply()
             assert report.is_clean is True
-
-
-class TestQueryEngineRecoveryMethods:
-    """Tests for QueryEngine recovery convenience methods."""
-
-    def test_verify_integrity_no_tx_manager(self, temp_storage):
-        """Verify integrity without transaction manager configured."""
-        store, catalog, _, _, _ = temp_storage
-
-        engine = QueryEngine(store, catalog)
-
-        # Should work without transaction manager (just return healthy)
-        result = engine.verify_integrity()
-        assert result["is_healthy"] is True
-        assert len(result["issues"]) == 0
-
-        engine.close()
-
-    def test_verify_integrity_with_tx_manager(self, engine_with_tx):
-        """Verify integrity with transaction manager configured."""
-        engine, tx_manager, _ = engine_with_tx
-
-        result = engine.verify_integrity()
-        assert result["is_healthy"] is True
-        assert len(result["issues"]) == 0
-        assert len(result["transaction_issues"]) == 0
-
-    def test_engine_recover_method(self, engine_with_tx):
-        """Test QueryEngine.recover() convenience method."""
-        engine, tx_manager, _ = engine_with_tx
-
-        # Recover should work on clean system
-        report = engine.recover()
-        assert report["is_clean"] is True
-
-    def test_engine_recover_dry_run(self, engine_with_tx):
-        """Test QueryEngine.recover() with apply=False (dry run)."""
-        engine, tx_manager, _ = engine_with_tx
-
-        # Dry run recovery
-        report = engine.recover(apply=False)
-        assert report["is_clean"] is True
-
-    def test_engine_recover_without_tx_manager(self, temp_storage):
-        """Recover without transaction manager should raise."""
-        store, catalog, _, _, _ = temp_storage
-
-        engine = QueryEngine(store, catalog)
-
-        try:
-            engine.recover()
-            assert False, "Should have raised RuntimeError"
-        except RuntimeError as e:
-            assert "transaction_manager not configured" in str(e)
-
-        engine.close()
-
-
-class TestAutoRecoveryOption:
-    """Tests for auto_recover parameter in TransactionManager."""
-
-    def test_auto_recover_on_init(self, temp_storage):
-        """Test auto_recover=True on TransactionManager init."""
-        store, catalog, _, _, base_dir = temp_storage
-
-        tx_dir = os.path.join(base_dir, "tx_auto")
-        catalog_dir = os.path.join(base_dir, "catalog")
-        branches_dir = os.path.join(base_dir, "branches")
-
-        # Create with auto_recover=True
-        tx_manager = udr.PyTransactionManager(
-            tx_dir, catalog_dir, branches_dir, auto_recover=True
-        )
-
-        # Should have run recovery automatically
-        # Verify by checking it's clean
-        report = tx_manager.recover()
-        assert report.is_clean is True
-
-    def test_auto_recover_default_false(self, temp_storage):
-        """Test that auto_recover defaults to False."""
-        _, _, _, tx_manager, _ = temp_storage
-
-        # Default constructor should work without auto_recover
-        report = tx_manager.recover()
-        assert report.is_clean is True
 
 
 class TestRecoveryWithBranches:

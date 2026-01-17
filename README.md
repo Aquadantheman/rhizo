@@ -1,6 +1,8 @@
-# Unified Data Runtime (UDR)
+# Armillaria
 
-**A next-generation data infrastructure that unifies transactional, analytical, and streaming workloads through content-addressable storage, cross-table ACID transactions, and Git-like versioning.**
+**Named after the largest organism on Earth — a 2,400-year-old honey fungus spanning 2,385 acres, connecting an entire forest underground.**
+
+Armillaria is a next-generation data infrastructure that unifies transactional, analytical, and streaming workloads through content-addressable storage, cross-table ACID transactions, and Git-like versioning.
 
 [![CI](https://github.com/yourusername/unifieddataruntime/actions/workflows/ci.yml/badge.svg)]()
 [![Rust Tests](https://img.shields.io/badge/tests-127%20passed-brightgreen)]()
@@ -9,7 +11,7 @@
 [![Ruff](https://img.shields.io/badge/ruff-clean-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
-## Why UDR?
+## Why Armillaria?
 
 Modern data infrastructure is fundamentally fragmented. Organizations maintain separate systems for:
 - Transactional workloads (PostgreSQL, MySQL)
@@ -19,7 +21,7 @@ Modern data infrastructure is fundamentally fragmented. Organizations maintain s
 
 **The result:** 60-80% of data engineering effort goes to integration, synchronization, and pipeline maintenance rather than generating insights.
 
-UDR eliminates this fragmentation through five foundational innovations:
+Armillaria eliminates this fragmentation through five foundational innovations:
 
 | Innovation | Benefit |
 |------------|---------|
@@ -45,7 +47,7 @@ UDR eliminates this fragmentation through five foundational innovations:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      Application Layer                       │
-│          Python (udr_query) │ Rust │ CLI (planned)          │
+│     Python (armillaria_query) │ Rust │ CLI (planned)          │
 │      TableWriter │ TableReader │ QueryEngine (DuckDB)        │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -100,13 +102,13 @@ pip install pyarrow duckdb pandas pytest
 ### Basic Usage (Python)
 
 ```python
-import udr
-from udr_query import TableWriter, TableReader, QueryEngine
+import armillaria
+from armillaria_query import TableWriter, TableReader, QueryEngine
 import pandas as pd
 
 # Initialize storage
-store = udr.PyChunkStore("./data/chunks")
-catalog = udr.PyCatalog("./data/catalog")
+store = armillaria.PyChunkStore("./data/chunks")
+catalog = armillaria.PyCatalog("./data/catalog")
 
 # Write data using the query layer
 engine = QueryEngine(store, catalog)
@@ -155,14 +157,14 @@ print(f"Rows removed: {diff['rows_removed']}")
 ### Branching (Phase 4)
 
 ```python
-import udr
-from udr_query import QueryEngine
+import armillaria
+from armillaria_query import QueryEngine
 import pandas as pd
 
 # Initialize with branch support
-store = udr.PyChunkStore("./data/chunks")
-catalog = udr.PyCatalog("./data/catalog")
-branches = udr.PyBranchManager("./data/branches")
+store = armillaria.PyChunkStore("./data/chunks")
+catalog = armillaria.PyCatalog("./data/catalog")
+branches = armillaria.PyBranchManager("./data/branches")
 engine = QueryEngine(store, catalog, branch_manager=branches)
 
 # Write initial data to main branch
@@ -198,15 +200,15 @@ engine.merge_branch("feature/new-scoring", into="main")
 ### Transactions (Phase 5)
 
 ```python
-import udr
-from udr_query import QueryEngine
+import armillaria
+from armillaria_query import QueryEngine
 import pandas as pd
 
 # Initialize with transaction support
-store = udr.PyChunkStore("./data/chunks")
-catalog = udr.PyCatalog("./data/catalog")
-branches = udr.PyBranchManager("./data/branches")
-tx_manager = udr.PyTransactionManager("./data/transactions", "./data/catalog", "./data/branches")
+store = armillaria.PyChunkStore("./data/chunks")
+catalog = armillaria.PyCatalog("./data/catalog")
+branches = armillaria.PyBranchManager("./data/branches")
+tx_manager = armillaria.PyTransactionManager("./data/transactions", "./data/catalog", "./data/branches")
 
 engine = QueryEngine(
     store, catalog,
@@ -241,10 +243,10 @@ print(f"Committed users: {result.to_pandas()['cnt'].iloc[0]}")  # 3
 ### Low-Level API (Rust Core)
 
 ```python
-import udr
+import armillaria
 
 # Content-addressable storage
-store = udr.PyChunkStore("./data/chunks")
+store = armillaria.PyChunkStore("./data/chunks")
 
 # Store data - returns BLAKE3 hash
 hash_str = store.put(b"Hello, World!")
@@ -254,9 +256,9 @@ print(f"Stored with hash: {hash_str}")
 data = store.get_verified(hash_str)  # Raises if corrupted
 
 # Versioned catalog
-catalog = udr.PyCatalog("./data/catalog")
+catalog = armillaria.PyCatalog("./data/catalog")
 
-version = udr.PyTableVersion("users", 1, [hash_str])
+version = armillaria.PyTableVersion("users", 1, [hash_str])
 catalog.commit(version)
 
 # Time travel to any version
@@ -313,12 +315,12 @@ unifieddataruntime/
 │           ├── entry.rs         # ChangelogEntry, TableChange
 │           └── query.rs         # ChangelogQuery builder
 │
-├── udr_python/                   # PyO3 bindings
+├── udr_python/                   # PyO3 bindings (builds 'armillaria' module)
 │   └── src/lib.rs               # Python interface
 │
 ├── python/                       # Python packages
-│   ├── udr.pyi                  # Type stubs for IDE support
-│   └── udr_query/               # Query layer
+│   ├── armillaria.pyi           # Type stubs for IDE support
+│   └── armillaria_query/        # Query layer
 │       ├── writer.py            # TableWriter (DataFrame → Parquet chunks)
 │       ├── reader.py            # TableReader (chunks → DataFrame)
 │       ├── engine.py            # QueryEngine (DuckDB + time travel + transactions)
@@ -326,7 +328,7 @@ unifieddataruntime/
 │       └── subscriber.py        # Subscriber for changelog events (Phase 6)
 │
 ├── tests/                        # Test suites
-│   ├── test_udr.py              # Core Rust binding tests (20 tests)
+│   ├── test_armillaria.py       # Core Rust binding tests (20 tests)
 │   ├── test_query_layer.py      # Query layer tests (26 tests)
 │   ├── test_branching.py        # Branching tests (20 tests)
 │   ├── test_branch_query_integration.py  # Branch+Query integration (15 tests)
@@ -362,7 +364,7 @@ unifieddataruntime/
 
 Based on the technical whitepaper analysis:
 
-| Metric | Current State | With UDR |
+| Metric | Current State | With Armillaria |
 |--------|--------------|----------|
 | Data engineering overhead | 60-80% on integration | Focus on insights |
 | Storage efficiency | Multiple copies per system | 60-85% deduplication |
@@ -393,8 +395,8 @@ See [udr_roadmap.md](./udr_roadmap.md) for the complete development roadmap.
 
 ## References
 
-- [UDR Action Plan](./UDR_ACTION_PLAN.md) - Comprehensive roadmap and strategy
-- [Origin Story](./ORIGIN_STORY.md) - Why I built UDR
+- [Armillaria Action Plan](./UDR_ACTION_PLAN.md) - Comprehensive roadmap and strategy
+- [Origin Story](./ORIGIN_STORY.md) - Why I built Armillaria
 - [Technical Whitepaper](./unified_data_runtime_whitepaper.docx) - Full architectural specification
 - [BLAKE3](https://github.com/BLAKE3-team/BLAKE3) - Cryptographic hash function
 - [DuckDB](https://duckdb.org/) - Analytical SQL engine

@@ -828,7 +828,7 @@ impl PyTransactionManager {
 }
 
 #[pymodule]
-fn udr(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn armillaria(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Core storage
     m.add_class::<PyChunkStore>()?;
     m.add_class::<PyTableVersion>()?;

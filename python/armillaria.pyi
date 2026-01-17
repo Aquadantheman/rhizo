@@ -1,4 +1,4 @@
-"""Type stubs for the udr Rust extension module."""
+"""Type stubs for the armillaria Rust extension module."""
 
 from typing import List, Dict, Optional, Tuple
 

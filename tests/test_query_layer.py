@@ -1,9 +1,9 @@
 """
-Tests for the UDR Query Layer.
+Tests for the Armillaria Query Layer.
 
 Run with: pytest tests/test_query_layer.py -v
 Requires:
-    - maturin develop (build udr extension)
+    - maturin develop (build armillaria extension)
     - pip install pyarrow duckdb pandas pytest
 """
 
@@ -15,20 +15,20 @@ import pytest
 import pyarrow as pa
 import pandas as pd
 
-# Import UDR components - conftest.py adds python/ to sys.path
-import udr
-from udr_query import TableWriter, TableReader, QueryEngine
+# Import Armillaria components - conftest.py adds python/ to sys.path
+import armillaria
+from armillaria_query import TableWriter, TableReader, QueryEngine
 
 
 @pytest.fixture
 def temp_storage():
     """Create temporary storage directories for testing."""
-    base_dir = tempfile.mkdtemp(prefix="udr_query_test_")
+    base_dir = tempfile.mkdtemp(prefix="armillaria_query_test_")
     chunks_dir = os.path.join(base_dir, "chunks")
     catalog_dir = os.path.join(base_dir, "catalog")
 
-    store = udr.PyChunkStore(chunks_dir)
-    catalog = udr.PyCatalog(catalog_dir)
+    store = armillaria.PyChunkStore(chunks_dir)
+    catalog = armillaria.PyCatalog(catalog_dir)
 
     yield store, catalog, base_dir
 

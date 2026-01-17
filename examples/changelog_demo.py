@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Unified Batch/Stream Demo - Showcase UDR's changelog and subscription capabilities.
+Unified Batch/Stream Demo - Showcase Armillaria's changelog and subscription capabilities.
 
-This demo shows the key innovation of UDR: unified batch and stream semantics.
+This demo shows the key innovation of Armillaria: unified batch and stream semantics.
 Instead of separate systems for "what is the data?" and "what changed?",
-UDR provides both through a single, consistent interface.
+Armillaria provides both through a single, consistent interface.
 
 The Five Patterns Demonstrated:
 1. Batch Query: "What is the current state?"
@@ -29,9 +29,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
 import pandas as pd
 
-# Import UDR components
-import udr
-from udr_query import QueryEngine, Subscriber, ChangeEvent
+# Import Armillaria components
+import armillaria
+from armillaria_query import QueryEngine, Subscriber, ChangeEvent
 
 
 def print_section(title: str):
@@ -48,16 +48,16 @@ def print_subsection(title: str):
 
 def main():
     # Create temporary storage
-    temp_dir = tempfile.mkdtemp(prefix="udr_changelog_demo_")
+    temp_dir = tempfile.mkdtemp(prefix="armillaria_changelog_demo_")
     chunks_dir = os.path.join(temp_dir, "chunks")
     catalog_dir = os.path.join(temp_dir, "catalog")
     branches_dir = os.path.join(temp_dir, "branches")
     tx_dir = os.path.join(temp_dir, "transactions")
 
-    print_section("UDR Unified Batch/Stream Demo")
+    print_section("Armillaria Unified Batch/Stream Demo")
     print(f"Storage location: {temp_dir}")
     print("""
-This demo shows how UDR unifies batch and streaming workloads:
+This demo shows how Armillaria unifies batch and streaming workloads:
 
   BATCH:  "What is the state?"     -> engine.query()
   STREAM: "What changed?"          -> engine.get_changes() / engine.subscribe()
@@ -66,11 +66,11 @@ Same data. Same guarantees. One system.
 """)
 
     try:
-        # Initialize UDR components with full transaction support
-        store = udr.PyChunkStore(chunks_dir)
-        catalog = udr.PyCatalog(catalog_dir)
-        branches = udr.PyBranchManager(branches_dir)
-        tx_manager = udr.PyTransactionManager(tx_dir, catalog_dir, branches_dir)
+        # Initialize Armillaria components with full transaction support
+        store = armillaria.PyChunkStore(chunks_dir)
+        catalog = armillaria.PyCatalog(catalog_dir)
+        branches = armillaria.PyBranchManager(branches_dir)
+        tx_manager = armillaria.PyTransactionManager(tx_dir, catalog_dir, branches_dir)
 
         engine = QueryEngine(
             store, catalog,
@@ -288,9 +288,9 @@ This pattern enables:
         print_section("Summary: Unified Batch/Stream")
 
         print("""
-UDR provides BOTH batch and stream semantics through ONE system:
+Armillaria provides BOTH batch and stream semantics through ONE system:
 
-  BEFORE UDR (fragmented):
+  BEFORE Armillaria (fragmented):
   +-----------------+     +------------------+
   |   PostgreSQL    | --> |      Kafka       | --> downstream
   | (current state) |     | (change events)  |
@@ -300,9 +300,9 @@ UDR provides BOTH batch and stream semantics through ONE system:
     Batch queries          Stream processing
     (different API)        (different API)
 
-  WITH UDR (unified):
+  WITH Armillaria (unified):
   +------------------------------------------+
-  |                   UDR                     |
+  |                   Armillaria                |
   |                                          |
   |  engine.query()     ->  "What is state?" |
   |  engine.get_changes() -> "What changed?" |

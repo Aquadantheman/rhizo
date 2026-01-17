@@ -1,10 +1,11 @@
 [package]
-name = "udr_python"
+name = "armillaria_python"
 version = "0.1.0"
 edition = "2021"
+description = "The largest organism on Earth, now for your data - content-addressable storage with cross-table ACID transactions"
 
 [lib]
-name = "udr"
+name = "armillaria"
 crate-type = ["cdylib"]
 
 [dependencies]

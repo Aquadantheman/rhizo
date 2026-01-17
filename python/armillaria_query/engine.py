@@ -25,7 +25,7 @@ from .writer import TableWriter, WriteResult
 
 if TYPE_CHECKING:
     import pandas as pd
-    import udr
+    import armillaria
     from .transaction import TransactionContext
     from .subscriber import Subscriber
 
@@ -62,12 +62,12 @@ class QueryEngine:
     """
     SQL query engine with time travel and branching support.
 
-    Provides a DuckDB-based SQL interface over versioned UDR tables.
+    Provides a DuckDB-based SQL interface over versioned Armillaria tables.
     Tables are loaded on-demand and cached for performance.
 
     Example:
-        >>> from udr import PyChunkStore, PyCatalog, PyBranchManager
-        >>> from udr_query import QueryEngine
+        >>> from armillaria import PyChunkStore, PyCatalog, PyBranchManager
+        >>> from armillaria_query import QueryEngine
         >>>
         >>> store = PyChunkStore("./data/chunks")
         >>> catalog = PyCatalog("./data/catalog")
@@ -104,11 +104,11 @@ class QueryEngine:
 
     def __init__(
         self,
-        store: "udr.PyChunkStore",
-        catalog: "udr.PyCatalog",
+        store: "armillaria.PyChunkStore",
+        catalog: "armillaria.PyCatalog",
         verify_integrity: bool = False,
-        branch_manager: Optional["udr.PyBranchManager"] = None,
-        transaction_manager: Optional["udr.PyTransactionManager"] = None,
+        branch_manager: Optional["armillaria.PyBranchManager"] = None,
+        transaction_manager: Optional["armillaria.PyTransactionManager"] = None,
     ):
         """
         Initialize the QueryEngine.

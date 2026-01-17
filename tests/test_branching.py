@@ -1,5 +1,5 @@
 """
-Tests for UDR Branching functionality.
+Tests for Armillaria Branching functionality.
 
 Run with: pytest tests/test_branching.py -v
 """
@@ -10,16 +10,16 @@ import shutil
 
 import pytest
 
-import udr
+import armillaria
 
 
 @pytest.fixture
 def temp_storage():
     """Create temporary storage directories for testing."""
-    base_dir = tempfile.mkdtemp(prefix="udr_branch_test_")
+    base_dir = tempfile.mkdtemp(prefix="armillaria_branch_test_")
     branches_dir = os.path.join(base_dir, "branches")
 
-    manager = udr.PyBranchManager(branches_dir)
+    manager = armillaria.PyBranchManager(branches_dir)
 
     yield manager, base_dir
 

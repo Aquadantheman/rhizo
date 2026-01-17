@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "udr-query"
+name = "armillaria-query"
 version = "0.1.0"
-description = "Query layer for Unified Data Runtime"
+description = "Query layer for Armillaria - The largest organism on Earth, now for your data"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -22,3 +22,4 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["armillaria_query*"]

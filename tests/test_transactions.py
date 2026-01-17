@@ -1,5 +1,5 @@
 """
-Tests for UDR Transaction functionality (Phase 5.1).
+Tests for Armillaria Transaction functionality (Phase 5.1).
 
 Run with: pytest tests/test_transactions.py -v
 
@@ -20,23 +20,23 @@ import shutil
 import pytest
 import pandas as pd
 
-import udr
-from udr_query import QueryEngine, TransactionContext
+import armillaria
+from armillaria_query import QueryEngine, TransactionContext
 
 
 @pytest.fixture
 def temp_storage():
     """Create temporary storage directories for testing."""
-    base_dir = tempfile.mkdtemp(prefix="udr_tx_test_")
+    base_dir = tempfile.mkdtemp(prefix="armillaria_tx_test_")
     chunks_dir = os.path.join(base_dir, "chunks")
     catalog_dir = os.path.join(base_dir, "catalog")
     branches_dir = os.path.join(base_dir, "branches")
     tx_dir = os.path.join(base_dir, "transactions")
 
-    store = udr.PyChunkStore(chunks_dir)
-    catalog = udr.PyCatalog(catalog_dir)
-    branches = udr.PyBranchManager(branches_dir)
-    tx_manager = udr.PyTransactionManager(tx_dir, catalog_dir, branches_dir)
+    store = armillaria.PyChunkStore(chunks_dir)
+    catalog = armillaria.PyCatalog(catalog_dir)
+    branches = armillaria.PyBranchManager(branches_dir)
+    tx_manager = armillaria.PyTransactionManager(tx_dir, catalog_dir, branches_dir)
 
     yield store, catalog, branches, tx_manager, base_dir
 

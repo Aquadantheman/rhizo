@@ -34,7 +34,7 @@ class TableMetadata:
 
 class TableReader:
     """
-    Reads versioned tables from UDR storage.
+    Reads versioned tables from Armillaria storage.
 
     Supports:
     - Reading specific versions (time travel)
@@ -43,8 +43,8 @@ class TableReader:
     - Full table materialization
 
     Example:
-        >>> from udr import PyChunkStore, PyCatalog
-        >>> from udr_query import TableReader
+        >>> from armillaria import PyChunkStore, PyCatalog
+        >>> from armillaria_query import TableReader
         >>>
         >>> store = PyChunkStore("./data/chunks")
         >>> catalog = PyCatalog("./data/catalog")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Time Travel Demo - Showcase UDR's versioning and query capabilities.
+Time Travel Demo - Showcase Armillaria's versioning and query capabilities.
 
 This demo shows:
 1. Writing data with automatic versioning
@@ -22,9 +22,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
 import pandas as pd
 
-# Import UDR components
-import udr
-from udr_query import QueryEngine
+# Import Armillaria components
+import armillaria
+from armillaria_query import QueryEngine
 
 
 def print_section(title: str):
@@ -36,17 +36,17 @@ def print_section(title: str):
 
 def main():
     # Create temporary storage
-    temp_dir = tempfile.mkdtemp(prefix="udr_demo_")
+    temp_dir = tempfile.mkdtemp(prefix="armillaria_demo_")
     chunks_dir = os.path.join(temp_dir, "chunks")
     catalog_dir = os.path.join(temp_dir, "catalog")
 
-    print_section("UDR Time Travel Demo")
+    print_section("Armillaria Time Travel Demo")
     print(f"Storage location: {temp_dir}")
 
     try:
-        # Initialize UDR components
-        store = udr.PyChunkStore(chunks_dir)
-        catalog = udr.PyCatalog(catalog_dir)
+        # Initialize Armillaria components
+        store = armillaria.PyChunkStore(chunks_dir)
+        catalog = armillaria.PyCatalog(catalog_dir)
         engine = QueryEngine(store, catalog)
 
         # =================================================================
