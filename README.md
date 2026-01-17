@@ -3,7 +3,7 @@
 **A next-generation data infrastructure that unifies transactional, analytical, and streaming workloads through content-addressable storage, cross-table ACID transactions, and Git-like versioning.**
 
 [![Rust Tests](https://img.shields.io/badge/tests-110%20passed-brightgreen)]()
-[![Python Tests](https://img.shields.io/badge/python%20tests-109%20passed-brightgreen)]()
+[![Python Tests](https://img.shields.io/badge/python%20tests-131%20passed-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
 ## Why UDR?
@@ -34,7 +34,7 @@ UDR eliminates this fragmentation through five foundational innovations:
 | Phase 2: Catalog | ✅ Complete | Versioned file catalog with time travel |
 | Phase 3: Query | ✅ Complete | DuckDB integration with SQL + time travel |
 | Phase 4: Branching | ✅ Complete | Git-like branching with zero-copy semantics |
-| Phase 5: Transactions | 🚧 In Progress | Cross-table ACID with MVCC (Phase 5.0-5.1 complete, Recovery remaining) |
+| Phase 5: Transactions | ✅ Complete | Cross-table ACID with recovery & robustness |
 | Phase 6: Changelog | ⏳ Planned | Unified batch/stream via subscriptions |
 
 ## Architecture
@@ -267,7 +267,7 @@ latest = catalog.get_version("users")  # Gets latest
 # Run all Rust tests (110 tests)
 cargo test --all
 
-# Run Python tests (81 tests)
+# Run Python tests (131 tests)
 pytest tests/ -v
 ```
 
@@ -311,13 +311,16 @@ unifieddataruntime/
 │   └── udr_query/               # Query layer
 │       ├── writer.py            # TableWriter (DataFrame → Parquet chunks)
 │       ├── reader.py            # TableReader (chunks → DataFrame)
-│       └── engine.py            # QueryEngine (DuckDB + time travel)
+│       ├── engine.py            # QueryEngine (DuckDB + time travel + transactions)
+│       └── transaction.py       # TransactionContext for ACID transactions
 │
 ├── tests/                        # Test suites
 │   ├── test_udr.py              # Core Rust binding tests (20 tests)
 │   ├── test_query_layer.py      # Query layer tests (26 tests)
 │   ├── test_branching.py        # Branching tests (20 tests)
-│   └── test_branch_query_integration.py  # Branch+Query integration (15 tests)
+│   ├── test_branch_query_integration.py  # Branch+Query integration (15 tests)
+│   ├── test_transactions.py     # Transaction tests (28 tests)
+│   └── test_recovery.py         # Recovery tests (22 tests)
 │
 └── examples/
     └── time_travel_demo.py      # Interactive demo
@@ -359,11 +362,11 @@ Based on the technical whitepaper analysis:
 
 See [udr_roadmap.md](./udr_roadmap.md) for the complete development roadmap.
 
-**Next milestone (Phase 5.1: Transaction Integration):**
-- Python context manager for transactions
-- QueryEngine integration with transaction support
-- Read-your-writes within transaction scope
-- Automatic rollback on exceptions
+**Next milestone (Phase 6: Changelog & Subscriptions):**
+- ChangelogEntry for each commit
+- Subscriber API for change notifications
+- Query changes since version/timestamp
+- Unified batch/stream semantics
 
 ## References
 
