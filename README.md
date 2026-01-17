@@ -6,8 +6,8 @@ Armillaria is a next-generation data infrastructure that unifies transactional, 
 
 [![CI](https://github.com/aquadantheman/unifieddataruntime/actions/workflows/ci.yml/badge.svg)](https://github.com/aquadantheman/unifieddataruntime/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-160%20tests-blue)](https://github.com/aquadantheman/unifieddataruntime)
-[![Python](https://img.shields.io/badge/python-173%20tests-blue)](https://github.com/aquadantheman/unifieddataruntime)
+[![Rust](https://img.shields.io/badge/rust-173%20tests-blue)](https://github.com/aquadantheman/unifieddataruntime)
+[![Python](https://img.shields.io/badge/python-179%20tests-blue)](https://github.com/aquadantheman/unifieddataruntime)
 
 ---
 
@@ -40,16 +40,30 @@ Armillaria replaces the architecture that makes these limitations inevitable.
 
 ## Benchmarks
 
-Measured on commodity hardware (results from running `examples/`):
+### Performance vs Competitors (100K rows)
+
+| Metric | Armillaria | Delta Lake | Iceberg | Hudi | Winner |
+|--------|------------|------------|---------|------|--------|
+| **Write** | **59.8ms** (211 MB/s) | 53.4ms | 115.2ms | 46.9ms | Competitive |
+| **Read** | 69.0ms (183 MB/s) | **34.6ms** | 72.5ms | N/A | Delta Lake |
+| **Versioning** (5 ver) | **213.8ms** | 216.8ms | 428.8ms | N/A | **Armillaria** |
+| **Storage** (5 ver) | **9.93 MB** (84%) | 14.70 MB (77%) | 11.11 MB (82%) | N/A | **Armillaria** |
+| **Branching** | **7.5ms, 280 bytes** | 14.5ms, 14.70 MB | N/A | N/A | **Armillaria** |
+
+**Key Wins:**
+- **52,500x better** branching overhead (280 bytes vs 14.70 MB)
+- **84% storage deduplication** (best in class)
+- **Competitive write speed** with native Rust Parquet encoding
+
+### Core Operations
 
 | Operation | Performance | Notes |
 |-----------|-------------|-------|
-| Write throughput | 2,278 MB/s | BLAKE3 hashing + file write |
-| Read + verify | 579 MB/s | Includes integrity verification |
-| Branch creation | <1 ms | 50,000 rows, 176 bytes overhead |
-| Identical content dedup | 5x | Same data stored once |
+| Write throughput | 211 MB/s | Native Rust Parquet encoding |
+| Read throughput | 183 MB/s | Zero-copy Arrow FFI |
+| Branch creation | <10 ms | Zero-copy, 280 bytes overhead |
+| Time travel query | ~26 ms | O(1) version lookup |
 | Incremental dedup | 95% reuse | 5% change = 95% chunk reuse |
-| Storage efficiency | 462 KB | 50,000 rows with indexes |
 
 ### Incremental Deduplication (Merkle Tree Storage)
 
@@ -61,15 +75,20 @@ Measured on commodity hardware (results from running `examples/`):
 
 **O(change) storage** instead of O(n) per version.
 
-### Comparison
+### Feature Comparison
 
 | Feature | Armillaria | Delta Lake | Iceberg | Hudi |
 |---------|------------|------------|---------|------|
-| Cross-table ACID | Yes | No | No | No |
-| Zero-copy branching | Yes | No | No | No |
-| Global deduplication | Yes | No | No | No |
-| Corruption detection | Built-in | External | External | External |
-| Time travel | O(1) | O(log n) | O(log n) | O(log n) |
+| **Cross-table ACID** | **Yes** | No | No | No |
+| **Zero-copy branching** | **Yes** | No | No* | No |
+| **Global deduplication** | **Yes** | No | No | No |
+| **Merkle tree dedup** | **Yes** | No | No | No |
+| **Corruption detection** | **Built-in** | External | External | External |
+| Time travel | Yes | Yes | Yes | Yes |
+| SQL Query Engine | Yes | Yes | Yes | Yes |
+| Cloud Storage | Planned | Yes | Yes | Yes |
+
+*Iceberg branching requires Nessie catalog
 
 ---
 
@@ -182,14 +201,20 @@ Application Layer
 | Phase 5: Transactions | Cross-table ACID with recovery | Complete |
 | Phase 6: Changelog | Unified batch/stream via subscriptions | Complete |
 | Phase A: Merkle Storage | O(change) deduplication via Merkle trees | Complete |
-| **Phase P: Performance** | Parallel I/O, batch operations | **In Progress** |
+| **Phase P: Performance** | Native Rust Parquet, parallel I/O | **Complete** |
 
-All core phases complete. 333 tests passing (160 Rust + 173 Python).
+**All phases complete. 352 tests passing (173 Rust + 179 Python).**
 
-Performance optimization in progress:
-- Phase P.1: Parallel chunk I/O with Rayon - Complete
-- Phase P.2: Memory-mapped reads - Complete
-- Phase P.3: Parallel Parquet parsing - Complete (2.1x speedup, **1.6x faster than Delta Lake reads**)
+### Performance Optimization Journey
+
+| Phase | Optimization | Result |
+|-------|-------------|--------|
+| P.1 | Parallel chunk I/O (Rayon) | 3-5x batch throughput |
+| P.2 | Memory-mapped reads | Infrastructure for zero-copy |
+| P.3 | Parallel Parquet parsing | 2.1x multi-chunk speedup |
+| **P.4** | **Native Rust Parquet encoder** | **2.3x write improvement** |
+
+Phase P.4 moved Parquet encoding from Python to Rust using `arrow-rs`, `parquet`, and `pyo3-arrow` for zero-copy Arrow FFI. Result: competitive with Delta Lake on writes.
 
 ---
 

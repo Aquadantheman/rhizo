@@ -4,7 +4,7 @@ TableReader - Read versioned tables from content-addressable storage.
 The reader handles:
 1. Fetching table version metadata from the catalog
 2. Retrieving chunks from the content-addressable store
-3. Deserializing Parquet chunks to Arrow
+3. Deserializing Parquet chunks to Arrow (PyArrow or native Rust decoder)
 4. Optionally concatenating into a single table
 """
 
@@ -20,6 +20,13 @@ import pyarrow.parquet as pq
 
 if TYPE_CHECKING:
     import pandas as pd
+
+# Try to import native Parquet decoder (Phase 4)
+try:
+    from armillaria import PyParquetDecoder
+    _NATIVE_PARQUET_AVAILABLE = True
+except ImportError:
+    _NATIVE_PARQUET_AVAILABLE = False
 
 
 @dataclass
@@ -69,6 +76,7 @@ class TableReader:
         verify_integrity: bool = False,
         use_mmap: bool = False,
         parallel_workers: Optional[int] = None,
+        use_native_parquet: bool = True,
     ):
         """
         Initialize the TableReader.
@@ -82,12 +90,20 @@ class TableReader:
             parallel_workers: Number of threads for parallel Parquet parsing.
                              None (default) = sequential parsing.
                              Set to number of CPU cores for best multi-chunk performance.
+            use_native_parquet: Use Rust-native Parquet decoder for better performance
+                               (default True, falls back to PyArrow if unavailable)
         """
         self.store = store
         self.catalog = catalog
         self.verify_integrity = verify_integrity
         self.use_mmap = use_mmap
         self.parallel_workers = parallel_workers
+        self.use_native_parquet = use_native_parquet and _NATIVE_PARQUET_AVAILABLE
+
+        # Initialize native decoder if available and requested
+        self._native_decoder = None
+        if self.use_native_parquet:
+            self._native_decoder = PyParquetDecoder()
 
     def get_metadata(
         self,
@@ -225,6 +241,13 @@ class TableReader:
 
     def _parquet_to_arrow(self, data: bytes) -> pa.Table:
         """Deserialize Parquet bytes to Arrow Table."""
+        if self._native_decoder is not None:
+            # Use native Rust decoder for better performance
+            # Decoder returns RecordBatch, convert to Table
+            batch = self._native_decoder.decode(data)
+            return pa.Table.from_batches([batch])
+
+        # Fallback to PyArrow
         buffer = io.BytesIO(data)
         return pq.read_table(buffer)
 

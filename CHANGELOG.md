@@ -5,6 +5,42 @@ All notable changes to Armillaria will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-01-17
+
+### Added
+
+#### Native Rust Parquet Encoding (Phase P.4)
+- Native Parquet encoder using `arrow-rs` and `parquet` crates
+- Native Parquet decoder with parallel batch support via Rayon
+- Zero-copy Arrow FFI between Python and Rust using `pyo3-arrow`
+- `PyParquetEncoder` and `PyParquetDecoder` Python bindings
+- `use_native_parquet` flag for TableWriter and TableReader (default: True)
+
+#### Merkle Tree Storage (Phase A)
+- Content-addressed Merkle tree for incremental deduplication
+- O(change) storage instead of O(n) per version
+- 95% chunk reuse for 5% data changes
+- `merkle_build_tree`, `merkle_diff_trees`, `merkle_verify_tree` functions
+
+### Changed
+- TableWriter now uses Rust Parquet encoder by default (2.3x faster)
+- TableReader now uses Rust Parquet decoder by default
+- Upgraded `pyo3` from 0.23 to 0.27 for pyo3-arrow compatibility
+
+### Performance
+- **Write throughput**: ~90 MB/s → **211 MB/s** (2.3x improvement)
+- **Write time (100K rows)**: ~143ms → **59.8ms**
+- **Competitive with Delta Lake** on write performance
+- **84% storage deduplication** (best in class vs 77% Delta Lake)
+- **52,500x better branching overhead** (280 bytes vs 14.70 MB)
+
+### Testing
+- 173 Rust tests (+13 new Parquet tests)
+- 179 Python tests (+6 new Parquet tests)
+- Full competition benchmark against Delta Lake, Iceberg, and Hudi
+
+---
+
 ## [0.1.0] - 2025-01-17
 
 ### Added

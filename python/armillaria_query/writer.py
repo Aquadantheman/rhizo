@@ -4,7 +4,7 @@ TableWriter - Write DataFrames/Arrow tables as versioned, chunked Parquet.
 The writer handles:
 1. Converting input data to Arrow format
 2. Chunking large tables for efficient storage
-3. Serializing chunks as Parquet
+3. Serializing chunks as Parquet (PyArrow or native Rust encoder)
 4. Storing chunks in the content-addressable store
 5. Committing table versions to the catalog
 """
@@ -20,6 +20,13 @@ import pyarrow.parquet as pq
 
 if TYPE_CHECKING:
     import pandas as pd
+
+# Try to import native Parquet encoder (Phase 4)
+try:
+    from armillaria import PyParquetEncoder
+    _NATIVE_PARQUET_AVAILABLE = True
+except ImportError:
+    _NATIVE_PARQUET_AVAILABLE = False
 
 
 # Default chunk size: 64MB uncompressed (will be smaller after Parquet compression)
@@ -80,6 +87,7 @@ class TableWriter:
         catalog,  # PyCatalog
         chunk_size_bytes: int = DEFAULT_CHUNK_SIZE_BYTES,
         chunk_size_rows: Optional[int] = None,
+        use_native_parquet: bool = True,
     ):
         """
         Initialize the TableWriter.
@@ -89,11 +97,19 @@ class TableWriter:
             catalog: PyCatalog instance for version metadata
             chunk_size_bytes: Target size per chunk in bytes (default 64MB)
             chunk_size_rows: Optional fixed row count per chunk (overrides byte-based)
+            use_native_parquet: Use Rust-native Parquet encoder for better performance
+                               (default True, falls back to PyArrow if unavailable)
         """
         self.store = store
         self.catalog = catalog
         self.chunk_size_bytes = chunk_size_bytes
         self.chunk_size_rows = chunk_size_rows
+        self.use_native_parquet = use_native_parquet and _NATIVE_PARQUET_AVAILABLE
+
+        # Initialize native encoder if available and requested
+        self._native_encoder = None
+        if self.use_native_parquet:
+            self._native_encoder = PyParquetEncoder("zstd")
 
     def write(
         self,
@@ -275,6 +291,13 @@ class TableWriter:
 
     def _to_parquet_bytes(self, table: pa.Table) -> bytes:
         """Serialize Arrow Table to Parquet bytes."""
+        if self._native_encoder is not None:
+            # Use native Rust encoder for better performance
+            # Convert Table to a single RecordBatch for encoding
+            batch = table.combine_chunks().to_batches()[0]
+            return bytes(self._native_encoder.encode(batch))
+
+        # Fallback to PyArrow
         buffer = io.BytesIO()
         pq.write_table(
             table,

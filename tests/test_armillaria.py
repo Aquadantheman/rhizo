@@ -465,3 +465,141 @@ class TestIntegration:
             version = catalog.get_version(table_name)
             data = store.get(version.chunk_hashes[0])
             assert data == f"data for {table_name}".encode()
+
+
+# =============================================================================
+# Phase 4: Native Parquet Encoder/Decoder Tests
+# =============================================================================
+
+class TestParquetEncoder:
+    """Tests for PyParquetEncoder (Rust Parquet encoding)."""
+
+    def test_encode_simple(self):
+        """Test basic encoding of a RecordBatch."""
+        import pyarrow as pa
+
+        encoder = armillaria.PyParquetEncoder()
+
+        # Create test data
+        ids = pa.array([1, 2, 3, 4, 5])
+        values = pa.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        batch = pa.RecordBatch.from_arrays([ids, values], names=["id", "value"])
+
+        # Encode
+        parquet_bytes = encoder.encode(batch)
+
+        # Verify we got valid Parquet (magic bytes)
+        assert parquet_bytes[:4] == b"PAR1"
+        assert len(parquet_bytes) > 0
+
+    def test_encode_with_compression(self):
+        """Test encoding with different compression types."""
+        import pyarrow as pa
+
+        ids = pa.array(list(range(1000)))
+        values = pa.array([float(i) for i in range(1000)])
+        batch = pa.RecordBatch.from_arrays([ids, values], names=["id", "value"])
+
+        compressions = ["zstd", "snappy", "none"]
+        sizes = []
+
+        for compression in compressions:
+            encoder = armillaria.PyParquetEncoder(compression)
+            parquet_bytes = encoder.encode(batch)
+            sizes.append(len(parquet_bytes))
+
+        # Uncompressed should be largest
+        assert sizes[2] > sizes[0]  # none > zstd
+
+    def test_encode_batch_parallel(self):
+        """Test parallel encoding of multiple batches."""
+        import pyarrow as pa
+
+        encoder = armillaria.PyParquetEncoder()
+
+        # Create multiple batches
+        batches = []
+        for i in range(10):
+            ids = pa.array(list(range(i * 100, (i + 1) * 100)))
+            values = pa.array([float(x) for x in range(100)])
+            batches.append(
+                pa.RecordBatch.from_arrays([ids, values], names=["id", "value"])
+            )
+
+        # Encode all in parallel
+        results = encoder.encode_batch(batches)
+
+        assert len(results) == 10
+        for r in results:
+            assert r[:4] == b"PAR1"
+
+
+class TestParquetDecoder:
+    """Tests for PyParquetDecoder (Rust Parquet decoding)."""
+
+    def test_decode_simple(self):
+        """Test basic decoding."""
+        import pyarrow as pa
+
+        # Create and encode test data
+        ids = pa.array([1, 2, 3, 4, 5])
+        values = pa.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        original = pa.RecordBatch.from_arrays([ids, values], names=["id", "value"])
+
+        encoder = armillaria.PyParquetEncoder()
+        parquet_bytes = encoder.encode(original)
+
+        # Decode
+        decoder = armillaria.PyParquetDecoder()
+        decoded = decoder.decode(parquet_bytes)
+
+        assert decoded.num_rows == original.num_rows
+        assert decoded.num_columns == original.num_columns
+
+    def test_roundtrip_data_integrity(self):
+        """Test that roundtrip preserves data exactly."""
+        import pyarrow as pa
+        import numpy as np
+
+        np.random.seed(42)
+
+        # Create test data with various types
+        ids = pa.array(list(range(1000)))
+        values = pa.array(np.random.random(1000))
+        names = pa.array([f"item_{i}" for i in range(1000)])
+        original = pa.RecordBatch.from_arrays(
+            [ids, values, names], names=["id", "value", "name"]
+        )
+
+        # Roundtrip
+        encoder = armillaria.PyParquetEncoder()
+        decoder = armillaria.PyParquetDecoder()
+        decoded = decoder.decode(encoder.encode(original))
+
+        # Verify data integrity
+        assert decoded.num_rows == 1000
+        orig_ids = original.column(0).to_pylist()
+        dec_ids = decoded.column(0).to_pylist()
+        assert orig_ids == dec_ids
+
+    def test_decode_batch_parallel(self):
+        """Test parallel decoding of multiple chunks."""
+        import pyarrow as pa
+
+        encoder = armillaria.PyParquetEncoder()
+        decoder = armillaria.PyParquetDecoder()
+
+        # Create and encode multiple batches
+        chunks = []
+        for i in range(10):
+            ids = pa.array(list(range(i * 100, (i + 1) * 100)))
+            values = pa.array([float(x) for x in range(100)])
+            batch = pa.RecordBatch.from_arrays([ids, values], names=["id", "value"])
+            chunks.append(encoder.encode(batch))
+
+        # Decode all in parallel
+        decoded = decoder.decode_batch(chunks)
+
+        assert len(decoded) == 10
+        for d in decoded:
+            assert d.num_rows == 100

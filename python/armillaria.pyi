@@ -1,6 +1,7 @@
 """Type stubs for the armillaria Rust extension module."""
 
 from typing import List, Dict, Optional, Tuple
+import pyarrow as pa
 
 class PyChunkStore:
     def __init__(self, path: str) -> None: ...
@@ -261,3 +262,79 @@ def merkle_verify_tree(
         ValueError: If integrity check fails
     """
     ...
+
+# =============================================================================
+# Phase 4: Native Parquet Encoder/Decoder
+# =============================================================================
+
+class PyParquetEncoder:
+    """High-performance Parquet encoder using Rust's parquet crate.
+
+    Provides zero-copy Arrow data transfer from Python via pyo3-arrow,
+    and parallel encoding of multiple batches using Rayon.
+    """
+
+    def __init__(self, compression: Optional[str] = None) -> None:
+        """Create a new encoder.
+
+        Args:
+            compression: Compression type ("zstd", "snappy", "gzip", "lz4", "none")
+                        Defaults to "zstd" for best compression/speed balance.
+        """
+        ...
+
+    def encode(self, batch: pa.RecordBatch) -> bytes:
+        """Encode an Arrow RecordBatch to Parquet bytes.
+
+        Args:
+            batch: PyArrow RecordBatch to encode (zero-copy transfer)
+
+        Returns:
+            Parquet-encoded bytes
+        """
+        ...
+
+    def encode_batch(self, batches: List[pa.RecordBatch]) -> List[bytes]:
+        """Encode multiple Arrow RecordBatches in parallel.
+
+        Args:
+            batches: List of PyArrow RecordBatches to encode
+
+        Returns:
+            List of Parquet-encoded bytes for each batch
+        """
+        ...
+
+
+class PyParquetDecoder:
+    """High-performance Parquet decoder using Rust's parquet crate.
+
+    Provides zero-copy Arrow data transfer to Python via pyo3-arrow,
+    and parallel decoding of multiple chunks using Rayon.
+    """
+
+    def __init__(self) -> None:
+        """Create a new decoder."""
+        ...
+
+    def decode(self, data: bytes) -> pa.RecordBatch:
+        """Decode Parquet bytes to an Arrow RecordBatch.
+
+        Args:
+            data: Parquet file bytes
+
+        Returns:
+            PyArrow RecordBatch (zero-copy transfer)
+        """
+        ...
+
+    def decode_batch(self, chunks: List[bytes]) -> List[pa.RecordBatch]:
+        """Decode multiple Parquet chunks in parallel.
+
+        Args:
+            chunks: List of Parquet byte arrays to decode
+
+        Returns:
+            List of PyArrow RecordBatches for each chunk
+        """
+        ...

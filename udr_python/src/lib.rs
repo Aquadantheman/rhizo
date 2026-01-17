@@ -9,9 +9,13 @@ use udr_core::{
     ChangelogEntry, TableChange, ChangelogQuery,
     MerkleTree, MerkleNode, DataChunk, MerkleDiff, MerkleConfig, MerkleError,
     build_tree, diff_trees, verify_tree,
+    ParquetEncoder, ParquetDecoder, ParquetCompression, ParquetError,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
+
+// Phase 4: pyo3-arrow for zero-copy Arrow FFI
+use pyo3_arrow::PyRecordBatch;
 
 /// Convert ChunkStoreError to appropriate Python exception
 fn chunk_err_to_py(e: ChunkStoreError) -> PyErr {
@@ -97,6 +101,138 @@ fn merkle_err_to_py(e: MerkleError) -> PyErr {
         MerkleError::ChunkStore(msg) => {
             PyIOError::new_err(format!("Chunk store error: {}", msg))
         }
+    }
+}
+
+/// Convert ParquetError to appropriate Python exception
+fn parquet_err_to_py(e: ParquetError) -> PyErr {
+    match e {
+        ParquetError::Arrow(e) => PyValueError::new_err(format!("Arrow error: {}", e)),
+        ParquetError::Parquet(e) => PyValueError::new_err(format!("Parquet error: {}", e)),
+        ParquetError::EmptyData => PyValueError::new_err("Cannot process empty data"),
+        ParquetError::InvalidCompression(c) => {
+            PyValueError::new_err(format!("Invalid compression: {}", c))
+        }
+    }
+}
+
+// =============================================================================
+// Phase 4: Native Parquet Encoder/Decoder with Zero-Copy Arrow FFI
+// =============================================================================
+
+/// High-performance Parquet encoder using Rust's parquet crate.
+///
+/// Provides zero-copy Arrow data transfer from Python via pyo3-arrow,
+/// and parallel encoding of multiple batches using Rayon.
+#[pyclass]
+struct PyParquetEncoder {
+    inner: ParquetEncoder,
+}
+
+#[pymethods]
+impl PyParquetEncoder {
+    /// Create a new encoder.
+    ///
+    /// Args:
+    ///     compression: Compression type ("zstd", "snappy", "gzip", "lz4", "none")
+    ///                  Defaults to "zstd" for best compression/speed balance.
+    #[new]
+    #[pyo3(signature = (compression = None))]
+    fn new(compression: Option<&str>) -> PyResult<Self> {
+        let compression = match compression {
+            Some(c) => ParquetCompression::from_str(c).map_err(parquet_err_to_py)?,
+            None => ParquetCompression::Zstd,
+        };
+        Ok(Self {
+            inner: ParquetEncoder::with_compression(compression),
+        })
+    }
+
+    /// Encode an Arrow RecordBatch to Parquet bytes.
+    ///
+    /// Args:
+    ///     batch: PyArrow RecordBatch to encode (zero-copy transfer)
+    ///
+    /// Returns:
+    ///     bytes: Parquet-encoded data
+    fn encode(&self, batch: PyRecordBatch) -> PyResult<Vec<u8>> {
+        let rust_batch = batch.into_inner();
+        self.inner.encode(&rust_batch).map_err(parquet_err_to_py)
+    }
+
+    /// Encode multiple Arrow RecordBatches in parallel.
+    ///
+    /// Uses Rayon for parallel encoding, significantly faster than
+    /// encoding batches sequentially.
+    ///
+    /// Args:
+    ///     batches: List of PyArrow RecordBatches to encode
+    ///
+    /// Returns:
+    ///     List[bytes]: Parquet-encoded data for each batch
+    fn encode_batch(&self, batches: Vec<PyRecordBatch>) -> PyResult<Vec<Vec<u8>>> {
+        let rust_batches: Vec<_> = batches.into_iter().map(|b| b.into_inner()).collect();
+        self.inner
+            .encode_batch(&rust_batches)
+            .map_err(parquet_err_to_py)
+    }
+}
+
+/// High-performance Parquet decoder using Rust's parquet crate.
+///
+/// Provides zero-copy Arrow data transfer to Python via pyo3-arrow,
+/// and parallel decoding of multiple chunks using Rayon.
+#[pyclass]
+struct PyParquetDecoder {
+    inner: ParquetDecoder,
+}
+
+#[pymethods]
+impl PyParquetDecoder {
+    /// Create a new decoder.
+    #[new]
+    fn new() -> Self {
+        Self {
+            inner: ParquetDecoder::new(),
+        }
+    }
+
+    /// Decode Parquet bytes to an Arrow RecordBatch.
+    ///
+    /// Args:
+    ///     data: Parquet file bytes
+    ///
+    /// Returns:
+    ///     PyArrow RecordBatch (zero-copy transfer)
+    fn decode<'py>(&self, py: Python<'py>, data: &[u8]) -> PyResult<Bound<'py, PyAny>> {
+        let batch = self.inner.decode(data).map_err(parquet_err_to_py)?;
+        PyRecordBatch::new(batch).into_pyarrow(py)
+    }
+
+    /// Decode multiple Parquet chunks in parallel.
+    ///
+    /// Uses Rayon for parallel decoding, significantly faster than
+    /// decoding chunks sequentially.
+    ///
+    /// Args:
+    ///     chunks: List of Parquet byte arrays to decode
+    ///
+    /// Returns:
+    ///     List[RecordBatch]: PyArrow RecordBatches for each chunk
+    fn decode_batch<'py>(
+        &self,
+        py: Python<'py>,
+        chunks: Vec<Vec<u8>>,
+    ) -> PyResult<Vec<Bound<'py, PyAny>>> {
+        let batches = self
+            .inner
+            .decode_batch_owned(&chunks)
+            .map_err(parquet_err_to_py)?;
+
+        batches
+            .into_iter()
+            .map(|batch| PyRecordBatch::new(batch).into_pyarrow(py))
+            .collect()
     }
 }
 
@@ -1304,6 +1440,10 @@ fn armillaria(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(merkle_build_tree, m)?)?;
     m.add_function(wrap_pyfunction!(merkle_diff_trees, m)?)?;
     m.add_function(wrap_pyfunction!(merkle_verify_tree, m)?)?;
+
+    // Phase 4: Native Parquet (zero-copy Arrow FFI)
+    m.add_class::<PyParquetEncoder>()?;
+    m.add_class::<PyParquetDecoder>()?;
 
     Ok(())
 }
