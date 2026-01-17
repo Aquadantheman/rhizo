@@ -14,5 +14,9 @@ uuid = { workspace = true }
 rayon = { workspace = true }
 memmap2 = { workspace = true }
 
+# Phase 4: Native Arrow/Parquet
+arrow = { workspace = true }
+parquet = { workspace = true }
+
 [dev-dependencies]
 tempfile = { workspace = true }

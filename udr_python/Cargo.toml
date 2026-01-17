@@ -9,5 +9,8 @@ name = "armillaria"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.23", features = ["extension-module"] }
+pyo3 = { version = "0.27", features = ["extension-module"] }
 udr_core = { path = "../udr_core" }
+
+# Phase 4: Native Arrow/Parquet with zero-copy FFI
+pyo3-arrow = "0.15"
