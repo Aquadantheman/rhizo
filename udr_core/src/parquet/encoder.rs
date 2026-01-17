@@ -3,6 +3,8 @@
 //! This module provides high-performance Parquet encoding using the Rust
 //! parquet crate, with support for parallel batch encoding via Rayon.
 
+use std::str::FromStr;
+
 use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
@@ -38,9 +40,12 @@ impl ParquetCompression {
             ParquetCompression::Zstd => Compression::ZSTD(Default::default()),
         }
     }
+}
 
-    /// Parse from string (for Python API).
-    pub fn from_str(s: &str) -> Result<Self, ParquetError> {
+impl FromStr for ParquetCompression {
+    type Err = ParquetError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "none" | "uncompressed" => Ok(ParquetCompression::Uncompressed),
             "snappy" => Ok(ParquetCompression::Snappy),

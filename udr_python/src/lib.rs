@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::Arc;
+
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyIOError, PyValueError, PyRuntimeError};
 use udr_core::{
@@ -11,8 +15,6 @@ use udr_core::{
     build_tree, diff_trees, verify_tree,
     ParquetEncoder, ParquetDecoder, ParquetCompression, ParquetError,
 };
-use std::collections::HashMap;
-use std::sync::Arc;
 
 // Phase 4: pyo3-arrow for zero-copy Arrow FFI
 use pyo3_arrow::PyRecordBatch;
