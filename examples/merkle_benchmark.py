@@ -191,7 +191,6 @@ def run_benchmark_suite():
             change_percentage=5,
             chunk_size_kb=chunk_kb,
         )
-        chunks_expected = int(10 * 1024 / chunk_kb)
         print(f"Chunk size={chunk_kb}KB: {result}")
 
     print()
@@ -232,9 +231,7 @@ def run_storage_comparison():
     print("=" * 80)
     print()
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        store = armillaria.PyChunkStore(tmpdir)
-
+    with tempfile.TemporaryDirectory():
         # Create 10MB of data
         data_size = 10 * 1024 * 1024
         original_data = generate_unique_data(data_size)
@@ -267,7 +264,7 @@ def run_storage_comparison():
 
         print(f"Original data:     {data_size / 1024 / 1024:.1f} MB ({chunks_v1} chunks)")
         print(f"Modified data:     {data_size / 1024 / 1024:.1f} MB ({tree2.chunk_count()} chunks)")
-        print(f"Change:            5%")
+        print("Change:            5%")
         print()
         print("WITHOUT Merkle (store full files):")
         print(f"  Version 1:       {data_size / 1024 / 1024:.1f} MB")
