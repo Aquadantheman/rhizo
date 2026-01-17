@@ -404,41 +404,314 @@ def read_arrow(self, table_name: str, version: Optional[int] = None) -> pa.Table
 
 ---
 
-## Phase 4: Native Arrow/Parquet (Optional)
+## Phase 4: Native Arrow/Parquet in Rust
 
-**Priority:** LOW (high effort)
-**Expected Gain:** 1.5× for Parquet-heavy workloads
-**Risk:** MEDIUM
-**Effort:** 8-16 hours
+**Priority:** HIGH (addresses main bottleneck)
+**Expected Gain:** 3-4x write speedup, closing gap with Delta Lake
+**Risk:** MEDIUM (complex FFI, but pyo3-arrow simplifies it)
+**Effort:** 12-20 hours
+**Status:** PLANNING
 
-### Overview
+### Why Phase 4 is Needed
 
-Move Parquet encoding/decoding to Rust using arrow-rs and parquet crates. This eliminates Python GIL contention.
+Bottleneck analysis (500K rows, 10 chunks):
 
-### Implementation Sketch
+| Operation | Time | % of Total | Notes |
+|-----------|------|------------|-------|
+| Arrow to Parquet (write) | 98.6 ms | **69%** | Main bottleneck |
+| DataFrame to Arrow | 41.5 ms | 29% | PyArrow optimized |
+| Store put | 2.1 ms | 1.5% | Already fast |
+| Parquet to Arrow (read) | 14.9 ms | 82% | Phase 3 parallelizes this |
+| Store get_batch | 3.2 ms | 18% | Already fast |
+
+**Write performance is 5x slower than Delta Lake because 69% of write time is Parquet encoding in Python.**
+
+### Architecture: Zero-Copy FFI with pyo3-arrow
+
+```
+CURRENT (Python-heavy):
+Python DataFrame --> PyArrow Table --> Parquet bytes --> Rust store
+                            ^^^^^^^^^^^^^^^^^^^^^^^
+                            This is 69% of write time
+
+PHASE 4 (Rust-native):
+Python DataFrame --> PyArrow Table --[zero-copy FFI]--> Rust Arrow --> Rust Parquet --> Rust store
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                     All in Rust, parallelized with Rayon
+```
+
+Key insight: `pyo3-arrow` provides zero-copy Arrow data transfer using the Arrow PyCapsule Interface.
+No serialization/deserialization overhead - just pointer sharing.
+
+### Dependencies
+
+```toml
+# Cargo.toml additions
+[dependencies]
+arrow = "57"
+parquet = "57"
+pyo3-arrow = "0.15"
+```
+
+### Implementation Plan
+
+#### Step 4.1: Add Dependencies and Basic Types (Low Risk)
+
+**Goal:** Add arrow-rs, parquet, and pyo3-arrow. Verify builds work.
+
+**Files to modify:**
+- `Cargo.toml` (workspace)
+- `udr_core/Cargo.toml`
+- `udr_python/Cargo.toml`
+
+**Verification:**
+```bash
+cargo build --all
+cargo test --all
+```
+
+#### Step 4.2: Implement Rust Parquet Encoder (Medium Risk)
+
+**Goal:** Create `ParquetEncoder` that converts Arrow RecordBatch to Parquet bytes.
+
+**File:** `udr_core/src/parquet/encoder.rs`
 
 ```rust
-// In Cargo.toml
-arrow = "50"
-parquet = "50"
+use arrow::record_batch::RecordBatch;
+use parquet::arrow::ArrowWriter;
+use parquet::basic::Compression;
+use parquet::file::properties::WriterProperties;
 
-// New methods
-fn put_arrow(&self, arrow_ipc: &[u8]) -> PyResult<Vec<String>> {
-    // Decode Arrow IPC format
-    // Encode as Parquet
-    // Store chunks
+pub struct ParquetEncoder {
+    compression: Compression,
+    write_statistics: bool,
 }
 
-fn get_arrow(&self, hashes: Vec<String>) -> PyResult<Vec<u8>> {
-    // Get chunks
-    // Decode Parquet
-    // Encode as Arrow IPC
+impl ParquetEncoder {
+    pub fn encode(&self, batch: &RecordBatch) -> Result<Vec<u8>, ParquetError> {
+        let mut buffer = Vec::new();
+        let props = WriterProperties::builder()
+            .set_compression(self.compression)
+            .set_statistics_enabled(self.write_statistics)
+            .build();
+        let mut writer = ArrowWriter::try_new(&mut buffer, batch.schema(), Some(props))?;
+        writer.write(batch)?;
+        writer.close()?;
+        Ok(buffer)
+    }
+
+    /// Encode multiple batches in parallel using Rayon
+    pub fn encode_batch(&self, batches: &[RecordBatch]) -> Result<Vec<Vec<u8>>, ParquetError> {
+        use rayon::prelude::*;
+        batches.par_iter().map(|b| self.encode(b)).collect()
+    }
 }
 ```
 
-### Decision Point
+**Tests:**
+- `test_encode_simple_batch`
+- `test_encode_with_compression`
+- `test_encode_batch_parallel`
+- `test_roundtrip_encode_decode`
 
-Only implement if Phase 1-3 don't achieve target performance. The complexity is high and Python PyArrow is already well-optimized.
+**Verification:**
+```bash
+cargo test parquet
+```
+
+#### Step 4.3: Implement Rust Parquet Decoder (Medium Risk)
+
+**Goal:** Create `ParquetDecoder` that converts Parquet bytes to Arrow RecordBatch.
+
+**File:** `udr_core/src/parquet/decoder.rs`
+
+```rust
+use arrow::record_batch::RecordBatch;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReader;
+
+pub struct ParquetDecoder;
+
+impl ParquetDecoder {
+    pub fn decode(&self, data: &[u8]) -> Result<RecordBatch, ParquetError> {
+        let reader = ParquetRecordBatchReader::try_new(data, 1024)?;
+        // Collect all batches into one
+        let batches: Vec<RecordBatch> = reader.collect::<Result<_, _>>()?;
+        arrow::compute::concat_batches(&batches[0].schema(), &batches)
+    }
+
+    /// Decode multiple Parquet chunks in parallel
+    pub fn decode_batch(&self, chunks: &[&[u8]]) -> Result<Vec<RecordBatch>, ParquetError> {
+        use rayon::prelude::*;
+        chunks.par_iter().map(|c| self.decode(c)).collect()
+    }
+}
+```
+
+**Tests:**
+- `test_decode_simple`
+- `test_decode_batch_parallel`
+- `test_roundtrip_decode_encode`
+
+#### Step 4.4: Add Python Bindings with pyo3-arrow (High Complexity)
+
+**Goal:** Expose Parquet encoder/decoder to Python with zero-copy Arrow transfer.
+
+**File:** `udr_python/src/lib.rs`
+
+```rust
+use pyo3_arrow::{PyRecordBatch, PyTable};
+
+#[pyclass]
+pub struct PyParquetEncoder {
+    inner: ParquetEncoder,
+}
+
+#[pymethods]
+impl PyParquetEncoder {
+    #[new]
+    fn new(compression: Option<&str>) -> Self { ... }
+
+    /// Encode Arrow RecordBatch to Parquet bytes (zero-copy input)
+    fn encode(&self, batch: PyRecordBatch) -> PyResult<Vec<u8>> {
+        let rust_batch = batch.into_inner();  // Zero-copy!
+        self.inner.encode(&rust_batch).map_err(parquet_err_to_py)
+    }
+
+    /// Encode multiple batches in parallel
+    fn encode_batch(&self, batches: Vec<PyRecordBatch>) -> PyResult<Vec<Vec<u8>>> {
+        let rust_batches: Vec<_> = batches.into_iter().map(|b| b.into_inner()).collect();
+        self.inner.encode_batch(&rust_batches).map_err(parquet_err_to_py)
+    }
+}
+
+#[pyclass]
+pub struct PyParquetDecoder;
+
+#[pymethods]
+impl PyParquetDecoder {
+    /// Decode Parquet bytes to Arrow RecordBatch (zero-copy output)
+    fn decode(&self, py: Python, data: &[u8]) -> PyResult<PyObject> {
+        let batch = self.inner.decode(data).map_err(parquet_err_to_py)?;
+        PyRecordBatch::new(batch).to_pyarrow(py)  // Zero-copy!
+    }
+
+    /// Decode multiple chunks in parallel
+    fn decode_batch(&self, py: Python, chunks: Vec<Vec<u8>>) -> PyResult<Vec<PyObject>> {
+        let refs: Vec<&[u8]> = chunks.iter().map(|c| c.as_slice()).collect();
+        let batches = self.inner.decode_batch(&refs).map_err(parquet_err_to_py)?;
+        batches.into_iter()
+            .map(|b| PyRecordBatch::new(b).to_pyarrow(py))
+            .collect()
+    }
+}
+```
+
+**Tests:**
+- `test_py_encode_from_pyarrow`
+- `test_py_decode_to_pyarrow`
+- `test_py_roundtrip`
+- `test_py_batch_operations`
+
+#### Step 4.5: Integrate with TableWriter (Medium Risk)
+
+**Goal:** Update TableWriter to use Rust Parquet encoder.
+
+**File:** `python/armillaria_query/writer.py`
+
+```python
+class TableWriter:
+    def __init__(self, ..., use_native_parquet: bool = True):
+        self.use_native_parquet = use_native_parquet
+        if use_native_parquet:
+            self._encoder = armillaria.PyParquetEncoder(compression="zstd")
+
+    def _to_parquet_bytes(self, table: pa.Table) -> bytes:
+        if self.use_native_parquet:
+            # Zero-copy to Rust, encode in Rust
+            batches = table.to_batches()
+            return self._encoder.encode(batches[0])
+        else:
+            # Fallback to PyArrow
+            buffer = io.BytesIO()
+            pq.write_table(table, buffer, compression="zstd")
+            return buffer.getvalue()
+```
+
+**Tests:**
+- `test_writer_native_parquet`
+- `test_writer_fallback`
+- `test_writer_native_vs_pyarrow_identical`
+
+#### Step 4.6: Integrate with TableReader (Medium Risk)
+
+**Goal:** Update TableReader to use Rust Parquet decoder.
+
+**File:** `python/armillaria_query/reader.py`
+
+```python
+class TableReader:
+    def __init__(self, ..., use_native_parquet: bool = True):
+        self.use_native_parquet = use_native_parquet
+        if use_native_parquet:
+            self._decoder = armillaria.PyParquetDecoder()
+
+    def _parquet_to_arrow(self, data: bytes) -> pa.Table:
+        if self.use_native_parquet:
+            # Decode in Rust, zero-copy to Python
+            batch = self._decoder.decode(data)
+            return pa.Table.from_batches([batch])
+        else:
+            # Fallback to PyArrow
+            return pq.read_table(io.BytesIO(data))
+```
+
+#### Step 4.7: Benchmark and Validate (Critical)
+
+**Goal:** Verify performance improvement and no regressions.
+
+**Benchmarks to run:**
+1. Write throughput (target: 300+ MB/s, currently 82 MB/s)
+2. Read throughput (should maintain or improve)
+3. Full competitive benchmark vs Delta Lake
+4. Deduplication still works (content-addressable)
+5. All existing tests pass
+
+**Success Criteria:**
+- [ ] Write throughput >= 300 MB/s (3.5x improvement)
+- [ ] Read throughput >= current (4,000+ MB/s with parallel)
+- [ ] All 333+ tests pass
+- [ ] Deduplication ratio maintained at 84%
+- [ ] Branching overhead maintained at 0 bytes
+
+### Risk Mitigation
+
+| Risk | Mitigation |
+|------|------------|
+| pyo3-arrow compatibility issues | Keep PyArrow fallback, test with multiple PyArrow versions |
+| Arrow schema mismatches | Extensive roundtrip tests |
+| Performance regression | Benchmark at every step, maintain fallback |
+| Memory safety with zero-copy | Use safe Rust APIs, extensive testing |
+| Build complexity | Document dependencies clearly, CI validation |
+
+### Rollback Plan
+
+All changes are additive with `use_native_parquet=True/False` flag:
+- If Phase 4 causes issues, set `use_native_parquet=False` to use PyArrow
+- No breaking API changes
+- Existing tests validate both paths
+
+### Estimated Timeline
+
+| Step | Description | Hours | Checkpoint |
+|------|-------------|-------|------------|
+| 4.1 | Add dependencies | 1-2 | Build passes |
+| 4.2 | Rust encoder | 3-4 | Rust tests pass |
+| 4.3 | Rust decoder | 2-3 | Rust tests pass |
+| 4.4 | Python bindings | 4-6 | Python tests pass |
+| 4.5 | TableWriter integration | 2-3 | Writer tests pass |
+| 4.6 | TableReader integration | 2-3 | Reader tests pass |
+| 4.7 | Benchmark and validate | 2-3 | All benchmarks pass |
+| **Total** | | **16-24** | |
 
 ---
 
