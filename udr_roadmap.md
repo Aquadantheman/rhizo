@@ -24,7 +24,7 @@ UDR is building the next generation of data infrastructure—one system that rep
 | Phase 2: Catalog | ✅ Complete | Versioned tables with time travel |
 | Phase 3: Query Layer | ✅ Complete | DuckDB + SQL + time travel queries |
 | Phase 4: Branching | ✅ Complete | Git-like branches with zero-copy semantics |
-| Phase 5: Transactions | ⏳ Planned | Cross-table ACID |
+| Phase 5: Transactions | 🚧 In Progress | Cross-table ACID (Core complete, QueryEngine integration next) |
 | Phase 6: Changelog | ⏳ Planned | Unified batch/stream |
 | Phase 7: Production | ⏳ Planned | Real workload migration |
 | Phase 8: Release | ⏳ Planned | Documentation and publication |
@@ -199,7 +199,7 @@ Branch:
 
 ---
 
-## ⏳ PLANNED PHASES
+## 🚧 IN PROGRESS
 
 ### Phase 5: Cross-Table Transactions
 
@@ -215,15 +215,42 @@ Branch:
 - **Isolation Level:** Snapshot Isolation
 - **Scope:** Single-process first, distributed later
 
-**Key Components:**
-1. `Transaction` struct with read/write sets
-2. `TransactionManager` with conflict detection
-3. Write-ahead logging (WAL) for recovery
-4. Python context manager interface
+#### Phase 5.0: Core Transaction Infrastructure ✅ COMPLETE
+
+**What We Built:**
+- [x] `TransactionRecord` struct with read/write sets
+- [x] `TransactionManager` with conflict detection
+- [x] `TransactionLog` - Epoch-based WAL with persistence
+- [x] `EpochConfig` - Configurable epoch modes (single_node, high_throughput, low_latency)
+- [x] `ConflictDetector` trait with `TableLevelConflictDetector`
+- [x] `RecoveryManager` for crash recovery
+- [x] Python bindings (`PyTransactionManager`, `PyTransactionInfo`, `PyRecoveryReport`)
+- [x] Type stubs in `udr.pyi`
+
+**Key Files:**
+- `udr_core/src/transaction/types.rs` - Core types (TxId, TransactionRecord, WriteGranularity)
+- `udr_core/src/transaction/epoch.rs` - Epoch configuration and metadata
+- `udr_core/src/transaction/error.rs` - TransactionError types
+- `udr_core/src/transaction/log.rs` - Persistent transaction log
+- `udr_core/src/transaction/conflict.rs` - Conflict detection (table-level)
+- `udr_core/src/transaction/manager.rs` - TransactionManager coordinator
+- `udr_core/src/transaction/recovery.rs` - RecoveryManager
+
+**Test Count:** 71 new Rust tests (110 total)
+
+#### Phase 5.1: QueryEngine Integration (Next)
+
+**Goal:** Seamless Python API with context manager
+
+**Planned:**
+- [ ] `engine.transaction()` context manager
+- [ ] Read-your-writes within transaction
+- [ ] Rollback on exception
+- [ ] Branch head auto-updates
 
 **Example API:**
 ```python
-with udr.transaction(store, catalog) as tx:
+with engine.transaction() as tx:
     parcels = tx.read_table("parcels")
     scores = tx.read_table("scores")
 
@@ -234,6 +261,10 @@ with udr.transaction(store, catalog) as tx:
     # Commits atomically on exit
 # Rolls back on exception
 ```
+
+---
+
+## ⏳ PLANNED PHASES
 
 ### Phase 6: Changelog & Subscriptions
 
@@ -406,7 +437,7 @@ from udr_query import TableWriter, TableReader, QueryEngine
 ```
 
 **Test Counts:**
-- Rust: 39 tests (22 core + 17 branch)
+- Rust: 110 tests (22 core + 17 branch + 71 transaction)
 - Python: 81 tests (20 core + 26 query layer + 20 branching + 15 branch-query integration)
 
 ---

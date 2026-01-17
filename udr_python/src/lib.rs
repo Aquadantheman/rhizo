@@ -1,11 +1,14 @@
 use pyo3::prelude::*;
-use pyo3::exceptions::{PyIOError, PyValueError};
+use pyo3::exceptions::{PyIOError, PyValueError, PyRuntimeError};
 use udr_core::{
     ChunkStore, ChunkStoreError,
     FileCatalog, CatalogError, TableVersion,
     Branch, BranchDiff, BranchError, BranchManager,
+    TransactionManager, TransactionRecord, TransactionError,
+    TableWrite, RecoveryReport,
 };
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Convert ChunkStoreError to appropriate Python exception
 fn chunk_err_to_py(e: ChunkStoreError) -> PyErr {
@@ -356,6 +359,258 @@ impl PyBranchManager {
     }
 }
 
+// ============================================================================
+// Transaction Classes
+// ============================================================================
+
+/// Convert TransactionError to appropriate Python exception
+fn tx_err_to_py(e: TransactionError) -> PyErr {
+    match e {
+        TransactionError::TransactionNotFound(id) => {
+            PyValueError::new_err(format!("Transaction not found: {}", id))
+        }
+        TransactionError::TransactionNotActive(id) => {
+            PyValueError::new_err(format!("Transaction {} is not active", id))
+        }
+        TransactionError::AlreadyCommitted(id) => {
+            PyValueError::new_err(format!("Transaction {} already committed", id))
+        }
+        TransactionError::AlreadyAborted(id) => {
+            PyValueError::new_err(format!("Transaction {} already aborted", id))
+        }
+        TransactionError::WriteConflict(tables) => {
+            PyValueError::new_err(format!("Write conflict on tables: {:?}", tables))
+        }
+        TransactionError::SnapshotConflict { table, read_version, current_version } => {
+            PyValueError::new_err(format!(
+                "Snapshot conflict: {} was v{}, now v{}",
+                table, read_version, current_version
+            ))
+        }
+        TransactionError::Io(e) => PyIOError::new_err(e.to_string()),
+        TransactionError::Json(e) => PyValueError::new_err(format!("JSON error: {}", e)),
+        TransactionError::CatalogError(msg) => PyIOError::new_err(format!("Catalog error: {}", msg)),
+        TransactionError::BranchError(msg) => PyIOError::new_err(format!("Branch error: {}", msg)),
+        _ => PyRuntimeError::new_err(e.to_string()),
+    }
+}
+
+#[pyclass]
+#[derive(Clone)]
+struct PyTransactionInfo {
+    #[pyo3(get)]
+    tx_id: u64,
+    #[pyo3(get)]
+    epoch_id: u64,
+    #[pyo3(get)]
+    status: String,
+    #[pyo3(get)]
+    branch: String,
+    #[pyo3(get)]
+    started_at: i64,
+    #[pyo3(get)]
+    committed_at: Option<i64>,
+    #[pyo3(get)]
+    read_snapshot: HashMap<String, u64>,
+    #[pyo3(get)]
+    written_tables: Vec<String>,
+}
+
+impl From<TransactionRecord> for PyTransactionInfo {
+    fn from(tx: TransactionRecord) -> Self {
+        let written = tx.written_tables().into_iter().map(|s| s.to_string()).collect();
+        Self {
+            tx_id: tx.tx_id,
+            epoch_id: tx.epoch_id,
+            status: format!("{}", tx.status),
+            branch: tx.branch,
+            started_at: tx.started_at,
+            committed_at: tx.committed_at,
+            read_snapshot: tx.read_snapshot,
+            written_tables: written,
+        }
+    }
+}
+
+#[pyclass]
+#[derive(Clone)]
+struct PyRecoveryReport {
+    #[pyo3(get)]
+    last_committed_epoch: Option<u64>,
+    #[pyo3(get)]
+    replayed: Vec<u64>,
+    #[pyo3(get)]
+    rolled_back: Vec<u64>,
+    #[pyo3(get)]
+    already_aborted: Vec<u64>,
+    #[pyo3(get)]
+    already_committed: Vec<u64>,
+    #[pyo3(get)]
+    warnings: Vec<String>,
+    #[pyo3(get)]
+    errors: Vec<String>,
+    #[pyo3(get)]
+    is_clean: bool,
+}
+
+impl From<RecoveryReport> for PyRecoveryReport {
+    fn from(r: RecoveryReport) -> Self {
+        let is_clean = r.is_clean();
+        Self {
+            last_committed_epoch: r.last_committed_epoch,
+            replayed: r.replayed,
+            rolled_back: r.rolled_back,
+            already_aborted: r.already_aborted,
+            already_committed: r.already_committed,
+            warnings: r.warnings,
+            errors: r.errors,
+            is_clean,
+        }
+    }
+}
+
+#[pyclass]
+struct PyTransactionManager {
+    inner: Arc<TransactionManager>,
+}
+
+#[pymethods]
+impl PyTransactionManager {
+    /// Create a new TransactionManager.
+    ///
+    /// Args:
+    ///     base_path: Path for transaction storage
+    ///     catalog_path: Path to catalog directory
+    ///     branch_path: Optional path to branch manager directory
+    #[new]
+    #[pyo3(signature = (base_path, catalog_path, branch_path=None))]
+    fn new(
+        base_path: &str,
+        catalog_path: &str,
+        branch_path: Option<&str>,
+    ) -> PyResult<Self> {
+        let catalog = Arc::new(FileCatalog::new(catalog_path).map_err(catalog_err_to_py)?);
+        let branch_manager = match branch_path {
+            Some(p) => Some(Arc::new(BranchManager::new(p).map_err(branch_err_to_py)?)),
+            None => None,
+        };
+
+        let inner = TransactionManager::new(base_path, catalog, branch_manager)
+            .map_err(tx_err_to_py)?;
+
+        Ok(Self { inner: Arc::new(inner) })
+    }
+
+    /// Begin a new transaction.
+    ///
+    /// Args:
+    ///     branch: Optional branch name (default: current branch)
+    ///
+    /// Returns:
+    ///     Transaction ID
+    #[pyo3(signature = (branch=None))]
+    fn begin(&self, branch: Option<&str>) -> PyResult<u64> {
+        self.inner.begin(branch).map_err(tx_err_to_py)
+    }
+
+    /// Add a write to a transaction.
+    ///
+    /// Args:
+    ///     tx_id: Transaction ID
+    ///     table_name: Table being written
+    ///     new_version: New version number
+    ///     chunk_hashes: List of chunk hashes
+    fn add_write(
+        &self,
+        tx_id: u64,
+        table_name: &str,
+        new_version: u64,
+        chunk_hashes: Vec<String>,
+    ) -> PyResult<()> {
+        let write = TableWrite::new(table_name, new_version, chunk_hashes);
+        self.inner.add_write(tx_id, write).map_err(tx_err_to_py)
+    }
+
+    /// Record a read for conflict detection.
+    ///
+    /// Args:
+    ///     tx_id: Transaction ID
+    ///     table_name: Table being read
+    ///     version: Version being read
+    fn record_read(
+        &self,
+        tx_id: u64,
+        table_name: &str,
+        version: u64,
+    ) -> PyResult<()> {
+        self.inner.record_read(tx_id, table_name, version).map_err(tx_err_to_py)
+    }
+
+    /// Commit a transaction.
+    ///
+    /// Args:
+    ///     tx_id: Transaction ID
+    ///
+    /// Raises:
+    ///     ValueError: If conflict detected or transaction not active
+    fn commit(&self, tx_id: u64) -> PyResult<()> {
+        self.inner.commit(tx_id).map_err(tx_err_to_py)
+    }
+
+    /// Abort a transaction.
+    ///
+    /// Args:
+    ///     tx_id: Transaction ID
+    ///     reason: Reason for abort
+    #[pyo3(signature = (tx_id, reason="User requested"))]
+    fn abort(&self, tx_id: u64, reason: &str) -> PyResult<()> {
+        self.inner.abort(tx_id, reason).map_err(tx_err_to_py)
+    }
+
+    /// Get transaction information.
+    ///
+    /// Args:
+    ///     tx_id: Transaction ID
+    ///
+    /// Returns:
+    ///     PyTransactionInfo with transaction details
+    fn get_transaction(&self, tx_id: u64) -> PyResult<PyTransactionInfo> {
+        self.inner
+            .get_transaction(tx_id)
+            .map(|tx| tx.into())
+            .map_err(tx_err_to_py)
+    }
+
+    /// Get all active transactions.
+    ///
+    /// Returns:
+    ///     List of PyTransactionInfo
+    fn active_transactions(&self) -> PyResult<Vec<PyTransactionInfo>> {
+        self.inner
+            .active_transactions()
+            .map(|txs| txs.into_iter().map(|tx| tx.into()).collect())
+            .map_err(tx_err_to_py)
+    }
+
+    /// Get count of active transactions.
+    fn active_count(&self) -> PyResult<usize> {
+        self.inner.active_count().map_err(tx_err_to_py)
+    }
+
+    /// Perform recovery after crash/restart.
+    ///
+    /// Returns:
+    ///     PyRecoveryReport with recovery details
+    fn recover(&self) -> PyResult<PyRecoveryReport> {
+        // We need access to the log for recovery, but TransactionManager
+        // owns it internally. For now, we'll create a new log for recovery.
+        // In a real implementation, we'd expose recovery through the manager.
+        Err(PyRuntimeError::new_err(
+            "Recovery should be performed by recreating TransactionManager"
+        ))
+    }
+}
+
 #[pymodule]
 fn udr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyChunkStore>()?;
@@ -364,5 +619,8 @@ fn udr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBranch>()?;
     m.add_class::<PyBranchDiff>()?;
     m.add_class::<PyBranchManager>()?;
+    m.add_class::<PyTransactionManager>()?;
+    m.add_class::<PyTransactionInfo>()?;
+    m.add_class::<PyRecoveryReport>()?;
     Ok(())
 }

@@ -2,7 +2,7 @@
 
 **A next-generation data infrastructure that unifies transactional, analytical, and streaming workloads through content-addressable storage, cross-table ACID transactions, and Git-like versioning.**
 
-[![Rust Tests](https://img.shields.io/badge/tests-39%20passed-brightgreen)]()
+[![Rust Tests](https://img.shields.io/badge/tests-110%20passed-brightgreen)]()
 [![Python Tests](https://img.shields.io/badge/python%20tests-81%20passed-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
@@ -34,7 +34,7 @@ UDR eliminates this fragmentation through five foundational innovations:
 | Phase 2: Catalog | ✅ Complete | Versioned file catalog with time travel |
 | Phase 3: Query | ✅ Complete | DuckDB integration with SQL + time travel |
 | Phase 4: Branching | ✅ Complete | Git-like branching with zero-copy semantics |
-| Phase 5: Transactions | ⏳ Planned | Cross-table ACID with MVCC |
+| Phase 5: Transactions | 🚧 In Progress | Cross-table ACID with MVCC (Core complete, QueryEngine integration pending) |
 | Phase 6: Changelog | ⏳ Planned | Unified batch/stream via subscriptions |
 
 ## Architecture
@@ -221,10 +221,10 @@ latest = catalog.get_version("users")  # Gets latest
 ## Testing
 
 ```bash
-# Run all Rust tests (39 tests)
+# Run all Rust tests (110 tests)
 cargo test --all
 
-# Run Python tests (66 tests)
+# Run Python tests (81 tests)
 pytest tests/ -v
 ```
 
@@ -247,10 +247,18 @@ unifieddataruntime/
 │       │   ├── file_catalog.rs  # FileCatalog implementation
 │       │   ├── version.rs       # TableVersion struct
 │       │   └── error.rs         # CatalogError types
-│       └── branch/              # Git-like branching (Phase 4)
-│           ├── branch.rs        # Branch, BranchDiff structs
-│           ├── manager.rs       # BranchManager (create, merge, diff)
-│           └── error.rs         # BranchError types
+│       ├── branch/              # Git-like branching (Phase 4)
+│       │   ├── branch.rs        # Branch, BranchDiff structs
+│       │   ├── manager.rs       # BranchManager (create, merge, diff)
+│       │   └── error.rs         # BranchError types
+│       └── transaction/         # Cross-table ACID (Phase 5)
+│           ├── types.rs         # TxId, TransactionRecord, WriteGranularity
+│           ├── epoch.rs         # EpochConfig, EpochMetadata
+│           ├── error.rs         # TransactionError types
+│           ├── log.rs           # TransactionLog (persistent WAL)
+│           ├── conflict.rs      # ConflictDetector trait, TableLevelConflictDetector
+│           ├── manager.rs       # TransactionManager (coordinator)
+│           └── recovery.rs      # RecoveryManager, RecoveryReport
 │
 ├── udr_python/                   # PyO3 bindings
 │   └── src/lib.rs               # Python interface
@@ -308,11 +316,11 @@ Based on the technical whitepaper analysis:
 
 See [udr_roadmap.md](./udr_roadmap.md) for the complete development roadmap.
 
-**Next milestone (Phase 4: Branching):**
-- Create named branches from any version
-- Zero-copy branch creation (only pointers copied)
-- Branch diff and merge capabilities
-- Git-like workflow for data development
+**Next milestone (Phase 5.1: Transaction Integration):**
+- Python context manager for transactions
+- QueryEngine integration with transaction support
+- Read-your-writes within transaction scope
+- Automatic rollback on exceptions
 
 ## References
 

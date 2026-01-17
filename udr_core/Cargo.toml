@@ -11,3 +11,6 @@ thiserror = { workspace = true }
 parking_lot = { workspace = true }
 bytes = { workspace = true }
 uuid = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

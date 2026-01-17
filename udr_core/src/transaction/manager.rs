@@ -1,0 +1,689 @@
+//! Transaction manager for cross-table ACID transactions.
+//!
+//! The TransactionManager coordinates transactions across multiple tables,
+//! providing snapshot isolation with conflict detection.
+
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
+
+use super::types::*;
+use super::epoch::*;
+use super::error::TransactionError;
+use super::log::TransactionLog;
+use super::conflict::{ConflictDetector, TableLevelConflictDetector};
+use crate::catalog::{FileCatalog, TableVersion};
+use crate::branch::BranchManager;
+
+/// Manages cross-table ACID transactions
+pub struct TransactionManager {
+    /// Base path for transaction storage
+    base_path: PathBuf,
+
+    /// Transaction log (persists transactions and epochs)
+    log: TransactionLog,
+
+    /// Current epoch configuration
+    config: EpochConfig,
+
+    /// Active transactions (in-memory for fast access)
+    active_transactions: RwLock<HashMap<TxId, TransactionRecord>>,
+
+    /// Recently committed transactions in current epoch (for conflict checking)
+    recent_committed: RwLock<Vec<TransactionRecord>>,
+
+    /// Conflict detector (pluggable strategy)
+    conflict_detector: Arc<dyn ConflictDetector + Send + Sync>,
+
+    /// Reference to catalog (for version resolution)
+    catalog: Arc<FileCatalog>,
+
+    /// Reference to branch manager (optional)
+    branch_manager: Option<Arc<BranchManager>>,
+}
+
+impl TransactionManager {
+    /// Create a new TransactionManager
+    pub fn new(
+        base_path: impl AsRef<Path>,
+        catalog: Arc<FileCatalog>,
+        branch_manager: Option<Arc<BranchManager>>,
+    ) -> Result<Self, TransactionError> {
+        Self::with_config(base_path, catalog, branch_manager, EpochConfig::single_node())
+    }
+
+    /// Create a new TransactionManager with custom epoch configuration
+    pub fn with_config(
+        base_path: impl AsRef<Path>,
+        catalog: Arc<FileCatalog>,
+        branch_manager: Option<Arc<BranchManager>>,
+        _config: EpochConfig,
+    ) -> Result<Self, TransactionError> {
+        let base_path = base_path.as_ref().to_path_buf();
+        let tx_path = base_path.join("transactions");
+        std::fs::create_dir_all(&tx_path)?;
+
+        let log = TransactionLog::new(&tx_path)?;
+
+        // Initialize config if needed
+        let storage_config = log.initialize_if_needed()?;
+
+        Ok(Self {
+            base_path: tx_path,
+            log,
+            config: storage_config.epoch_config,
+            active_transactions: RwLock::new(HashMap::new()),
+            recent_committed: RwLock::new(Vec::new()),
+            conflict_detector: Arc::new(TableLevelConflictDetector::new()),
+            catalog,
+            branch_manager,
+        })
+    }
+
+    /// Set a custom conflict detector
+    pub fn set_conflict_detector(
+        &mut self,
+        detector: Arc<dyn ConflictDetector + Send + Sync>,
+    ) {
+        self.conflict_detector = detector;
+    }
+
+    /// Get the epoch configuration
+    pub fn config(&self) -> &EpochConfig {
+        &self.config
+    }
+
+    /// Begin a new transaction
+    pub fn begin(&self, branch: Option<&str>) -> Result<TxId, TransactionError> {
+        // Get next transaction ID
+        let tx_id = self.log.next_tx_id()?;
+
+        // Get current epoch (or create new one)
+        let epoch_id = self.log.current_epoch_id()?;
+
+        // Determine branch
+        let branch_name = match branch {
+            Some(b) => b.to_string(),
+            None => self.default_branch()?,
+        };
+
+        // Create transaction record
+        let mut tx = TransactionRecord::new(tx_id, epoch_id, branch_name.clone());
+
+        // Capture read snapshot (current versions of all tables on branch)
+        tx.read_snapshot = self.capture_snapshot(&branch_name)?;
+
+        // Add to active transactions
+        {
+            let mut active = self.active_transactions.write()
+                .map_err(|_| TransactionError::LockError("active_transactions".to_string()))?;
+            active.insert(tx_id, tx.clone());
+        }
+
+        // Persist to log
+        self.log.write_transaction(&tx)?;
+
+        // Update epoch metadata
+        let mut epoch_meta = self.log.get_epoch(epoch_id)?;
+        epoch_meta.add_transaction(tx_id);
+        self.log.write_epoch_metadata(&epoch_meta)?;
+
+        Ok(tx_id)
+    }
+
+    /// Add a read to the transaction (for conflict detection)
+    pub fn record_read(
+        &self,
+        tx_id: TxId,
+        table_name: &str,
+        version: u64,
+    ) -> Result<(), TransactionError> {
+        let mut active = self.active_transactions.write()
+            .map_err(|_| TransactionError::LockError("active_transactions".to_string()))?;
+        let tx = active.get_mut(&tx_id)
+            .ok_or(TransactionError::TransactionNotFound(tx_id))?;
+
+        if !tx.is_active() {
+            return Err(TransactionError::TransactionNotActive(tx_id));
+        }
+
+        tx.read_snapshot.insert(table_name.to_string(), version);
+        Ok(())
+    }
+
+    /// Add a write to the transaction
+    pub fn add_write(
+        &self,
+        tx_id: TxId,
+        write: TableWrite,
+    ) -> Result<(), TransactionError> {
+        let mut active = self.active_transactions.write()
+            .map_err(|_| TransactionError::LockError("active_transactions".to_string()))?;
+        let tx = active.get_mut(&tx_id)
+            .ok_or(TransactionError::TransactionNotFound(tx_id))?;
+
+        if !tx.is_active() {
+            return Err(TransactionError::TransactionNotActive(tx_id));
+        }
+
+        tx.writes.push(write);
+        Ok(())
+    }
+
+    /// Commit a transaction
+    pub fn commit(&self, tx_id: TxId) -> Result<(), TransactionError> {
+        // Get transaction from active set
+        let tx = {
+            let active = self.active_transactions.read()
+                .map_err(|_| TransactionError::LockError("active_transactions".to_string()))?;
+            active.get(&tx_id)
+                .ok_or(TransactionError::TransactionNotFound(tx_id))?
+                .clone()
+        };
+
+        if !tx.is_active() {
+            return Err(TransactionError::TransactionNotActive(tx_id));
+        }
+
+        // Check for conflicts with recently committed transactions
+        self.check_conflicts(&tx)?;
+
+        // Validate snapshot (tables we read haven't changed)
+        self.validate_snapshot(&tx)?;
+
+        // Prepare commit (update status)
+        let mut committed_tx = tx.clone();
+        committed_tx.mark_committed();
+
+        // Apply writes to catalog
+        self.apply_writes(&committed_tx)?;
+
+        // Update branch heads (if branch manager configured)
+        self.update_branch_heads(&committed_tx)?;
+
+        // Persist committed status
+        self.log.write_transaction(&committed_tx)?;
+
+        // Update epoch metadata
+        let mut epoch_meta = self.log.get_epoch(committed_tx.epoch_id)?;
+        epoch_meta.record_commit();
+        self.log.write_epoch_metadata(&epoch_meta)?;
+
+        // Add to recently committed for conflict detection
+        {
+            let mut recent = self.recent_committed.write()
+                .map_err(|_| TransactionError::LockError("recent_committed".to_string()))?;
+            recent.push(committed_tx.clone());
+        }
+
+        // Remove from active set
+        {
+            let mut active = self.active_transactions.write()
+                .map_err(|_| TransactionError::LockError("active_transactions".to_string()))?;
+            active.remove(&tx_id);
+        }
+
+        Ok(())
+    }
+
+    /// Abort a transaction
+    pub fn abort(&self, tx_id: TxId, reason: &str) -> Result<(), TransactionError> {
+        let mut active = self.active_transactions.write()
+            .map_err(|_| TransactionError::LockError("active_transactions".to_string()))?;
+        let tx = active.get_mut(&tx_id)
+            .ok_or(TransactionError::TransactionNotFound(tx_id))?;
+
+        if !tx.is_active() {
+            return Err(TransactionError::TransactionNotActive(tx_id));
+        }
+
+        tx.mark_aborted(reason);
+
+        // Persist aborted status
+        self.log.write_transaction(tx)?;
+
+        // Update epoch metadata
+        let mut epoch_meta = self.log.get_epoch(tx.epoch_id)?;
+        epoch_meta.record_abort();
+        self.log.write_epoch_metadata(&epoch_meta)?;
+
+        // Remove from active set
+        let tx_id = tx.tx_id;
+        active.remove(&tx_id);
+
+        Ok(())
+    }
+
+    /// Get a transaction by ID
+    pub fn get_transaction(&self, tx_id: TxId) -> Result<TransactionRecord, TransactionError> {
+        // Check active first
+        {
+            let active = self.active_transactions.read()
+                .map_err(|_| TransactionError::LockError("active_transactions".to_string()))?;
+            if let Some(tx) = active.get(&tx_id) {
+                return Ok(tx.clone());
+            }
+        }
+
+        // Fall back to log
+        self.log.read_transaction(tx_id)
+    }
+
+    /// Get all active transactions
+    pub fn active_transactions(&self) -> Result<Vec<TransactionRecord>, TransactionError> {
+        let active = self.active_transactions.read()
+            .map_err(|_| TransactionError::LockError("active_transactions".to_string()))?;
+        Ok(active.values().cloned().collect())
+    }
+
+    /// Get count of active transactions
+    pub fn active_count(&self) -> Result<usize, TransactionError> {
+        let active = self.active_transactions.read()
+            .map_err(|_| TransactionError::LockError("active_transactions".to_string()))?;
+        Ok(active.len())
+    }
+
+    /// Clear recently committed transactions (called at epoch boundary)
+    pub fn clear_recent_committed(&self) -> Result<(), TransactionError> {
+        let mut recent = self.recent_committed.write()
+            .map_err(|_| TransactionError::LockError("recent_committed".to_string()))?;
+        recent.clear();
+        Ok(())
+    }
+
+    // === Private helpers ===
+
+    fn default_branch(&self) -> Result<String, TransactionError> {
+        if let Some(ref bm) = self.branch_manager {
+            bm.get_default()
+                .map_err(|e| TransactionError::BranchError(e.to_string()))?
+                .ok_or_else(|| TransactionError::BranchError("No default branch".to_string()))
+        } else {
+            Ok("main".to_string())
+        }
+    }
+
+    fn capture_snapshot(&self, branch: &str) -> Result<HashMap<String, u64>, TransactionError> {
+        let mut snapshot = HashMap::new();
+
+        if let Some(ref bm) = self.branch_manager {
+            // Use branch heads
+            let branch_data = bm.get(branch)
+                .map_err(|e| TransactionError::BranchError(e.to_string()))?;
+            snapshot = branch_data.head;
+        } else {
+            // Use catalog latest versions
+            let tables = self.catalog.list_tables()
+                .map_err(|e| TransactionError::CatalogError(e.to_string()))?;
+            for table in tables {
+                if let Ok(version) = self.catalog.get_version(&table, None) {
+                    snapshot.insert(table, version.version);
+                }
+            }
+        }
+
+        Ok(snapshot)
+    }
+
+    fn check_conflicts(&self, tx: &TransactionRecord) -> Result<(), TransactionError> {
+        // Check against recently committed transactions
+        let recent = self.recent_committed.read()
+            .map_err(|_| TransactionError::LockError("recent_committed".to_string()))?;
+
+        for committed_tx in recent.iter() {
+            // Only check transactions that started before us and committed after
+            if committed_tx.tx_id >= tx.tx_id {
+                continue;
+            }
+
+            if let Some(conflict) = self.conflict_detector.detect(tx, committed_tx) {
+                return Err(TransactionError::WriteConflict(conflict.tables));
+            }
+        }
+
+        // Check against other active transactions that are committing
+        let active = self.active_transactions.read()
+            .map_err(|_| TransactionError::LockError("active_transactions".to_string()))?;
+
+        for (_, other_tx) in active.iter() {
+            if other_tx.tx_id == tx.tx_id {
+                continue;
+            }
+
+            // Only check if other is preparing to commit
+            if !other_tx.is_preparing() {
+                continue;
+            }
+
+            if let Some(conflict) = self.conflict_detector.detect(tx, other_tx) {
+                return Err(TransactionError::WriteConflict(conflict.tables));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_snapshot(&self, tx: &TransactionRecord) -> Result<(), TransactionError> {
+        for (table, read_version) in &tx.read_snapshot {
+            let current_version = if let Some(ref bm) = self.branch_manager {
+                bm.get_table_version(&tx.branch, table)
+                    .map_err(|e| TransactionError::BranchError(e.to_string()))?
+            } else {
+                self.catalog.get_version(table, None)
+                    .map(|v| Some(v.version))
+                    .unwrap_or(None)
+            };
+
+            if let Some(current) = current_version {
+                if current != *read_version {
+                    return Err(TransactionError::SnapshotConflict {
+                        table: table.clone(),
+                        read_version: *read_version,
+                        current_version: current,
+                    });
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn apply_writes(&self, tx: &TransactionRecord) -> Result<(), TransactionError> {
+        for write in &tx.writes {
+            let table_version = TableVersion::new(
+                &write.table_name,
+                write.new_version,
+                write.chunk_hashes.clone(),
+            );
+
+            self.catalog.commit(table_version)
+                .map_err(|e| TransactionError::CatalogError(e.to_string()))?;
+        }
+
+        Ok(())
+    }
+
+    fn update_branch_heads(&self, tx: &TransactionRecord) -> Result<(), TransactionError> {
+        if let Some(ref bm) = self.branch_manager {
+            for write in &tx.writes {
+                let branch = write.branch.as_ref().unwrap_or(&tx.branch);
+                bm.update_head(branch, &write.table_name, write.new_version)
+                    .map_err(|e| TransactionError::BranchError(e.to_string()))?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn create_test_manager() -> (TransactionManager, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        let catalog_path = temp_dir.path().join("catalog");
+        let catalog = Arc::new(FileCatalog::new(&catalog_path).unwrap());
+        let manager = TransactionManager::new(temp_dir.path(), catalog, None).unwrap();
+        (manager, temp_dir)
+    }
+
+    fn create_test_manager_with_branches() -> (TransactionManager, Arc<BranchManager>, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        let catalog_path = temp_dir.path().join("catalog");
+        let branches_path = temp_dir.path().join("branches");
+
+        let catalog = Arc::new(FileCatalog::new(&catalog_path).unwrap());
+        let branches = Arc::new(BranchManager::new(&branches_path).unwrap());
+
+        let manager = TransactionManager::new(
+            temp_dir.path(),
+            catalog,
+            Some(branches.clone()),
+        ).unwrap();
+
+        (manager, branches, temp_dir)
+    }
+
+    #[test]
+    fn test_begin_transaction() {
+        let (manager, _temp) = create_test_manager();
+
+        let tx_id = manager.begin(None).unwrap();
+        assert_eq!(tx_id, 1);
+
+        let tx = manager.get_transaction(tx_id).unwrap();
+        assert!(tx.is_active());
+        assert_eq!(tx.branch, "main");
+    }
+
+    #[test]
+    fn test_begin_multiple_transactions() {
+        let (manager, _temp) = create_test_manager();
+
+        let tx1 = manager.begin(None).unwrap();
+        let tx2 = manager.begin(None).unwrap();
+        let tx3 = manager.begin(None).unwrap();
+
+        assert_eq!(tx1, 1);
+        assert_eq!(tx2, 2);
+        assert_eq!(tx3, 3);
+
+        assert_eq!(manager.active_count().unwrap(), 3);
+    }
+
+    #[test]
+    fn test_commit_transaction() {
+        let (manager, _temp) = create_test_manager();
+
+        let tx_id = manager.begin(None).unwrap();
+
+        // Add a write
+        let write = TableWrite::new("users", 1, vec!["chunk1".to_string()]);
+        manager.add_write(tx_id, write).unwrap();
+
+        // Commit
+        manager.commit(tx_id).unwrap();
+
+        // Transaction should be committed
+        let tx = manager.get_transaction(tx_id).unwrap();
+        assert!(tx.is_committed());
+        assert!(tx.committed_at.is_some());
+
+        // Active count should be 0
+        assert_eq!(manager.active_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_abort_transaction() {
+        let (manager, _temp) = create_test_manager();
+
+        let tx_id = manager.begin(None).unwrap();
+        manager.abort(tx_id, "Test abort").unwrap();
+
+        let tx = manager.get_transaction(tx_id).unwrap();
+        assert!(tx.is_aborted());
+
+        assert_eq!(manager.active_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_add_write() {
+        let (manager, _temp) = create_test_manager();
+
+        let tx_id = manager.begin(None).unwrap();
+
+        let write = TableWrite::new("users", 1, vec!["chunk1".to_string()]);
+        manager.add_write(tx_id, write).unwrap();
+
+        let tx = manager.get_transaction(tx_id).unwrap();
+        assert_eq!(tx.writes.len(), 1);
+        assert_eq!(tx.writes[0].table_name, "users");
+    }
+
+    #[test]
+    fn test_record_read() {
+        let (manager, _temp) = create_test_manager();
+
+        let tx_id = manager.begin(None).unwrap();
+
+        manager.record_read(tx_id, "users", 5).unwrap();
+        manager.record_read(tx_id, "orders", 3).unwrap();
+
+        let tx = manager.get_transaction(tx_id).unwrap();
+        assert_eq!(tx.read_snapshot.get("users"), Some(&5));
+        assert_eq!(tx.read_snapshot.get("orders"), Some(&3));
+    }
+
+    #[test]
+    fn test_transaction_not_found() {
+        let (manager, _temp) = create_test_manager();
+
+        let result = manager.get_transaction(999);
+        assert!(matches!(result, Err(TransactionError::TransactionNotFound(999))));
+    }
+
+    #[test]
+    fn test_cannot_modify_committed_transaction() {
+        let (manager, _temp) = create_test_manager();
+
+        let tx_id = manager.begin(None).unwrap();
+        manager.commit(tx_id).unwrap();
+
+        // Try to add write
+        let write = TableWrite::new("users", 1, vec!["chunk1".to_string()]);
+        let result = manager.add_write(tx_id, write);
+        assert!(matches!(result, Err(TransactionError::TransactionNotFound(_))));
+    }
+
+    #[test]
+    fn test_cannot_abort_committed_transaction() {
+        let (manager, _temp) = create_test_manager();
+
+        let tx_id = manager.begin(None).unwrap();
+        manager.commit(tx_id).unwrap();
+
+        let result = manager.abort(tx_id, "Test");
+        assert!(matches!(result, Err(TransactionError::TransactionNotFound(_))));
+    }
+
+    #[test]
+    fn test_write_conflict_detection() {
+        let (manager, _temp) = create_test_manager();
+
+        // Start two transactions
+        let tx1 = manager.begin(None).unwrap();
+        let tx2 = manager.begin(None).unwrap();
+
+        // Both write to same table
+        let write1 = TableWrite::new("users", 1, vec!["chunk1".to_string()]);
+        let write2 = TableWrite::new("users", 1, vec!["chunk2".to_string()]);
+
+        manager.add_write(tx1, write1).unwrap();
+        manager.add_write(tx2, write2).unwrap();
+
+        // First commit succeeds
+        manager.commit(tx1).unwrap();
+
+        // Second commit should fail with conflict
+        let result = manager.commit(tx2);
+        assert!(matches!(result, Err(TransactionError::WriteConflict(_))));
+    }
+
+    #[test]
+    fn test_no_conflict_different_tables() {
+        let (manager, _temp) = create_test_manager();
+
+        // Start two transactions
+        let tx1 = manager.begin(None).unwrap();
+        let tx2 = manager.begin(None).unwrap();
+
+        // Write to different tables
+        let write1 = TableWrite::new("users", 1, vec!["chunk1".to_string()]);
+        let write2 = TableWrite::new("orders", 1, vec!["chunk2".to_string()]);
+
+        manager.add_write(tx1, write1).unwrap();
+        manager.add_write(tx2, write2).unwrap();
+
+        // Both should commit successfully
+        manager.commit(tx1).unwrap();
+        manager.commit(tx2).unwrap();
+    }
+
+    #[test]
+    fn test_with_branch_manager() {
+        let (manager, _branches, _temp) = create_test_manager_with_branches();
+
+        let tx_id = manager.begin(None).unwrap();
+        let tx = manager.get_transaction(tx_id).unwrap();
+
+        // Should use main branch
+        assert_eq!(tx.branch, "main");
+    }
+
+    #[test]
+    fn test_begin_on_specific_branch() {
+        let (manager, branches, _temp) = create_test_manager_with_branches();
+
+        // Create a feature branch
+        branches.create("feature/test", None, None).unwrap();
+
+        // Start transaction on feature branch
+        let tx_id = manager.begin(Some("feature/test")).unwrap();
+        let tx = manager.get_transaction(tx_id).unwrap();
+
+        assert_eq!(tx.branch, "feature/test");
+    }
+
+    #[test]
+    fn test_commit_updates_branch_heads() {
+        let (manager, branches, _temp) = create_test_manager_with_branches();
+
+        let tx_id = manager.begin(None).unwrap();
+
+        let write = TableWrite::new("users", 1, vec!["chunk1".to_string()]);
+        manager.add_write(tx_id, write).unwrap();
+
+        manager.commit(tx_id).unwrap();
+
+        // Branch should have updated head
+        let version = branches.get_table_version("main", "users").unwrap();
+        assert_eq!(version, Some(1));
+    }
+
+    #[test]
+    fn test_transaction_persistence() {
+        let temp_dir = TempDir::new().unwrap();
+        let catalog_path = temp_dir.path().join("catalog");
+        let catalog = Arc::new(FileCatalog::new(&catalog_path).unwrap());
+
+        // Create manager and begin transaction
+        {
+            let manager = TransactionManager::new(temp_dir.path(), catalog.clone(), None).unwrap();
+            let tx_id = manager.begin(None).unwrap();
+            let write = TableWrite::new("users", 1, vec!["chunk1".to_string()]);
+            manager.add_write(tx_id, write).unwrap();
+            manager.commit(tx_id).unwrap();
+        }
+
+        // Create new manager and verify transaction is readable
+        {
+            let manager = TransactionManager::new(temp_dir.path(), catalog, None).unwrap();
+            let tx = manager.get_transaction(1).unwrap();
+            assert!(tx.is_committed());
+            assert_eq!(tx.writes.len(), 1);
+        }
+    }
+
+    #[test]
+    fn test_active_transactions_list() {
+        let (manager, _temp) = create_test_manager();
+
+        manager.begin(None).unwrap();
+        manager.begin(None).unwrap();
+
+        let active = manager.active_transactions().unwrap();
+        assert_eq!(active.len(), 2);
+    }
+}

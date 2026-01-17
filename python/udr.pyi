@@ -74,3 +74,49 @@ class PyBranchManager:
     def merge(self, source: str, into: str) -> None: ...
     def get_default(self) -> Optional[str]: ...
     def set_default(self, name: str) -> None: ...
+
+class PyTransactionInfo:
+    """Information about a transaction."""
+    tx_id: int
+    epoch_id: int
+    status: str
+    branch: str
+    started_at: int
+    committed_at: Optional[int]
+    read_snapshot: Dict[str, int]
+    written_tables: List[str]
+
+class PyRecoveryReport:
+    """Result of transaction recovery process."""
+    last_committed_epoch: Optional[int]
+    replayed: List[int]
+    rolled_back: List[int]
+    already_aborted: List[int]
+    already_committed: List[int]
+    warnings: List[str]
+    errors: List[str]
+    is_clean: bool
+
+class PyTransactionManager:
+    """Manages cross-table ACID transactions."""
+    def __init__(
+        self,
+        base_path: str,
+        catalog_path: str,
+        branch_path: Optional[str] = None,
+    ) -> None: ...
+    def begin(self, branch: Optional[str] = None) -> int: ...
+    def add_write(
+        self,
+        tx_id: int,
+        table_name: str,
+        new_version: int,
+        chunk_hashes: List[str],
+    ) -> None: ...
+    def record_read(self, tx_id: int, table_name: str, version: int) -> None: ...
+    def commit(self, tx_id: int) -> None: ...
+    def abort(self, tx_id: int, reason: str = "User requested") -> None: ...
+    def get_transaction(self, tx_id: int) -> PyTransactionInfo: ...
+    def active_transactions(self) -> List[PyTransactionInfo]: ...
+    def active_count(self) -> int: ...
+    def recover(self) -> PyRecoveryReport: ...
