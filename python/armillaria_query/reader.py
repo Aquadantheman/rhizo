@@ -11,6 +11,7 @@ The reader handles:
 from __future__ import annotations
 
 import io
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Iterator, List
 
@@ -67,6 +68,7 @@ class TableReader:
         catalog,  # PyCatalog
         verify_integrity: bool = False,
         use_mmap: bool = False,
+        parallel_workers: Optional[int] = None,
     ):
         """
         Initialize the TableReader.
@@ -77,11 +79,15 @@ class TableReader:
             verify_integrity: If True, verify chunk hashes on read (slower but safer)
             use_mmap: If True, use memory-mapped I/O for reading chunks (can improve
                       performance for large files through OS page caching)
+            parallel_workers: Number of threads for parallel Parquet parsing.
+                             None (default) = sequential parsing.
+                             Set to number of CPU cores for best multi-chunk performance.
         """
         self.store = store
         self.catalog = catalog
         self.verify_integrity = verify_integrity
         self.use_mmap = use_mmap
+        self.parallel_workers = parallel_workers
 
     def get_metadata(
         self,
@@ -148,8 +154,14 @@ class TableReader:
         else:
             chunk_data_list = self.store.get_batch(metadata.chunk_hashes)
 
-        # Deserialize all chunks to Arrow
-        arrow_chunks = [self._parquet_to_arrow(data) for data in chunk_data_list]
+        # Deserialize chunks to Arrow - parallel if configured and multiple chunks
+        if self.parallel_workers and len(chunk_data_list) > 1:
+            # Use thread pool for parallel Parquet parsing
+            with ThreadPoolExecutor(max_workers=self.parallel_workers) as executor:
+                arrow_chunks = list(executor.map(self._parquet_to_arrow, chunk_data_list))
+        else:
+            # Sequential parsing (default, or single chunk)
+            arrow_chunks = [self._parquet_to_arrow(data) for data in chunk_data_list]
 
         if len(arrow_chunks) == 1:
             return arrow_chunks[0]

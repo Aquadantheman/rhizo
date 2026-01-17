@@ -478,3 +478,88 @@ class TestQueryEngine:
             engine.write_table("users", sample_dataframe)
             result = engine.query("SELECT * FROM users")
             assert result.row_count == 5
+
+
+class TestParallelParsing:
+    """Tests for parallel Parquet parsing (Phase 3)."""
+
+    def test_parallel_workers_single_chunk(self, temp_storage, sample_dataframe):
+        """Test parallel_workers with single chunk (should still work)."""
+        store, catalog, _ = temp_storage
+        writer = TableWriter(store, catalog)
+        writer.write("test_table", sample_dataframe)
+
+        # Read with parallel_workers enabled
+        reader = TableReader(store, catalog, parallel_workers=4)
+        result = reader.read_arrow("test_table")
+
+        assert result.num_rows == 5
+        assert "id" in result.column_names
+
+    def test_parallel_workers_multi_chunk(self, temp_storage, large_dataframe):
+        """Test parallel_workers with multiple chunks."""
+        store, catalog, _ = temp_storage
+
+        # Write with small chunks to create multiple
+        writer = TableWriter(store, catalog, chunk_size_rows=10000)
+        write_result = writer.write("test_table", large_dataframe)
+
+        # Verify multiple chunks were created
+        assert write_result.chunk_count > 1
+
+        # Read with parallel_workers enabled
+        reader = TableReader(store, catalog, parallel_workers=4)
+        result = reader.read_arrow("test_table")
+
+        assert result.num_rows == 50000
+        assert "id" in result.column_names
+
+    def test_parallel_vs_sequential_correctness(self, temp_storage, large_dataframe):
+        """Test that parallel and sequential reads return identical results."""
+        store, catalog, _ = temp_storage
+
+        # Write with small chunks
+        writer = TableWriter(store, catalog, chunk_size_rows=10000)
+        writer.write("test_table", large_dataframe)
+
+        # Read sequentially
+        reader_seq = TableReader(store, catalog)
+        result_seq = reader_seq.read_arrow("test_table")
+
+        # Read in parallel
+        reader_par = TableReader(store, catalog, parallel_workers=4)
+        result_par = reader_par.read_arrow("test_table")
+
+        # Results should be identical
+        assert result_seq.num_rows == result_par.num_rows
+        assert result_seq.column_names == result_par.column_names
+
+        # Compare actual data
+        df_seq = result_seq.to_pandas().sort_values("id").reset_index(drop=True)
+        df_par = result_par.to_pandas().sort_values("id").reset_index(drop=True)
+        pd.testing.assert_frame_equal(df_seq, df_par)
+
+    def test_parallel_with_mmap(self, temp_storage, large_dataframe):
+        """Test parallel_workers combined with use_mmap."""
+        store, catalog, _ = temp_storage
+
+        writer = TableWriter(store, catalog, chunk_size_rows=10000)
+        writer.write("test_table", large_dataframe)
+
+        # Read with both mmap and parallel workers
+        reader = TableReader(store, catalog, use_mmap=True, parallel_workers=4)
+        result = reader.read_arrow("test_table")
+
+        assert result.num_rows == 50000
+
+    def test_parallel_workers_zero_disables(self, temp_storage, sample_dataframe):
+        """Test that parallel_workers=0 or None uses sequential."""
+        store, catalog, _ = temp_storage
+        writer = TableWriter(store, catalog)
+        writer.write("test_table", sample_dataframe)
+
+        # None should use sequential
+        reader_none = TableReader(store, catalog, parallel_workers=None)
+        result_none = reader_none.read_arrow("test_table")
+
+        assert result_none.num_rows == 5

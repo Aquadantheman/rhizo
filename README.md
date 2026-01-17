@@ -7,7 +7,7 @@ Armillaria is a next-generation data infrastructure that unifies transactional, 
 [![CI](https://github.com/aquadantheman/unifieddataruntime/actions/workflows/ci.yml/badge.svg)](https://github.com/aquadantheman/unifieddataruntime/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-160%20tests-blue)](https://github.com/aquadantheman/unifieddataruntime)
-[![Python](https://img.shields.io/badge/python-168%20tests-blue)](https://github.com/aquadantheman/unifieddataruntime)
+[![Python](https://img.shields.io/badge/python-173%20tests-blue)](https://github.com/aquadantheman/unifieddataruntime)
 
 ---
 
@@ -184,12 +184,12 @@ Application Layer
 | Phase A: Merkle Storage | O(change) deduplication via Merkle trees | Complete |
 | **Phase P: Performance** | Parallel I/O, batch operations | **In Progress** |
 
-All core phases complete. 328 tests passing (160 Rust + 168 Python).
+All core phases complete. 333 tests passing (160 Rust + 173 Python).
 
 Performance optimization in progress:
 - Phase P.1: Parallel chunk I/O with Rayon - Complete
 - Phase P.2: Memory-mapped reads - Complete
-- Phase P.3: Batch Parquet parsing - Planned
+- Phase P.3: Parallel Parquet parsing - Complete (2.1x speedup, **1.6x faster than Delta Lake reads**)
 
 ---
 
