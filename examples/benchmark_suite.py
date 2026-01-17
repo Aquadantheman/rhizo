@@ -204,7 +204,6 @@ def benchmark_deduplication() -> List[BenchmarkResult]:
             engine.write_table(f"identical_{i}", df)
 
         storage_identical = get_directory_size(base_dir)
-        single_table_size = storage_identical / 5  # Approximate
 
         results.append(BenchmarkResult(
             name="Deduplication (identical tables)",
@@ -304,7 +303,7 @@ def benchmark_time_travel() -> List[BenchmarkResult]:
             times = []
             for _ in range(5):  # 5 iterations
                 start = time.perf_counter()
-                result = engine.query(
+                _result = engine.query(
                     "SELECT AVG(value) FROM data",
                     versions={"data": version}
                 )
