@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "armillaria-query"
 version = "0.1.0"
 description = "Query layer for Armillaria - versioned data with SQL, time travel, and cross-table ACID transactions"
-readme = "../README.md"
+readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 keywords = ["data", "sql", "duckdb", "arrow", "versioning", "time-travel", "transactions"]
