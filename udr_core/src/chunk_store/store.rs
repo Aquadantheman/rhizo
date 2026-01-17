@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use rayon::prelude::*;
+use memmap2::Mmap;
 use super::error::ChunkStoreError;
 
 /// BLAKE3 hashes are 64 hex characters (256 bits)
@@ -76,6 +77,61 @@ impl ChunkStore {
         }
 
         Ok(data)
+    }
+
+    /// Get a memory-mapped view of a chunk.
+    ///
+    /// This is faster than `get()` for large chunks because:
+    /// 1. No copy from kernel buffer to userspace
+    /// 2. OS handles page caching automatically
+    /// 3. Can be used with zero-copy parsers
+    ///
+    /// # Safety
+    /// The returned Mmap is read-only and the underlying file is immutable
+    /// (content-addressed), so this is safe to use.
+    ///
+    /// # Arguments
+    /// * `hash` - The BLAKE3 hash of the chunk to retrieve
+    ///
+    /// # Returns
+    /// A memory-mapped view of the chunk data
+    ///
+    /// # Errors
+    /// - `ChunkStoreError::NotFound` if the chunk doesn't exist
+    /// - `ChunkStoreError::InvalidHash` if the hash format is invalid
+    /// - `ChunkStoreError::Io` for other I/O errors
+    pub fn get_mmap(&self, hash: &str) -> Result<Mmap, ChunkStoreError> {
+        self.validate_hash(hash)?;
+        let chunk_path = self.hash_to_path(hash)?;
+
+        let file = std::fs::File::open(&chunk_path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ChunkStoreError::NotFound(hash.to_string())
+            } else {
+                ChunkStoreError::Io(e)
+            }
+        })?;
+
+        // SAFETY: We're only reading the file, and chunks are immutable once written
+        // (content-addressed storage guarantees this)
+        unsafe { Mmap::map(&file) }.map_err(ChunkStoreError::Io)
+    }
+
+    /// Get memory-mapped views of multiple chunks in parallel.
+    ///
+    /// Returns results in the same order as input hashes.
+    /// If any chunk is not found, returns an error.
+    ///
+    /// # Arguments
+    /// * `hashes` - Slice of hash strings to retrieve
+    ///
+    /// # Returns
+    /// Vector of memory-mapped views in the same order as input hashes
+    pub fn get_mmap_batch(&self, hashes: &[&str]) -> Result<Vec<Mmap>, ChunkStoreError> {
+        hashes
+            .par_iter()
+            .map(|hash| self.get_mmap(hash))
+            .collect()
     }
 
     pub fn exists(&self, hash: &str) -> Result<bool, ChunkStoreError> {
@@ -621,6 +677,111 @@ mod tests {
         for (i, result) in results.iter().enumerate() {
             assert_eq!(result, &chunks_data[i], "Chunk {} mismatch", i);
         }
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // =========================================================================
+    // Memory-Mapped I/O Tests
+    // =========================================================================
+
+    #[test]
+    fn test_get_mmap_basic() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        let data = b"memory mapped data";
+        let hash = store.put(data).unwrap();
+
+        let mmap = store.get_mmap(&hash).unwrap();
+
+        // Mmap should contain the same data
+        assert_eq!(&mmap[..], data);
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_get_mmap_large() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        // 1MB of data
+        let data: Vec<u8> = (0..1_000_000).map(|i| (i % 256) as u8).collect();
+        let hash = store.put(&data).unwrap();
+
+        let mmap = store.get_mmap(&hash).unwrap();
+
+        assert_eq!(mmap.len(), data.len());
+        assert_eq!(&mmap[..], &data[..]);
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_get_mmap_not_found() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        let result = store.get_mmap(&fake_valid_hash());
+        assert!(matches!(result, Err(ChunkStoreError::NotFound(_))));
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_get_mmap_invalid_hash() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        let result = store.get_mmap("invalid");
+        assert!(matches!(result, Err(ChunkStoreError::InvalidHash(_))));
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_get_mmap_batch() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        let data1 = b"mmap batch one";
+        let data2 = b"mmap batch two";
+        let data3 = b"mmap batch three";
+
+        let hash1 = store.put(data1).unwrap();
+        let hash2 = store.put(data2).unwrap();
+        let hash3 = store.put(data3).unwrap();
+
+        let mmaps = store.get_mmap_batch(&[&hash1, &hash2, &hash3]).unwrap();
+
+        assert_eq!(mmaps.len(), 3);
+        assert_eq!(&mmaps[0][..], data1);
+        assert_eq!(&mmaps[1][..], data2);
+        assert_eq!(&mmaps[2][..], data3);
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_get_mmap_batch_empty() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        let hashes: Vec<&str> = vec![];
+        let mmaps = store.get_mmap_batch(&hashes).unwrap();
+
+        assert!(mmaps.is_empty());
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_get_mmap_vs_get_same_content() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        let data = b"compare mmap vs get";
+        let hash = store.put(data).unwrap();
+
+        let via_get = store.get(&hash).unwrap();
+        let via_mmap = store.get_mmap(&hash).unwrap();
+
+        // Both should return identical content
+        assert_eq!(via_get, &via_mmap[..]);
         fs::remove_dir_all(&dir).ok();
     }
 }

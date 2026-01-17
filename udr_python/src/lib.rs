@@ -202,6 +202,46 @@ impl PyChunkStore {
         let refs: Vec<&str> = hashes.iter().map(|s| s.as_str()).collect();
         self.inner.get_batch_verified(&refs).map_err(chunk_err_to_py)
     }
+
+    // =========================================================================
+    // Memory-Mapped Operations
+    // =========================================================================
+
+    /// Get chunk data using memory-mapped I/O.
+    ///
+    /// This can be faster than `get()` for large chunks because:
+    /// 1. Uses OS page caching efficiently
+    /// 2. Data is demand-paged (only accessed pages are loaded)
+    /// 3. No intermediate buffering in Rust layer
+    ///
+    /// Note: The returned bytes are copied to Python. For true zero-copy,
+    /// future versions may expose a buffer protocol interface.
+    ///
+    /// Args:
+    ///     hash: Hash of the chunk to retrieve
+    ///
+    /// Returns:
+    ///     Chunk data as bytes
+    fn get_mmap(&self, hash: &str) -> PyResult<Vec<u8>> {
+        let mmap = self.inner.get_mmap(hash).map_err(chunk_err_to_py)?;
+        Ok(mmap.to_vec())
+    }
+
+    /// Get multiple chunks using memory-mapped I/O in parallel.
+    ///
+    /// Combines the benefits of parallel I/O with memory-mapped access.
+    /// Results are returned in the same order as input hashes.
+    ///
+    /// Args:
+    ///     hashes: List of chunk hashes to retrieve
+    ///
+    /// Returns:
+    ///     List of chunk data in the same order as input
+    fn get_mmap_batch(&self, hashes: Vec<String>) -> PyResult<Vec<Vec<u8>>> {
+        let refs: Vec<&str> = hashes.iter().map(|s| s.as_str()).collect();
+        let mmaps = self.inner.get_mmap_batch(&refs).map_err(chunk_err_to_py)?;
+        Ok(mmaps.iter().map(|m| m.to_vec()).collect())
+    }
 }
 
 #[pyclass]

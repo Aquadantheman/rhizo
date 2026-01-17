@@ -66,6 +66,7 @@ class TableReader:
         store,  # PyChunkStore
         catalog,  # PyCatalog
         verify_integrity: bool = False,
+        use_mmap: bool = False,
     ):
         """
         Initialize the TableReader.
@@ -74,10 +75,13 @@ class TableReader:
             store: PyChunkStore instance for content-addressable storage
             catalog: PyCatalog instance for version metadata
             verify_integrity: If True, verify chunk hashes on read (slower but safer)
+            use_mmap: If True, use memory-mapped I/O for reading chunks (can improve
+                      performance for large files through OS page caching)
         """
         self.store = store
         self.catalog = catalog
         self.verify_integrity = verify_integrity
+        self.use_mmap = use_mmap
 
     def get_metadata(
         self,
@@ -136,7 +140,10 @@ class TableReader:
             raise ValueError(f"Table {table_name} has no chunks")
 
         # Fetch all chunks in parallel using batch operation
-        if self.verify_integrity:
+        if self.use_mmap:
+            # Memory-mapped I/O for potentially better OS caching
+            chunk_data_list = self.store.get_mmap_batch(metadata.chunk_hashes)
+        elif self.verify_integrity:
             chunk_data_list = self.store.get_batch_verified(metadata.chunk_hashes)
         else:
             chunk_data_list = self.store.get_batch(metadata.chunk_hashes)
@@ -197,7 +204,9 @@ class TableReader:
 
     def _fetch_chunk(self, chunk_hash: str) -> bytes:
         """Fetch chunk data from the store."""
-        if self.verify_integrity:
+        if self.use_mmap:
+            return self.store.get_mmap(chunk_hash)
+        elif self.verify_integrity:
             return self.store.get_verified(chunk_hash)
         else:
             return self.store.get(chunk_hash)

@@ -250,6 +250,58 @@ class TestChunkStore:
         for i, chunk in enumerate(chunks):
             assert retrieved[i] == chunk
 
+    # ========== Memory-Mapped Operations ==========
+
+    def test_get_mmap_basic(self, temp_dir):
+        """Test get_mmap returns same data as get."""
+        store = armillaria.PyChunkStore(os.path.join(temp_dir, "chunks"))
+
+        data = b"memory mapped data"
+        hash_str = store.put(data)
+
+        via_get = store.get(hash_str)
+        via_mmap = store.get_mmap(hash_str)
+
+        assert via_get == via_mmap == data
+
+    def test_get_mmap_large(self, temp_dir):
+        """Test get_mmap with large data."""
+        store = armillaria.PyChunkStore(os.path.join(temp_dir, "chunks"))
+
+        # 1MB of data
+        data = bytes(range(256)) * (1024 * 4)
+        hash_str = store.put(data)
+
+        retrieved = store.get_mmap(hash_str)
+        assert retrieved == data
+
+    def test_get_mmap_not_found(self, temp_dir):
+        """Test get_mmap raises error for missing chunk."""
+        store = armillaria.PyChunkStore(os.path.join(temp_dir, "chunks"))
+
+        fake_hash = "a" * 64
+        with pytest.raises(IOError, match="not found"):
+            store.get_mmap(fake_hash)
+
+    def test_get_mmap_batch(self, temp_dir):
+        """Test get_mmap_batch retrieves multiple chunks."""
+        store = armillaria.PyChunkStore(os.path.join(temp_dir, "chunks"))
+
+        chunks = [b"mmap_one", b"mmap_two", b"mmap_three"]
+        hashes = store.put_batch(chunks)
+
+        retrieved = store.get_mmap_batch(hashes)
+
+        assert len(retrieved) == 3
+        assert retrieved == chunks
+
+    def test_get_mmap_batch_empty(self, temp_dir):
+        """Test get_mmap_batch with empty list."""
+        store = armillaria.PyChunkStore(os.path.join(temp_dir, "chunks"))
+
+        result = store.get_mmap_batch([])
+        assert result == []
+
 
 class TestCatalog:
     """Tests for PyCatalog and PyTableVersion."""
