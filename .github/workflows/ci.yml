@@ -68,7 +68,7 @@ jobs:
       - name: Install query layer
         run: |
           source .venv/bin/activate
-          pip install -e python/
+          pip install -e python/ --no-deps
 
       - name: Ruff check (linting)
         run: |
