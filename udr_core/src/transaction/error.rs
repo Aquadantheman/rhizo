@@ -141,6 +141,8 @@ impl TransactionError {
 }
 
 /// Result type alias for transaction operations
+/// (Planned for broader use in future phases)
+#[allow(dead_code)]
 pub type TxResult<T> = Result<T, TransactionError>;
 
 #[cfg(test)]

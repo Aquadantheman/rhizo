@@ -1,3 +1,5 @@
+#![allow(clippy::module_inception)] // branch::branch is intentional for types
+
 pub mod error;
 pub mod branch;
 pub mod manager;

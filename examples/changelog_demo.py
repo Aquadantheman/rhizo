@@ -177,7 +177,7 @@ Same data. Same guarantees. One system.
         for event in events:
             print(f"  - {event.table_name}: v{event.old_version or 'NEW'} -> v{event.new_version}")
             if event.is_new_table():
-                print(f"    (New table created)")
+                print("    (New table created)")
 
         # =================================================================
         # PATTERN 4: Background Subscriber - Event-driven processing

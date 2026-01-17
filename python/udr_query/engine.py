@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Dict, List, Any, Union, Generator
 
 import duckdb
@@ -591,8 +591,6 @@ class QueryEngine:
             # Register both versions temporarily
             self._conn.register("__diff_a", table_a)
             self._conn.register("__diff_b", table_b)
-
-            key_cols = ", ".join(key_columns)
 
             # Find added rows (in B but not in A)
             added = self._conn.execute(f"""

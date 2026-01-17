@@ -103,9 +103,11 @@ impl ConflictDetector for TableLevelConflictDetector {
 ///
 /// Two transactions conflict only if they write to the same partition
 /// of the same table.
+#[allow(dead_code)] // Planned for Phase 5.5
 #[derive(Debug, Default)]
 pub struct PartitionLevelConflictDetector;
 
+#[allow(dead_code)] // Planned for Phase 5.5
 impl PartitionLevelConflictDetector {
     pub fn new() -> Self {
         Self
@@ -176,9 +178,11 @@ impl ConflictDetector for PartitionLevelConflictDetector {
 ///
 /// Two transactions conflict only if they write to the same row keys.
 /// This provides the highest concurrency but requires key tracking.
+#[allow(dead_code)] // Planned for Phase 5.x
 #[derive(Debug, Default)]
 pub struct RowLevelConflictDetector;
 
+#[allow(dead_code)] // Planned for Phase 5.x
 impl RowLevelConflictDetector {
     pub fn new() -> Self {
         Self
@@ -200,9 +204,11 @@ impl ConflictDetector for RowLevelConflictDetector {
 /// Multi-strategy conflict detector
 ///
 /// Uses different detection strategies based on write granularity.
+#[allow(dead_code)] // Planned for future adaptive conflict detection
 #[derive(Debug, Default)]
 pub struct AdaptiveConflictDetector;
 
+#[allow(dead_code)]
 impl AdaptiveConflictDetector {
     pub fn new() -> Self {
         Self

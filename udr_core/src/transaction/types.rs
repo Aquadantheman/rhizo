@@ -41,9 +41,10 @@ impl std::fmt::Display for TransactionStatus {
 }
 
 /// How granular is our conflict detection for a write
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum WriteGranularity {
     /// Entire table (Phase 5.0)
+    #[default]
     WholeTable,
 
     /// Specific partitions (Phase 5.5)
@@ -54,12 +55,6 @@ pub enum WriteGranularity {
         key_columns: Vec<String>,
         affected_keys: Vec<serde_json::Value>,
     },
-}
-
-impl Default for WriteGranularity {
-    fn default() -> Self {
-        WriteGranularity::WholeTable
-    }
 }
 
 /// A single table write within a transaction

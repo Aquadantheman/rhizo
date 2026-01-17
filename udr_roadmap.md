@@ -26,6 +26,7 @@ UDR is building the next generation of data infrastructure—one system that rep
 | Phase 4: Branching | ✅ Complete | Git-like branches with zero-copy semantics |
 | Phase 5: Transactions | ✅ Complete | Cross-table ACID with recovery & robustness |
 | Phase 6: Changelog | ✅ Complete | Unified batch/stream via subscriptions |
+| Phase 6.5: QC & CI | ✅ Complete | Ruff + Clippy linting, GitHub Actions |
 | Phase 7: Production | ⏳ Planned | Real workload migration |
 | Phase 8: Release | ⏳ Planned | Documentation and publication |
 
@@ -404,11 +405,58 @@ subscriber.start_background(on_change)
 
 ---
 
+## ✅ RECENTLY COMPLETED
+
+### Phase 6.5: Quality Control & CI
+
+**Status:** Complete
+
+**Goal:** Establish gentle linting and automated CI
+
+**Why This Matters:**
+- Catch issues early before they become habits
+- Ensure consistent code quality across Rust and Python
+- Automated verification on every PR
+
+**What We Built:**
+
+#### Ruff Linting (Python)
+- [x] Gentle configuration in `pyproject.toml`
+- [x] Essential checks only: `E` (errors), `F` (pyflakes), `W` (warnings)
+- [x] Per-file ignores for `__init__.py` and tests
+- [x] All Python code passes (155 tests, 0 lint errors)
+
+#### Clippy Linting (Rust)
+- [x] Clean codebase with no warnings
+- [x] `#[allow(dead_code)]` annotations for planned-but-unused features
+- [x] All Rust code passes (127 tests, 0 clippy warnings)
+
+#### GitHub Actions CI
+- [x] `.github/workflows/ci.yml` - Automated CI on push/PR
+- [x] Rust job: Clippy + cargo test
+- [x] Python job: Ruff + pytest
+
+**Commands:**
+```bash
+# Linting
+cargo clippy --all       # Rust - should be clean
+python -m ruff check .   # Python - should be clean
+
+# Tests
+cargo test --all         # 127 tests
+pytest tests/ -v         # 155 tests
+```
+
+---
+
 ## ⏳ PLANNED PHASES
 
 ### Phase 7: Production Migration
 
 **Goal:** Run real workloads on UDR
+
+**See:** [PHASE7_PLAN.md](./PHASE7_PLAN.md) for detailed plan
+**See:** [KILLER_DEMOS.md](./KILLER_DEMOS.md) for demo strategy
 
 **Key Steps:**
 1. Audit current data storage and flows
@@ -429,7 +477,7 @@ subscriber.start_background(on_change)
 - Architecture document
 - Demo video/GIF
 - Blog post
-- GitHub Actions CI/CD
+- GitHub Actions CI/CD (done in Phase 6.5!)
 
 ---
 
@@ -537,12 +585,14 @@ From the whitepaper verification:
 # Rust
 cargo build --release
 cargo test --all
+cargo clippy --all       # Linting
 
 # Python bindings
 cd udr_python && maturin develop --release
 
-# Python tests
+# Python tests & linting
 pytest tests/ -v
+python -m ruff check .   # Linting
 ```
 
 **Key Imports:**

@@ -1,0 +1,43 @@
+# UDR Project Configuration
+# This file configures project-wide tools (linting, formatting)
+# Package-specific config is in python/pyproject.toml
+
+[tool.ruff]
+# Gentle configuration - we can tighten over time
+line-length = 100
+target-version = "py39"
+
+# Include all Python files
+include = ["python/**/*.py", "tests/**/*.py", "examples/**/*.py"]
+
+[tool.ruff.lint]
+# Start with essentials only - very gentle
+select = [
+    "E",   # pycodestyle errors (syntax issues)
+    "F",   # pyflakes (undefined names, unused imports)
+    "W",   # pycodestyle warnings
+]
+
+# Ignore some rules that would be too strict initially
+ignore = [
+    "E501",  # Line too long (let's not worry about this yet)
+    "E402",  # Module level import not at top (sometimes needed)
+    "F401",  # Unused imports in __init__.py (often intentional for re-export)
+]
+
+# Per-file ignores for specific patterns
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # Unused imports OK in __init__ (re-exports)
+"tests/**/*.py" = ["F841"]  # Unused variables OK in tests (fixtures)
+
+[tool.ruff.format]
+# Use double quotes (Python convention)
+quote-style = "double"
+# Indent with 4 spaces
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

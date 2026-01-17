@@ -19,6 +19,7 @@ use crate::branch::BranchManager;
 /// Manages cross-table ACID transactions
 pub struct TransactionManager {
     /// Base path for transaction storage
+    #[allow(dead_code)] // Stored for future use (recovery, diagnostics)
     base_path: PathBuf,
 
     /// Transaction log (persists transactions and epochs)

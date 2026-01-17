@@ -2,8 +2,11 @@
 
 **A next-generation data infrastructure that unifies transactional, analytical, and streaming workloads through content-addressable storage, cross-table ACID transactions, and Git-like versioning.**
 
+[![CI](https://github.com/yourusername/unifieddataruntime/actions/workflows/ci.yml/badge.svg)]()
 [![Rust Tests](https://img.shields.io/badge/tests-127%20passed-brightgreen)]()
 [![Python Tests](https://img.shields.io/badge/python%20tests-155%20passed-brightgreen)]()
+[![Clippy](https://img.shields.io/badge/clippy-clean-brightgreen)]()
+[![Ruff](https://img.shields.io/badge/ruff-clean-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
 ## Why UDR?
@@ -261,7 +264,7 @@ v1 = catalog.get_version("users", 1)
 latest = catalog.get_version("users")  # Gets latest
 ```
 
-## Testing
+## Testing & Quality Checks
 
 ```bash
 # Run all Rust tests (127 tests)
@@ -269,6 +272,10 @@ cargo test --all
 
 # Run Python tests (155 tests)
 pytest tests/ -v
+
+# Linting (Phase 6.5)
+cargo clippy --all       # Rust linting
+python -m ruff check .   # Python linting
 ```
 
 ## Project Structure
@@ -374,6 +381,11 @@ See [udr_roadmap.md](./udr_roadmap.md) for the complete development roadmap.
 - ✅ QueryEngine: `get_changes()`, `subscribe()`, `latest_tx_id()`
 - ✅ Interactive demo: `python examples/changelog_demo.py`
 
+**Phase 6.5 Complete - Quality & CI:**
+- ✅ Ruff linting for Python (gentle configuration)
+- ✅ Clippy linting for Rust (clean codebase)
+- ✅ GitHub Actions CI workflow
+
 **Next milestone (Phase 7: Production Migration):**
 - Run real workloads on UDR
 - Validate performance at scale
@@ -381,6 +393,8 @@ See [udr_roadmap.md](./udr_roadmap.md) for the complete development roadmap.
 
 ## References
 
+- [UDR Action Plan](./UDR_ACTION_PLAN.md) - Comprehensive roadmap and strategy
+- [Origin Story](./ORIGIN_STORY.md) - Why I built UDR
 - [Technical Whitepaper](./unified_data_runtime_whitepaper.docx) - Full architectural specification
 - [BLAKE3](https://github.com/BLAKE3-team/BLAKE3) - Cryptographic hash function
 - [DuckDB](https://duckdb.org/) - Analytical SQL engine
