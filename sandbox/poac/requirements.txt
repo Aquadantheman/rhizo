@@ -1,0 +1,4 @@
+# POAC Sandbox Dependencies
+mmh3>=4.0.0          # MurmurHash3 for bloom filters
+scipy>=1.10.0        # Statistical functions for experiments
+numpy>=1.24.0        # Numerical operations
