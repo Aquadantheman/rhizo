@@ -13,6 +13,7 @@ Performance (100k rows, measured):
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Optional, Dict, List, Any, Union
 
 import pyarrow as pa
@@ -161,14 +162,21 @@ class OLAPEngine:
         # Extract table names from query
         table_names = self._extract_table_names(sql)
 
-        # Ensure all tables are loaded and registered
-        for table_name in table_names:
-            version = versions.get(table_name)
-            self._ensure_registered(table_name, version, effective_branch)
+        # Load tables - use parallel loading for multi-table queries
+        if len(table_names) > 1:
+            self._load_tables_parallel(table_names, versions, effective_branch)
+        else:
+            for table_name in table_names:
+                version = versions.get(table_name)
+                self._ensure_registered(table_name, version, effective_branch)
 
         # Execute query with DataFusion
         df = self._ctx.sql(sql)
-        return df.collect()[0] if df.collect() else pa.table({})
+        batches = df.collect()
+        if not batches:
+            return pa.table({})
+        # Convert record batches to table
+        return pa.Table.from_batches(batches)
 
     def query_pandas(
         self,
@@ -370,6 +378,67 @@ class OLAPEngine:
             del self._registered[old_key]
 
         self._registered[reg_key] = True
+
+    def _load_tables_parallel(
+        self,
+        table_names: List[str],
+        versions: Dict[str, int],
+        branch: str,
+        max_workers: int = 4,
+    ) -> None:
+        """
+        Load multiple tables in parallel for better performance on JOINs.
+
+        Parallelizes disk reads and cache operations, but DataFusion
+        registration is done sequentially (context is not thread-safe).
+
+        Args:
+            table_names: List of table names to load
+            versions: Version overrides
+            branch: Branch to load from
+            max_workers: Maximum parallel workers (default: 4)
+        """
+        # First, parallel load into cache (disk I/O bound)
+        def load_to_cache(table_name: str) -> tuple:
+            """Load a single table into cache, return (name, version, table)."""
+            version = versions.get(table_name)
+            resolved_version = self._resolve_version(table_name, version, branch)
+
+            cache_key = CacheKey(
+                table_name=table_name.lower(),
+                version=resolved_version,
+                branch=branch,
+            )
+
+            # Check cache first
+            table = self._cache.get(cache_key)
+            if table is None:
+                # Load from disk
+                table = self._reader.read_arrow(table_name, resolved_version)
+                self._cache.put(cache_key, table)
+
+            return (table_name, resolved_version, table)
+
+        # Parallel load phase
+        loaded_tables = []
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(table_names))) as executor:
+            futures = {executor.submit(load_to_cache, name): name for name in table_names}
+            for future in as_completed(futures):
+                loaded_tables.append(future.result())
+
+        # Sequential registration phase (DataFusion context not thread-safe)
+        for table_name, resolved_version, table in loaded_tables:
+            reg_key = (table_name.lower(), resolved_version, branch)
+            if reg_key not in self._registered:
+                self._deregister_table_from_datafusion(table_name)
+                self._ctx.register_record_batches(table_name.lower(), [table.to_batches()])
+
+                # Clear old registrations
+                old_keys = [k for k in self._registered if k[0] == table_name.lower()]
+                for old_key in old_keys:
+                    del self._registered[old_key]
+
+                self._registered[reg_key] = True
 
     def _deregister_table_from_datafusion(self, table_name: str) -> None:
         """Deregister a table from DataFusion context."""
