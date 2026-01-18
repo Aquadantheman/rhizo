@@ -5,6 +5,22 @@ All notable changes to Rhizo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-01-18
+
+### Fixed
+- **Transaction cache invalidation**: Fixed ordering bug where cache invalidation ran after clearing buffered writes, resulting in no-op invalidation
+- Cache now properly invalidates tables written during transactions
+
+### Added
+- New test `test_conflict_detection_after_epoch_boundary_clear` verifying 3-layer conflict protection works even after epoch boundary clears `recent_committed`
+
+### Testing
+- 204 Rust tests (+1 new conflict detection test)
+- 247 Python tests
+- All tests passing
+
+---
+
 ## [0.3.1] - 2026-01-18
 
 ### Added

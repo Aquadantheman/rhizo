@@ -6,7 +6,7 @@ Rhizo is a next-generation data infrastructure that unifies transactional, analy
 
 [![CI](https://github.com/aquadantheman/unifieddataruntime/actions/workflows/ci.yml/badge.svg)](https://github.com/aquadantheman/unifieddataruntime/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-173%20tests-blue)](https://github.com/aquadantheman/unifieddataruntime)
+[![Rust](https://img.shields.io/badge/rust-204%20tests-blue)](https://github.com/aquadantheman/unifieddataruntime)
 [![Python](https://img.shields.io/badge/python-247%20tests-blue)](https://github.com/aquadantheman/unifieddataruntime)
 
 ---
@@ -234,7 +234,7 @@ Application Layer
 | Phase A: Merkle Storage | O(change) deduplication via Merkle trees | Complete |
 | **Phase P: Performance** | Native Rust Parquet, parallel I/O | **Complete** |
 
-**All phases complete. 352 tests passing (173 Rust + 179 Python).**
+**All phases complete. 451 tests passing (204 Rust + 247 Python).**
 
 ### Performance Optimization Journey
 

@@ -199,3 +199,51 @@ Arrow RecordBatch (filtered, projected)
       v
 OLAP Engine (DataFusion) --[LRU cache]--> Fast repeated queries
 ```
+
+## Arrow Chunk Cache (Phase P.5)
+
+**Speedup: 15x** for repeated reads
+
+The Arrow chunk cache stores decoded Arrow RecordBatches, eliminating both disk I/O and Parquet decoding on cache hits.
+
+### Enable Caching (enabled by default)
+
+```python
+reader = TableReader(
+    store, catalog,
+    enable_chunk_cache=True,      # Default: True
+    chunk_cache_size_mb=100       # Default: 100MB
+)
+
+# Check cache performance
+stats = reader.cache_stats()
+print(f"Hit rate: {stats.hit_rate:.1%}")
+print(f"Utilization: {stats.utilization:.1%}")
+
+# Clear cache if needed
+reader.clear_cache()
+```
+
+### Why It Works
+
+Rhizo's content-addressed storage makes caching highly effective:
+- **Immutable chunks**: Same hash = same content forever (no invalidation needed)
+- **Shared across tables**: Common data between tables hits cache
+- **Shared across versions**: Unchanged data between versions hits cache
+- **Shared across branches**: Branched data that wasn't modified hits cache
+
+### Performance
+
+| Metric | Value |
+|--------|-------|
+| Cache hit read | 0.24ms |
+| Uncached read | 3.6ms |
+| Speedup | **15x** |
+| Typical hit rate | 91%+ |
+
+### Best Practices
+
+1. **Keep default settings** for most workloads (100MB cache, enabled)
+2. **Increase cache size** for read-heavy analytical workloads
+3. **Check hit rate** to validate cache effectiveness
+4. **Use with time travel** - historical versions often share chunks with current
