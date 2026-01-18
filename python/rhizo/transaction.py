@@ -341,10 +341,11 @@ class TransactionContext:
             except Exception:
                 pass  # Ignore cleanup errors
 
-        self._temp_tables.clear()
-        self._buffered_writes.clear()
-
         # Invalidate engine's cache for tables we wrote to
         # (they may need to be reloaded with committed versions)
+        # Must happen BEFORE clearing _buffered_writes
         for table_name in list(self._buffered_writes.keys()):
             self._engine._invalidate_cache(table_name)
+
+        self._temp_tables.clear()
+        self._buffered_writes.clear()

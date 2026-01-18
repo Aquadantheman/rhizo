@@ -810,4 +810,51 @@ mod tests {
         let active = manager.active_transactions().unwrap();
         assert_eq!(active.len(), 2);
     }
+
+    #[test]
+    fn test_conflict_detection_after_epoch_boundary_clear() {
+        // This test verifies that conflict detection works even when
+        // recent_committed is cleared (simulating an epoch boundary).
+        // The system should still detect conflicts via:
+        // 1. validate_snapshot (checks if tables changed since tx start)
+        // 2. catalog version enforcement (rejects duplicate versions)
+
+        let (manager, _temp) = create_test_manager();
+
+        // Start two transactions (both see same initial state)
+        let tx1 = manager.begin(None).unwrap();
+        let tx2 = manager.begin(None).unwrap();
+
+        // Both want to write to same table, version 1
+        let write1 = TableWrite::new("users", 1, vec!["chunk1".to_string()]);
+        let write2 = TableWrite::new("users", 1, vec!["chunk2".to_string()]);
+
+        manager.add_write(tx1, write1).unwrap();
+        manager.add_write(tx2, write2).unwrap();
+
+        // First commit succeeds
+        manager.commit(tx1).unwrap();
+
+        // Clear recent_committed (simulating epoch boundary)
+        manager.clear_recent_committed().unwrap();
+
+        // Second commit should STILL fail due to either:
+        // - validate_snapshot detecting users changed from v0 to v1
+        // - catalog version enforcement rejecting duplicate v1
+        let result = manager.commit(tx2);
+
+        // Should fail with either SnapshotConflict or CatalogError
+        assert!(result.is_err(),
+            "TX2 should fail after epoch boundary clear, but got: {:?}", result);
+
+        // Verify it's a conflict-related error, not some other error
+        let err = result.unwrap_err();
+        let is_conflict = matches!(
+            err,
+            TransactionError::WriteConflict(_) |
+            TransactionError::SnapshotConflict { .. } |
+            TransactionError::CatalogError(_)
+        );
+        assert!(is_conflict, "Expected conflict error, got: {:?}", err);
+    }
 }
