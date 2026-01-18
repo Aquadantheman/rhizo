@@ -1,0 +1,31 @@
+{
+  "metadata": {
+    "timestamp": "2026-01-17 21:21:03",
+    "num_rows": 100000,
+    "num_columns": 10
+  },
+  "armillaria": {
+    "write": 55.23,
+    "read": 16.2,
+    "time_travel": 14.38,
+    "filtered_read": 11.65,
+    "projection": 7.22,
+    "combined": 11.92
+  },
+  "delta_lake": {
+    "write": 65.95,
+    "read": 24.01,
+    "time_travel": 19.23,
+    "filtered_read": 15.48,
+    "projection": 9.61,
+    "combined": 9.68
+  },
+  "raw_parquet": {
+    "write": 50.31,
+    "read": 5.39,
+    "time_travel": "N/A",
+    "filtered_read": 5.77,
+    "projection": 2.94,
+    "combined": 3.09
+  }
+}
