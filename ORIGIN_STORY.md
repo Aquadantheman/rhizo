@@ -1,4 +1,4 @@
-# Why I Built Armillaria
+# Why I Built Rhizo
 
 I was building a real estate analytics platform called Lotitude - aggregating 50+ public data sources into a unified scoring system for 856,000 NYC parcels. Every night, I'd refresh 77 data compounds, rebuild a master table, and push it to production.
 
@@ -10,7 +10,7 @@ I looked at Delta Lake, Iceberg, Hudi. They solved single-table versioning, but 
 
 Nothing unified it all.
 
-So I built Armillaria.
+So I built Rhizo.
 
 Content-addressable storage for automatic deduplication. Cross-table ACID transactions. Git-like branching for data. Time travel queries. Change tracking without Kafka. One system instead of five.
 
@@ -20,16 +20,16 @@ I built this for myself. But the more I used it, the more I realized: every data
 
 Linus Torvalds built Linux in 1991. Fourteen years later, he got frustrated with the source control tools available for managing Linux development, so he built Git. Git became arguably more influential than Linux itself.
 
-I'm not comparing myself to Linus. But the pattern resonates: Lotitude is my Linux - the thing I actually wanted to build. Armillaria is my Git - the infrastructure I built because nothing else worked.
+I'm not comparing myself to Linus. But the pattern resonates: Lotitude is my Linux - the thing I actually wanted to build. Rhizo is my Git - the infrastructure I built because nothing else worked.
 
 Lotitude stays proprietary. The scoring algorithms, the domain expertise - that's my edge.
 
-But Armillaria? That's just infrastructure. It shouldn't be proprietary. Every data team deserves these primitives.
+But Rhizo? That's just infrastructure. It shouldn't be proprietary. Every data team deserves these primitives.
 
 So I'm open-sourcing it.
 
 ---
 
-**Armillaria is available now at [github.com/aquadantheman/armillaria](https://github.com/aquadantheman/armillaria)**
+**Rhizo is available now at [github.com/aquadantheman/rhizo](https://github.com/aquadantheman/rhizo)**
 
 If you've ever held your breath during a data pipeline run, I built this for you.

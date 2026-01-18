@@ -840,7 +840,7 @@ import numpy as np
 
 df = pd.DataFrame({'id': range(100000), 'value': np.random.random(100000)})
 with tempfile.TemporaryDirectory() as d:
-    r = benchmark_armillaria_write(df, d)
+    r = benchmark_rhizo_write(df, d)
     print(f'Write: {r.throughput_mb_s:.1f} MB/s')
 "
 

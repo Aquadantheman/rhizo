@@ -99,12 +99,12 @@ Rhizo is the next generation of data infrastructure—one system that replaces t
 - [x] JOIN queries across multiple tables
 - [x] Multiple result formats (pandas, Arrow, dict)
 - [x] Chunking for large tables
-- [x] Type stubs for IDE support (`udr.pyi`)
+- [x] Type stubs for IDE support (`_rhizo.pyi`)
 
 **Key Files:**
-- `python/udr_query/writer.py`
-- `python/udr_query/reader.py`
-- `python/udr_query/engine.py`
+- `python/rhizo/writer.py`
+- `python/rhizo/reader.py`
+- `python/rhizo/engine.py`
 - `tests/test_query_layer.py`
 
 ---
@@ -229,7 +229,7 @@ Branch:
 - [x] `ConflictDetector` trait with `TableLevelConflictDetector`
 - [x] `RecoveryManager` for crash recovery
 - [x] Python bindings (`PyTransactionManager`, `PyTransactionInfo`, `PyRecoveryReport`)
-- [x] Type stubs in `udr.pyi`
+- [x] Type stubs in `_rhizo.pyi`
 
 **Key Files:**
 - `rhizo_core/src/transaction/types.rs` - Core types (TxId, TransactionRecord, WriteGranularity)
@@ -255,9 +255,9 @@ Branch:
 - [x] Snapshot conflict detection
 
 **Key Files:**
-- `python/udr_query/transaction.py` - TransactionContext class
-- `python/udr_query/engine.py` - Added transaction() method
-- `python/udr_query/writer.py` - Added write_chunks_only() for transactions
+- `python/rhizo/transaction.py` - TransactionContext class
+- `python/rhizo/engine.py` - Added transaction() method
+- `python/rhizo/writer.py` - Added write_chunks_only() for transactions
 - `tests/test_transactions.py` - 28 integration tests
 
 **Test Count:** 28 new Python tests (109 total Python, 219 total)
@@ -299,7 +299,7 @@ with engine.transaction() as tx:
 **Key Files:**
 - `rhizo_core/src/transaction/manager.rs` - Added recover(), recover_and_apply(), verify_consistency()
 - `rhizo_python/src/lib.rs` - Updated Python bindings with recovery methods
-- `python/udr_query/engine.py` - Added verify_integrity() and recover() convenience methods
+- `python/rhizo/engine.py` - Added verify_integrity() and recover() convenience methods
 - `tests/test_recovery.py` - 22 recovery integration tests
 
 **Test Count:** 22 new Python tests (131 total Python, 241 total)
@@ -359,7 +359,7 @@ if not health["is_healthy"]:
 - [x] `PyChangelogEntry` with helper methods (changed_tables, contains_table, get_change)
 - [x] `PyTableChange` with is_new_table()
 - [x] `PyTransactionManager.get_changelog()` and `latest_tx_id()`
-- [x] Type stubs in `udr.pyi`
+- [x] Type stubs in `_rhizo.pyi`
 
 #### Phase 6.2: Subscriber API (Python)
 - [x] `Subscriber` class with multiple interfaces:
@@ -372,8 +372,8 @@ if not health["is_healthy"]:
 - [x] 24 new Python tests (155 total)
 
 **Key Files:**
-- `python/udr_query/subscriber.py` - Subscriber class, ChangeEvent
-- `python/udr_query/engine.py` - get_changes(), subscribe(), latest_tx_id()
+- `python/rhizo/subscriber.py` - Subscriber class, ChangeEvent
+- `python/rhizo/engine.py` - get_changes(), subscribe(), latest_tx_id()
 - `tests/test_changelog.py` - Comprehensive tests
 
 #### Phase 6.3: Demo & Documentation
@@ -663,12 +663,12 @@ python -m ruff check .   # Linting
 
 **Key Imports:**
 ```python
-import udr
-from udr_query import TableWriter, TableReader, QueryEngine
+import _rhizo
+from rhizo import TableWriter, TableReader, QueryEngine
 ```
 
 **Test Counts:**
-- Rust: 173 tests
+- Rust: 204 tests
 - Python: 247 tests (including OLAP, time travel SQL, changelog SQL)
 
 ---
