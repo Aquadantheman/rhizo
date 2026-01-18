@@ -18,23 +18,23 @@ import shutil
 import pytest
 import pandas as pd
 
-import armillaria
-from armillaria_query import QueryEngine
+import _rhizo
+from rhizo import QueryEngine
 
 
 @pytest.fixture
 def temp_storage():
     """Create temporary storage directories for testing."""
-    base_dir = tempfile.mkdtemp(prefix="armillaria_recovery_test_")
+    base_dir = tempfile.mkdtemp(prefix="rhizo_recovery_test_")
     chunks_dir = os.path.join(base_dir, "chunks")
     catalog_dir = os.path.join(base_dir, "catalog")
     branches_dir = os.path.join(base_dir, "branches")
     tx_dir = os.path.join(base_dir, "transactions")
 
-    store = armillaria.PyChunkStore(chunks_dir)
-    catalog = armillaria.PyCatalog(catalog_dir)
-    branches = armillaria.PyBranchManager(branches_dir)
-    tx_manager = armillaria.PyTransactionManager(tx_dir, catalog_dir, branches_dir)
+    store = _rhizo.PyChunkStore(chunks_dir)
+    catalog = _rhizo.PyCatalog(catalog_dir)
+    branches = _rhizo.PyBranchManager(branches_dir)
+    tx_manager = _rhizo.PyTransactionManager(tx_dir, catalog_dir, branches_dir)
 
     yield store, catalog, branches, tx_manager, base_dir
 

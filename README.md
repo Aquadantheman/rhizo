@@ -1,8 +1,8 @@
-# Armillaria
+# Rhizo
 
 **Named after the largest organism on Earth — a 2,400-year-old honey fungus spanning 2,385 acres, connecting an entire forest underground.**
 
-Armillaria is a next-generation data infrastructure that unifies transactional, analytical, and streaming workloads through content-addressable storage, cross-table ACID transactions, and Git-like versioning.
+Rhizo is a next-generation data infrastructure that unifies transactional, analytical, and streaming workloads through content-addressable storage, cross-table ACID transactions, and Git-like versioning.
 
 [![CI](https://github.com/aquadantheman/unifieddataruntime/actions/workflows/ci.yml/badge.svg)](https://github.com/aquadantheman/unifieddataruntime/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -26,7 +26,7 @@ Existing lakehouse formats (Delta Lake, Iceberg, Hudi) improve single-table vers
 
 ## The Solution
 
-Armillaria replaces the architecture that makes these limitations inevitable.
+Rhizo replaces the architecture that makes these limitations inevitable.
 
 | Capability | What It Enables |
 |------------|-----------------|
@@ -42,31 +42,31 @@ Armillaria replaces the architecture that makes these limitations inevitable.
 
 ### OLAP Performance vs Industry (100K rows)
 
-With the new **DataFusion-powered OLAP engine**, Armillaria delivers industry-leading query performance:
+With the new **DataFusion-powered OLAP engine**, Rhizo delivers industry-leading query performance:
 
-| Metric | Armillaria OLAP | DuckDB | Delta Lake | Parquet | Winner |
+| Metric | Rhizo OLAP | DuckDB | Delta Lake | Parquet | Winner |
 |--------|-----------------|--------|------------|---------|--------|
-| **Read** | **0.9ms** | 23.8ms | 23.9ms | 6.3ms | **Armillaria (26x)** |
-| **Filtered (5%)** | **1.2ms** | 1.8ms | 19.9ms | 7.0ms | **Armillaria** |
-| **Projection** | **0.7ms** | 1.4ms | 14.5ms | 3.5ms | **Armillaria (2x)** |
-| **Complex Query** | **2.9ms** | 6.6ms | 30.5ms | 18.5ms | **Armillaria (2.3x)** |
-| **Storage** | **3.67MB** | 6.26MB | 63.10MB | 3.73MB | **Armillaria (17x vs Delta)** |
+| **Read** | **0.9ms** | 23.8ms | 23.9ms | 6.3ms | **Rhizo (26x)** |
+| **Filtered (5%)** | **1.2ms** | 1.8ms | 19.9ms | 7.0ms | **Rhizo** |
+| **Projection** | **0.7ms** | 1.4ms | 14.5ms | 3.5ms | **Rhizo (2x)** |
+| **Complex Query** | **2.9ms** | 6.6ms | 30.5ms | 18.5ms | **Rhizo (2.3x)** |
+| **Storage** | **3.67MB** | 6.26MB | 63.10MB | 3.73MB | **Rhizo (17x vs Delta)** |
 
-**Armillaria wins 4/6 performance categories** with built-in lakehouse features no competitor matches.
+**Rhizo wins 4/6 performance categories** with built-in lakehouse features no competitor matches.
 
 ### JOIN Performance (10K users x 100K orders)
 
-| Operation | Armillaria OLAP | DuckDB | Delta Lake |
+| Operation | Rhizo OLAP | DuckDB | Delta Lake |
 |-----------|-----------------|--------|------------|
 | Simple JOIN | **2.9ms** | 7.5ms | 31.5ms |
 | JOIN + Filter | **3.0ms** | 5.9ms | 33.4ms |
 | JOIN + Aggregate | **4.2ms** | 5.6ms | 34.0ms |
 
-**Armillaria wins all JOIN categories.**
+**Rhizo wins all JOIN categories.**
 
 ### Scale Performance (1M rows)
 
-| Metric | Armillaria OLAP | DuckDB | Speedup |
+| Metric | Rhizo OLAP | DuckDB | Speedup |
 |--------|-----------------|--------|---------|
 | Read | **5.1ms** | 257.2ms | **50x faster** |
 | Filter | **1.9ms** | 14.2ms | **7.5x faster** |
@@ -74,7 +74,7 @@ With the new **DataFusion-powered OLAP engine**, Armillaria delivers industry-le
 
 ### Unique Features (No Competitor Has All)
 
-| Feature | Armillaria | Delta Lake | DuckDB | Iceberg |
+| Feature | Rhizo | Delta Lake | DuckDB | Iceberg |
 |---------|------------|------------|--------|---------|
 | **OLAP Query Speed** | **Yes** | No | Yes | No |
 | **Time Travel SQL** | **Yes** (`VERSION 5`) | API only | No | API only |
@@ -106,7 +106,7 @@ With the new **DataFusion-powered OLAP engine**, Armillaria delivers industry-le
 
 ### Feature Comparison
 
-| Feature | Armillaria | Delta Lake | Iceberg | Hudi |
+| Feature | Rhizo | Delta Lake | Iceberg | Hudi |
 |---------|------------|------------|---------|------|
 | **Cross-table ACID** | **Yes** | No | No | No |
 | **Zero-copy branching** | **Yes** | No | No* | No |
@@ -126,19 +126,19 @@ With the new **DataFusion-powered OLAP engine**, Armillaria delivers industry-le
 ### Installation
 
 ```bash
-pip install armillaria-query
+pip install rhizo-query
 ```
 
 ### Basic Usage
 
 ```python
-import armillaria
-from armillaria_query import QueryEngine
+import rhizo
+from rhizo import QueryEngine
 import pandas as pd
 
 # Initialize
-store = armillaria.PyChunkStore("./data/chunks")
-catalog = armillaria.PyCatalog("./data/catalog")
+store = rhizo.PyChunkStore("./data/chunks")
+catalog = rhizo.PyCatalog("./data/catalog")
 engine = QueryEngine(store, catalog)
 
 # Write data
@@ -200,7 +200,7 @@ with engine.transaction() as tx:
 
 ```
 Application Layer
-    Python (armillaria_query) | Rust | CLI (planned)
+    Python (rhizo) | Rust | CLI (planned)
     TableWriter | TableReader | QueryEngine (DuckDB)
                             |
                             v
@@ -250,8 +250,8 @@ Phase P.4 moved Parquet encoding from Python to Rust using `arrow-rs`, `parquet`
 ## Project Structure
 
 ```
-armillaria/
-├── udr_core/                 # Rust core library
+rhizo/
+├── rhizo_core/                 # Rust core library
 │   └── src/
 │       ├── chunk_store/      # Content-addressable storage
 │       ├── catalog/          # Versioned catalog
@@ -260,8 +260,8 @@ armillaria/
 │       ├── changelog/        # Change tracking
 │       └── merkle/           # Merkle tree deduplication
 │
-├── udr_python/               # PyO3 bindings
-├── python/armillaria_query/  # Python query layer
+├── rhizo_python/               # PyO3 bindings
+├── python/rhizo/  # Python query layer
 ├── tests/                    # Test suites
 └── examples/                 # Interactive demos
 ```
@@ -284,7 +284,7 @@ armillaria/
 - [Technical Foundations](./docs/TECHNICAL_FOUNDATIONS.md) — Mathematical proofs and complexity analysis
 - [Development Roadmap](./udr_roadmap.md) — Planned features and architecture
 - [Changelog](./CHANGELOG.md) — Version history
-- [Origin Story](./ORIGIN_STORY.md) — Why I built Armillaria
+- [Origin Story](./ORIGIN_STORY.md) — Why I built Rhizo
 - [Contributing](./CONTRIBUTING.md) — How to contribute
 
 ---

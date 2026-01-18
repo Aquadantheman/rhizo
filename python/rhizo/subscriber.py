@@ -15,7 +15,7 @@ import time
 import threading
 
 if TYPE_CHECKING:
-    import armillaria
+    import _rhizo
 
 
 @dataclass
@@ -44,7 +44,7 @@ class ChangeEvent:
     chunk_hashes: List[str]
 
     @classmethod
-    def from_changelog_entry(cls, entry: "armillaria.PyChangelogEntry") -> List["ChangeEvent"]:
+    def from_changelog_entry(cls, entry: "_rhizo.PyChangelogEntry") -> List["ChangeEvent"]:
         """
         Convert a changelog entry to individual change events.
 
@@ -107,7 +107,7 @@ class Subscriber:
 
     def __init__(
         self,
-        transaction_manager: "armillaria.PyTransactionManager",
+        transaction_manager: "_rhizo.PyTransactionManager",
         since_tx_id: Optional[int] = None,
         tables: Optional[List[str]] = None,
         branch: Optional[str] = None,
@@ -237,7 +237,7 @@ class Subscriber:
         """Check if background subscriber is running."""
         return self._running
 
-    def _poll(self) -> List["armillaria.PyChangelogEntry"]:
+    def _poll(self) -> List["_rhizo.PyChangelogEntry"]:
         """
         Poll for new changelog entries from the transaction manager.
 

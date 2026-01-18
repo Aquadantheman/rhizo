@@ -14,8 +14,9 @@ import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
-import armillaria
-from armillaria_query import (
+import rhizo
+import _rhizo
+from rhizo import (
     OLAPEngine,
     QueryEngine,
     TableWriter,
@@ -71,8 +72,8 @@ def run_benchmark():
         chunks_path = os.path.join(tmp_dir, "chunks")
         catalog_path = os.path.join(tmp_dir, "catalog")
 
-        store = armillaria.PyChunkStore(chunks_path)
-        catalog = armillaria.PyCatalog(catalog_path)
+        store = _rhizo.PyChunkStore(chunks_path)
+        catalog = _rhizo.PyCatalog(catalog_path)
         writer = TableWriter(store, catalog)
 
         # Create test data

@@ -1,4 +1,4 @@
-# UDR Project Configuration
+# Rhizo Project Configuration
 # This file configures project-wide tools (linting, formatting)
 # Package-specific config is in python/pyproject.toml
 
@@ -41,3 +41,8 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+
+[tool.pyright]
+stubPath = "python"
+extraPaths = ["python"]
+pythonVersion = "3.9"

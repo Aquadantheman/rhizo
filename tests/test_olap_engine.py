@@ -15,7 +15,7 @@ import pandas as pd
 import pyarrow as pa
 import pytest
 
-from armillaria_query import (
+from rhizo import (
     CacheManager,
     CacheKey,
     CacheStats,
@@ -196,13 +196,12 @@ class TestCacheManager:
 @pytest.fixture
 def olap_setup(tmp_path):
     """Create OLAP engine with test data."""
-    import armillaria
-
+    import _rhizo
     chunks_path = str(tmp_path / "chunks")
     catalog_path = str(tmp_path / "catalog")
 
-    store = armillaria.PyChunkStore(chunks_path)
-    catalog = armillaria.PyCatalog(catalog_path)
+    store = _rhizo.PyChunkStore(chunks_path)
+    catalog = _rhizo.PyCatalog(catalog_path)
     writer = TableWriter(store, catalog)
 
     # Create test data
@@ -477,15 +476,14 @@ class TestOLAPIntegration:
 
     def test_olap_with_branches(self, tmp_path):
         """Test OLAP queries with branching."""
-        import armillaria
-
+        import _rhizo
         chunks_path = str(tmp_path / "chunks")
         catalog_path = str(tmp_path / "catalog")
         branches_path = str(tmp_path / "branches")
 
-        store = armillaria.PyChunkStore(chunks_path)
-        catalog = armillaria.PyCatalog(catalog_path)
-        branches = armillaria.PyBranchManager(branches_path)
+        store = _rhizo.PyChunkStore(chunks_path)
+        catalog = _rhizo.PyCatalog(catalog_path)
+        branches = _rhizo.PyBranchManager(branches_path)
         writer = TableWriter(store, catalog)
 
         # Write initial data

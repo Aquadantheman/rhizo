@@ -23,8 +23,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 import pandas as pd
 
 # Import Armillaria components
-import armillaria
-from armillaria_query import QueryEngine
+import rhizo
+import _rhizo
+from rhizo import QueryEngine
 
 
 def print_section(title: str):
@@ -47,7 +48,7 @@ def main():
     """)
 
     # Create temporary storage
-    temp_dir = tempfile.mkdtemp(prefix="armillaria_demo_")
+    temp_dir = tempfile.mkdtemp(prefix="rhizo_demo_")
     chunks_dir = os.path.join(temp_dir, "chunks")
     catalog_dir = os.path.join(temp_dir, "catalog")
 
@@ -55,8 +56,8 @@ def main():
 
     try:
         # Initialize Armillaria components
-        store = armillaria.PyChunkStore(chunks_dir)
-        catalog = armillaria.PyCatalog(catalog_dir)
+        store = _rhizo.PyChunkStore(chunks_dir)
+        catalog = _rhizo.PyCatalog(catalog_dir)
         engine = QueryEngine(store, catalog)
 
         # =================================================================

@@ -17,7 +17,8 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-import armillaria
+import _rhizo
+import rhizo
 
 
 @dataclass
@@ -106,21 +107,21 @@ def run_benchmark(
     original_data = generate_unique_data(data_size)
 
     # Build original tree
-    config = armillaria.PyMerkleConfig(chunk_size=chunk_size)
+    config = _rhizo.PyMerkleConfig(chunk_size=chunk_size)
 
     start = time.perf_counter()
-    original_tree = armillaria.merkle_build_tree(original_data, config)
+    original_tree = rhizo.merkle_build_tree(original_data, config)
     build_time = (time.perf_counter() - start) * 1000
 
     # Modify data
     modified_data = modify_data(original_data, change_ratio, change_location)
 
     # Build new tree
-    new_tree = armillaria.merkle_build_tree(modified_data, config)
+    new_tree = rhizo.merkle_build_tree(modified_data, config)
 
     # Calculate diff
     start = time.perf_counter()
-    diff = armillaria.merkle_diff_trees(original_tree, new_tree)
+    diff = rhizo.merkle_diff_trees(original_tree, new_tree)
     diff_time = (time.perf_counter() - start) * 1000
 
     return BenchmarkResult(
@@ -237,8 +238,8 @@ def run_storage_comparison():
         original_data = generate_unique_data(data_size)
 
         # Store as Merkle tree
-        config = armillaria.PyMerkleConfig(chunk_size=64*1024)
-        tree1 = armillaria.merkle_build_tree(original_data, config)
+        config = _rhizo.PyMerkleConfig(chunk_size=64*1024)
+        tree1 = rhizo.merkle_build_tree(original_data, config)
 
         # Store each chunk
         stored_hashes = set()
@@ -251,7 +252,7 @@ def run_storage_comparison():
 
         # Modify 5% and create new tree
         modified_data = modify_data(original_data, 0.05)
-        tree2 = armillaria.merkle_build_tree(modified_data, config)
+        tree2 = rhizo.merkle_build_tree(modified_data, config)
 
         # Count new chunks needed
         new_chunks = 0
@@ -260,7 +261,7 @@ def run_storage_comparison():
                 new_chunks += 1
                 stored_hashes.add(chunk_hash)
 
-        diff = armillaria.merkle_diff_trees(tree1, tree2)
+        diff = rhizo.merkle_diff_trees(tree1, tree2)
 
         print(f"Original data:     {data_size / 1024 / 1024:.1f} MB ({chunks_v1} chunks)")
         print(f"Modified data:     {data_size / 1024 / 1024:.1f} MB ({tree2.chunk_count()} chunks)")

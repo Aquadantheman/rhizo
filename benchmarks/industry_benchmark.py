@@ -28,11 +28,11 @@ import pyarrow.parquet as pq
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 
 # Armillaria
-from armillaria import PyChunkStore, PyCatalog
-from armillaria_query import TableWriter, TableReader, Filter
+from _rhizo import PyChunkStore, PyCatalog
+from rhizo import TableWriter, TableReader, Filter
 
 # Check available systems
-SYSTEMS = {"armillaria": True, "parquet": True}
+SYSTEMS = {"rhizo": True, "parquet": True}
 
 try:
     from deltalake import DeltaTable, write_deltalake
@@ -114,7 +114,7 @@ def benchmark(func, warmup: int = 1, iterations: int = 5):
     return round(np.median(times), 2) if times else float('inf')
 
 
-def run_armillaria(df: pd.DataFrame, temp_dir: str) -> dict:
+def run_rhizo(df: pd.DataFrame, temp_dir: str) -> dict:
     """Benchmark Armillaria."""
     results = {}
 
@@ -296,7 +296,7 @@ def main():
         print("Running benchmarks...")
 
         print("  Armillaria...", end=" ", flush=True)
-        results["armillaria"] = run_armillaria(df, temp_dir)
+        results["rhizo"] = run_rhizo(df, temp_dir)
         print("done")
 
         print("  Delta Lake...", end=" ", flush=True)
@@ -316,7 +316,7 @@ def main():
         print("PERFORMANCE RESULTS (lower is better)")
         print("=" * 90)
 
-        systems = ["armillaria", "delta_lake", "duckdb", "parquet"]
+        systems = ["rhizo", "delta_lake", "duckdb", "parquet"]
         header = f"{'Metric':<20}" + "".join(f"{s:>15}" for s in systems)
         print(f"\n{header}")
         print("-" * 90)
@@ -369,15 +369,15 @@ def main():
         print("=" * 90)
 
         features = [
-            ("Time Travel", ["armillaria", "delta_lake"], ["duckdb", "parquet"]),
-            ("ACID Transactions", ["armillaria", "delta_lake", "duckdb"], ["parquet"]),
-            ("Cross-table TX", ["armillaria"], ["delta_lake", "duckdb", "parquet"]),
-            ("Branching", ["armillaria"], ["delta_lake", "duckdb", "parquet"]),
-            ("CDC/Changelog", ["armillaria"], ["delta_lake", "duckdb", "parquet"]),
-            ("Deduplication", ["armillaria"], ["delta_lake", "duckdb", "parquet"]),
-            ("Merkle Integrity", ["armillaria"], ["delta_lake", "duckdb", "parquet"]),
-            ("SQL Queries", ["duckdb"], ["armillaria", "delta_lake", "parquet"]),
-            ("Spark Integration", ["delta_lake"], ["armillaria", "duckdb", "parquet"]),
+            ("Time Travel", ["rhizo", "delta_lake"], ["duckdb", "parquet"]),
+            ("ACID Transactions", ["rhizo", "delta_lake", "duckdb"], ["parquet"]),
+            ("Cross-table TX", ["rhizo"], ["delta_lake", "duckdb", "parquet"]),
+            ("Branching", ["rhizo"], ["delta_lake", "duckdb", "parquet"]),
+            ("CDC/Changelog", ["rhizo"], ["delta_lake", "duckdb", "parquet"]),
+            ("Deduplication", ["rhizo"], ["delta_lake", "duckdb", "parquet"]),
+            ("Merkle Integrity", ["rhizo"], ["delta_lake", "duckdb", "parquet"]),
+            ("SQL Queries", ["duckdb"], ["rhizo", "delta_lake", "parquet"]),
+            ("Spark Integration", ["delta_lake"], ["rhizo", "duckdb", "parquet"]),
         ]
 
         print(f"\n{'Feature':<25}" + "".join(f"{s:>15}" for s in systems))

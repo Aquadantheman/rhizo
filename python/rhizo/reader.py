@@ -20,11 +20,11 @@ import pyarrow.parquet as pq
 
 if TYPE_CHECKING:
     import pandas as pd
-    from armillaria import PyPredicateFilter
+    from _rhizo import PyPredicateFilter
 
 # Try to import native Parquet decoder (Phase 4) and filters (Phase R.2)
 try:
-    from armillaria import PyParquetDecoder, PyPredicateFilter as _PyPredicateFilter
+    from _rhizo import PyParquetDecoder, PyPredicateFilter as _PyPredicateFilter
     _NATIVE_PARQUET_AVAILABLE = True
 except ImportError:
     _NATIVE_PARQUET_AVAILABLE = False
@@ -59,7 +59,7 @@ class Filter:
         if not _NATIVE_PARQUET_AVAILABLE:
             raise RuntimeError(
                 "Filter requires native Parquet decoder. "
-                "Please ensure the armillaria package is installed correctly."
+                "Please ensure the rhizo package is installed correctly."
             )
         self.column = column
 
@@ -110,8 +110,8 @@ class TableReader:
     - Full table materialization
 
     Example:
-        >>> from armillaria import PyChunkStore, PyCatalog
-        >>> from armillaria_query import TableReader
+        >>> from _rhizo import PyChunkStore, PyCatalog
+        >>> from rhizo import TableReader
         >>>
         >>> store = PyChunkStore("./data/chunks")
         >>> catalog = PyCatalog("./data/catalog")

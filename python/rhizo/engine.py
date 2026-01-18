@@ -26,7 +26,7 @@ from .olap_engine import OLAPEngine, is_datafusion_available
 
 if TYPE_CHECKING:
     import pandas as pd
-    import armillaria
+    import _rhizo
     from .transaction import TransactionContext
     from .subscriber import Subscriber
 
@@ -106,8 +106,8 @@ class QueryEngine:
     Tables are loaded on-demand and cached for performance.
 
     Example:
-        >>> from armillaria import PyChunkStore, PyCatalog, PyBranchManager
-        >>> from armillaria_query import QueryEngine
+        >>> from _rhizo import PyChunkStore, PyCatalog, PyBranchManager
+        >>> from rhizo import QueryEngine
         >>>
         >>> store = PyChunkStore("./data/chunks")
         >>> catalog = PyCatalog("./data/catalog")
@@ -144,11 +144,11 @@ class QueryEngine:
 
     def __init__(
         self,
-        store: "armillaria.PyChunkStore",
-        catalog: "armillaria.PyCatalog",
+        store: "_rhizo.PyChunkStore",
+        catalog: "_rhizo.PyCatalog",
         verify_integrity: bool = False,
-        branch_manager: Optional["armillaria.PyBranchManager"] = None,
-        transaction_manager: Optional["armillaria.PyTransactionManager"] = None,
+        branch_manager: Optional["_rhizo.PyBranchManager"] = None,
+        transaction_manager: Optional["_rhizo.PyTransactionManager"] = None,
         enable_olap: bool = True,
         olap_cache_size: int = 1_000_000_000,
     ):

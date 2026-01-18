@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 # Try to import native Parquet encoder (Phase 4)
 try:
-    from armillaria import PyParquetEncoder
+    from _rhizo import PyParquetEncoder
     _NATIVE_PARQUET_AVAILABLE = True
 except ImportError:
     _NATIVE_PARQUET_AVAILABLE = False
@@ -67,8 +67,8 @@ class TableWriter:
     Writes data to Armillaria as versioned, content-addressable Parquet chunks.
 
     Example:
-        >>> from armillaria import PyChunkStore, PyCatalog
-        >>> from armillaria_query import TableWriter
+        >>> from _rhizo import PyChunkStore, PyCatalog
+        >>> from rhizo import TableWriter
         >>>
         >>> store = PyChunkStore("./data/chunks")
         >>> catalog = PyCatalog("./data/catalog")
@@ -157,10 +157,10 @@ class TableWriter:
         version = self._get_next_version(table_name)
 
         # Import here to avoid circular dependency
-        import armillaria
+        import _rhizo
 
         # Create and commit the version
-        table_version = armillaria.PyTableVersion(table_name, version, chunk_hashes)
+        table_version = _rhizo.PyTableVersion(table_name, version, chunk_hashes)
         # Note: metadata handling would require extending PyTableVersion
 
         committed_version = self.catalog.commit(table_version)

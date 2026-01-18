@@ -32,11 +32,11 @@ import pyarrow.parquet as pq
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 
 # Armillaria imports
-from armillaria import (
+from rhizo import (
     PyChunkStore, PyCatalog, PyBranchManager, PyTransactionManager,
     PyMerkleConfig, merkle_build_tree, merkle_verify_tree
 )
-from armillaria_query import TableWriter, TableReader, Filter, TransactionContext
+from rhizo import TableWriter, TableReader, Filter, TransactionContext
 
 # Delta Lake import
 try:
@@ -107,7 +107,7 @@ def main():
     temp_dir = tempfile.mkdtemp(prefix="comprehensive_bench_")
 
     results = {
-        "armillaria": {},
+        "rhizo": {},
         "delta_lake": {},
         "feature_comparison": {},
     }
@@ -138,7 +138,7 @@ def main():
         # Write
         print("\n--- Write Performance ---")
         arm_write = benchmark(lambda: writer.write("test_table", df))
-        results["armillaria"]["write_ms"] = arm_write
+        results["rhizo"]["write_ms"] = arm_write
         print(f"  Armillaria: {arm_write:.2f}ms")
 
         if DELTA_AVAILABLE:
@@ -149,7 +149,7 @@ def main():
         # Read
         print("\n--- Read Performance ---")
         arm_read = benchmark(lambda: reader.read_arrow("test_table"))
-        results["armillaria"]["read_ms"] = arm_read
+        results["rhizo"]["read_ms"] = arm_read
         print(f"  Armillaria: {arm_read:.2f}ms")
 
         if DELTA_AVAILABLE:
@@ -170,7 +170,7 @@ def main():
             writer.write("versioned_table", df)
 
         arm_storage = get_dir_size(arm_chunks) + get_dir_size(arm_catalog)
-        results["armillaria"]["storage_5_versions_bytes"] = arm_storage
+        results["rhizo"]["storage_5_versions_bytes"] = arm_storage
         print(f"  Armillaria: {arm_storage / 1024 / 1024:.2f} MB")
 
         if DELTA_AVAILABLE:
@@ -197,13 +197,13 @@ def main():
         dedup_storage = get_dir_size(arm_chunks)
         naive_storage = dedup_storage * 3  # If no dedup
 
-        results["armillaria"]["dedup_actual_bytes"] = dedup_storage
-        results["armillaria"]["dedup_naive_bytes"] = naive_storage
+        results["rhizo"]["dedup_actual_bytes"] = dedup_storage
+        results["rhizo"]["dedup_naive_bytes"] = naive_storage
 
         print(f"  Armillaria (with dedup): {dedup_storage / 1024 / 1024:.2f} MB")
         print(f"  Without dedup would be: ~{naive_storage / 1024 / 1024:.2f} MB")
         print(f"  Space saved: {(1 - dedup_storage/naive_storage) * 100:.1f}%")
-        results["armillaria"]["dedup_savings_pct"] = round((1 - dedup_storage/naive_storage) * 100, 1)
+        results["rhizo"]["dedup_savings_pct"] = round((1 - dedup_storage/naive_storage) * 100, 1)
 
         print("\n  Delta Lake: NO DEDUPLICATION (stores 3x the data)")
         results["delta_lake"]["dedup_savings_pct"] = 0
@@ -217,7 +217,7 @@ def main():
 
         print("\n--- Read historical version (v2 of 5) ---")
         arm_tt = benchmark(lambda: reader.read_arrow("versioned_table", version=2))
-        results["armillaria"]["time_travel_ms"] = arm_tt
+        results["rhizo"]["time_travel_ms"] = arm_tt
         print(f"  Armillaria: {arm_tt:.2f}ms (O(1) catalog lookup)")
 
         if DELTA_AVAILABLE:
@@ -246,7 +246,7 @@ def main():
             tx_mgr.commit(tx_id)
 
         arm_tx = benchmark(arm_transaction)
-        results["armillaria"]["transaction_ms"] = arm_tx
+        results["rhizo"]["transaction_ms"] = arm_tx
         print(f"  Armillaria: {arm_tx:.2f}ms")
 
         print("\n--- Cross-Table Transaction (Armillaria-only) ---")
@@ -259,7 +259,7 @@ def main():
             tx_mgr.commit(tx_id)
 
         arm_multi_tx = benchmark(arm_multi_table_tx)
-        results["armillaria"]["multi_table_tx_ms"] = arm_multi_tx
+        results["rhizo"]["multi_table_tx_ms"] = arm_multi_tx
         print(f"  Armillaria (3 tables atomic): {arm_multi_tx:.2f}ms")
         print(f"  Delta Lake: NOT SUPPORTED (single-table only)")
         results["delta_lake"]["multi_table_tx_ms"] = "N/A"
@@ -275,14 +275,14 @@ def main():
 
         # Create branch
         arm_branch_create = benchmark(lambda: branches.create(f"feature_{np.random.randint(10000)}", "main"))
-        results["armillaria"]["branch_create_ms"] = arm_branch_create
+        results["rhizo"]["branch_create_ms"] = arm_branch_create
         print(f"  Create branch:  {arm_branch_create:.2f}ms")
 
         # Branch diff
         branches.create("branch_a", "main")
         branches.create("branch_b", "main")
         arm_branch_diff = benchmark(lambda: branches.diff("branch_a", "branch_b"))
-        results["armillaria"]["branch_diff_ms"] = arm_branch_diff
+        results["rhizo"]["branch_diff_ms"] = arm_branch_diff
         print(f"  Branch diff:    {arm_branch_diff:.2f}ms")
 
         print(f"\n  Delta Lake: NO BRANCHING SUPPORT")
@@ -298,7 +298,7 @@ def main():
 
         print("\n--- Query Changelog ---")
         arm_changelog = benchmark(lambda: tx_mgr.get_changelog(limit=100))
-        results["armillaria"]["changelog_query_ms"] = arm_changelog
+        results["rhizo"]["changelog_query_ms"] = arm_changelog
         print(f"  Armillaria get_changelog(): {arm_changelog:.2f}ms")
         print(f"  Delta Lake: Requires CDF setup, not built-in")
         results["delta_lake"]["changelog_query_ms"] = "Requires setup"
@@ -319,7 +319,7 @@ def main():
         config = PyMerkleConfig(chunk_size=65536)
 
         tree_build = benchmark(lambda: merkle_build_tree(data_bytes, config))
-        results["armillaria"]["merkle_build_ms"] = tree_build
+        results["rhizo"]["merkle_build_ms"] = tree_build
         print(f"  Build tree:   {tree_build:.2f}ms")
 
         tree = merkle_build_tree(data_bytes, config)
@@ -354,7 +354,7 @@ def main():
         ]
 
         for name, key, unit, *divisor in comparisons:
-            arm_val = results["armillaria"].get(key, "N/A")
+            arm_val = results["rhizo"].get(key, "N/A")
             delta_val = results["delta_lake"].get(key, "N/A")
 
             if divisor and isinstance(arm_val, (int, float)):

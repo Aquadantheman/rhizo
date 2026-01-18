@@ -1,6 +1,6 @@
-# Contributing to Armillaria
+# Contributing to Rhizo
 
-Thank you for your interest in contributing to Armillaria! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to Rhizo! This document provides guidelines and instructions for contributing.
 
 ## Getting Started
 
@@ -14,8 +14,8 @@ Thank you for your interest in contributing to Armillaria! This document provide
 
 ```bash
 # Clone the repository
-git clone https://github.com/aquadantheman/armillaria.git
-cd armillaria
+git clone https://github.com/aquadantheman/rhizo.git
+cd rhizo
 
 # Create a virtual environment
 python -m venv .venv
@@ -25,7 +25,7 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install maturin pytest pandas pyarrow duckdb ruff
 
 # Build the Rust extension
-cd udr_python && maturin develop --release && cd ..
+cd rhizo_python && maturin develop --release && cd ..
 
 # Install the Python query layer
 pip install -e python/
@@ -68,17 +68,17 @@ python -m ruff check .
 ## Project Structure
 
 ```
-armillaria/
-├── udr_core/           # Rust core library
+rhizo/
+├── rhizo_core/           # Rust core library
 │   └── src/
 │       ├── chunk_store/    # Content-addressable storage
 │       ├── catalog/        # Versioned file catalog
 │       ├── branch/         # Git-like branching
 │       ├── transaction/    # Cross-table ACID transactions
 │       └── changelog/      # Change tracking
-├── udr_python/         # PyO3 bindings (builds 'armillaria' module)
-├── python/             # Python query layer (armillaria-query)
-│   └── armillaria_query/
+├── rhizo_python/         # PyO3 bindings (builds 'rhizo' module)
+├── python/             # Python query layer (rhizo-query)
+│   └── rhizo/
 ├── tests/              # Python test suite
 └── examples/           # Usage examples
 ```

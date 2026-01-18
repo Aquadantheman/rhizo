@@ -1,4 +1,4 @@
-"""Type stubs for the armillaria Rust extension module."""
+"""Type stubs for the _rhizo Rust extension module (rhizo-core)."""
 
 from typing import List, Dict, Optional, Tuple
 import pyarrow as pa
@@ -62,7 +62,7 @@ class PyBranchDiff:
     has_conflicts: bool
 
 class PyBranchManager:
-    """Manages branches for UDR tables."""
+    """Manages branches for Rhizo tables."""
     def __init__(self, path: str) -> None: ...
     def create(
         self,

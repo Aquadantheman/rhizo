@@ -169,7 +169,7 @@ impl ChunkStore {
     ///
     /// # Example
     /// ```
-    /// # use udr_core::ChunkStore;
+    /// # use rhizo_core::ChunkStore;
     /// # let dir = std::env::temp_dir().join("batch_example");
     /// # std::fs::create_dir_all(&dir).unwrap();
     /// let store = ChunkStore::new(&dir).unwrap();
@@ -198,7 +198,7 @@ impl ChunkStore {
     ///
     /// # Example
     /// ```
-    /// # use udr_core::ChunkStore;
+    /// # use rhizo_core::ChunkStore;
     /// # let dir = std::env::temp_dir().join("get_batch_example");
     /// # std::fs::create_dir_all(&dir).unwrap();
     /// let store = ChunkStore::new(&dir).unwrap();

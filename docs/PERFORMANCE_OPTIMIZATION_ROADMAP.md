@@ -1,4 +1,4 @@
-# Armillaria Performance Optimization Roadmap
+# Rhizo Performance Optimization Roadmap
 
 **Created:** January 2026
 **Status:** Active Development
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Armillaria now **beats Delta Lake** on write performance through native Rust Parquet encoding (Phase 4). The performance optimization roadmap has achieved its primary goal.
+Rhizo now **beats Delta Lake** on write performance through native Rust Parquet encoding (Phase 4). The performance optimization roadmap has achieved its primary goal.
 
 ### Performance Achievement (January 2026)
 
@@ -61,7 +61,7 @@ Add parallel processing using Rayon for chunk hashing and I/O operations. This i
 
 #### Step 1.1: Add Rayon Dependency
 
-**File:** `udr_core/Cargo.toml`
+**File:** `rhizo_core/Cargo.toml`
 
 ```toml
 [dependencies]
@@ -76,7 +76,7 @@ cargo test --all
 
 #### Step 1.2: Implement `put_batch` in Rust
 
-**File:** `udr_core/src/chunk_store/store.rs`
+**File:** `rhizo_core/src/chunk_store/store.rs`
 
 ```rust
 /// Store multiple chunks in parallel, returning their hashes.
@@ -104,7 +104,7 @@ pub fn put_batch(&self, chunks: &[&[u8]]) -> Result<Vec<String>, ChunkStoreError
 
 #### Step 1.3: Implement `get_batch` in Rust
 
-**File:** `udr_core/src/chunk_store/store.rs`
+**File:** `rhizo_core/src/chunk_store/store.rs`
 
 ```rust
 /// Retrieve multiple chunks in parallel by their hashes.
@@ -140,7 +140,7 @@ pub fn get_batch_verified(&self, hashes: &[&str]) -> Result<Vec<Vec<u8>>, ChunkS
 
 #### Step 1.4: Add Python Bindings
 
-**File:** `udr_python/src/lib.rs`
+**File:** `rhizo_python/src/lib.rs`
 
 ```rust
 /// Store multiple chunks in parallel.
@@ -174,11 +174,11 @@ fn get_batch_verified(&self, hashes: Vec<String>) -> PyResult<Vec<Vec<u8>>> {
 }
 ```
 
-**Update type stubs:** `python/armillaria.pyi`
+**Update type stubs:** `python/rhizo.pyi`
 
 #### Step 1.5: Update TableWriter
 
-**File:** `python/armillaria_query/writer.py`
+**File:** `python/rhizo/writer.py`
 
 Change from:
 ```python
@@ -199,7 +199,7 @@ chunk_hashes = self.store.put_batch(parquet_chunks)
 
 #### Step 1.6: Update TableReader
 
-**File:** `python/armillaria_query/reader.py`
+**File:** `python/rhizo/reader.py`
 
 Change from:
 ```python
@@ -265,7 +265,7 @@ Use memory-mapped files for reading chunks, eliminating the copy from kernel to 
 
 #### Step 2.1: Add memmap2 Dependency
 
-**File:** `udr_core/Cargo.toml`
+**File:** `rhizo_core/Cargo.toml`
 
 ```toml
 [dependencies]
@@ -274,7 +274,7 @@ memmap2 = "0.9"
 
 #### Step 2.2: Add `get_mmap` Method
 
-**File:** `udr_core/src/chunk_store/store.rs`
+**File:** `rhizo_core/src/chunk_store/store.rs`
 
 ```rust
 use memmap2::Mmap;
@@ -345,13 +345,13 @@ With `parallel_workers=4` on 500K rows (10 chunks):
 - Parallel (4 workers): 3,989 MB/s
 - **Speedup: 2.13x**
 
-**Key finding:** With parallel parsing, Armillaria reads are **1.6x faster than Delta Lake** for multi-chunk tables!
+**Key finding:** With parallel parsing, Rhizo reads are **1.6x faster than Delta Lake** for multi-chunk tables!
 
 ### Implementation
 
 #### Step 3.1: Add parallel_workers parameter to TableReader
 
-**File:** `python/armillaria_query/reader.py`
+**File:** `python/rhizo/reader.py`
 
 ```python
 def __init__(
@@ -367,7 +367,7 @@ def __init__(
 
 #### Step 3.2: Implement parallel Parquet parsing
 
-**File:** `python/armillaria_query/reader.py`
+**File:** `python/rhizo/reader.py`
 
 ```python
 from concurrent.futures import ThreadPoolExecutor
@@ -476,8 +476,8 @@ pyo3-arrow = "0.15"
 
 **Files to modify:**
 - `Cargo.toml` (workspace)
-- `udr_core/Cargo.toml`
-- `udr_python/Cargo.toml`
+- `rhizo_core/Cargo.toml`
+- `rhizo_python/Cargo.toml`
 
 **Verification:**
 ```bash
@@ -489,7 +489,7 @@ cargo test --all
 
 **Goal:** Create `ParquetEncoder` that converts Arrow RecordBatch to Parquet bytes.
 
-**File:** `udr_core/src/parquet/encoder.rs`
+**File:** `rhizo_core/src/parquet/encoder.rs`
 
 ```rust
 use arrow::record_batch::RecordBatch;
@@ -538,7 +538,7 @@ cargo test parquet
 
 **Goal:** Create `ParquetDecoder` that converts Parquet bytes to Arrow RecordBatch.
 
-**File:** `udr_core/src/parquet/decoder.rs`
+**File:** `rhizo_core/src/parquet/decoder.rs`
 
 ```rust
 use arrow::record_batch::RecordBatch;
@@ -571,7 +571,7 @@ impl ParquetDecoder {
 
 **Goal:** Expose Parquet encoder/decoder to Python with zero-copy Arrow transfer.
 
-**File:** `udr_python/src/lib.rs`
+**File:** `rhizo_python/src/lib.rs`
 
 ```rust
 use pyo3_arrow::{PyRecordBatch, PyTable};
@@ -631,14 +631,14 @@ impl PyParquetDecoder {
 
 **Goal:** Update TableWriter to use Rust Parquet encoder.
 
-**File:** `python/armillaria_query/writer.py`
+**File:** `python/rhizo/writer.py`
 
 ```python
 class TableWriter:
     def __init__(self, ..., use_native_parquet: bool = True):
         self.use_native_parquet = use_native_parquet
         if use_native_parquet:
-            self._encoder = armillaria.PyParquetEncoder(compression="zstd")
+            self._encoder = rhizo.PyParquetEncoder(compression="zstd")
 
     def _to_parquet_bytes(self, table: pa.Table) -> bytes:
         if self.use_native_parquet:
@@ -661,14 +661,14 @@ class TableWriter:
 
 **Goal:** Update TableReader to use Rust Parquet decoder.
 
-**File:** `python/armillaria_query/reader.py`
+**File:** `python/rhizo/reader.py`
 
 ```python
 class TableReader:
     def __init__(self, ..., use_native_parquet: bool = True):
         self.use_native_parquet = use_native_parquet
         if use_native_parquet:
-            self._decoder = armillaria.PyParquetDecoder()
+            self._decoder = rhizo.PyParquetDecoder()
 
     def _parquet_to_arrow(self, data: bytes) -> pa.Table:
         if self.use_native_parquet:
@@ -777,9 +777,9 @@ Implement when users have queries that scan large tables with selective filters.
 
 | Phase | Test File | Tests |
 |-------|-----------|-------|
-| 1 | `udr_core/src/chunk_store/store.rs` | 10 new tests for batch methods |
+| 1 | `rhizo_core/src/chunk_store/store.rs` | 10 new tests for batch methods |
 | 1 | `tests/test_core.py` | 5 new tests for Python batch methods |
-| 2 | `udr_core/src/chunk_store/store.rs` | 3 new tests for mmap |
+| 2 | `rhizo_core/src/chunk_store/store.rs` | 3 new tests for mmap |
 | 3 | `tests/test_query_layer.py` | 2 new tests for parallel parsing |
 
 ### Benchmark Tracking
@@ -790,7 +790,7 @@ Track these metrics after each phase (vs Delta Lake for reference):
 |--------|-----------|---------|------------|--------|
 | Write 100K rows | ~90 MB/s | **203.8 MB/s** | 80.2 MB/s | **2.5x WIN** |
 | Read 100K rows | ~175 MB/s | 174.9 MB/s | 301.0 MB/s | Delta faster |
-| Versioning (5 ver) | - | 218.0 ms | 258.9 ms | **Armillaria faster** |
+| Versioning (5 ver) | - | 218.0 ms | 258.9 ms | **Rhizo faster** |
 | Time travel | - | 29.0 ms | 24.4 ms | Comparable |
 | Dedup ratio | 84.0% | 84.3% | 76.8% | **Better** |
 | Branch overhead | 280 bytes | 280 bytes | 14.70 MB | **52,500x better** |
@@ -853,4 +853,4 @@ python examples/merkle_benchmark.py
 ---
 
 *Document version: January 2026*
-*Last updated: Phase 4 COMPLETE - Armillaria now 2.5x faster than Delta Lake on writes!*
+*Last updated: Phase 4 COMPLETE - Rhizo now 2.5x faster than Delta Lake on writes!*

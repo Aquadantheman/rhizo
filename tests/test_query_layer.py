@@ -3,7 +3,7 @@ Tests for the Armillaria Query Layer.
 
 Run with: pytest tests/test_query_layer.py -v
 Requires:
-    - maturin develop (build armillaria extension)
+    - maturin develop (build rhizo extension)
     - pip install pyarrow duckdb pandas pytest
 """
 
@@ -16,19 +16,19 @@ import pyarrow as pa
 import pandas as pd
 
 # Import Armillaria components - conftest.py adds python/ to sys.path
-import armillaria
-from armillaria_query import TableWriter, TableReader, QueryEngine
+import _rhizo
+from rhizo import TableWriter, TableReader, QueryEngine
 
 
 @pytest.fixture
 def temp_storage():
     """Create temporary storage directories for testing."""
-    base_dir = tempfile.mkdtemp(prefix="armillaria_query_test_")
+    base_dir = tempfile.mkdtemp(prefix="rhizo_query_test_")
     chunks_dir = os.path.join(base_dir, "chunks")
     catalog_dir = os.path.join(base_dir, "catalog")
 
-    store = armillaria.PyChunkStore(chunks_dir)
-    catalog = armillaria.PyCatalog(catalog_dir)
+    store = _rhizo.PyChunkStore(chunks_dir)
+    catalog = _rhizo.PyCatalog(catalog_dir)
 
     yield store, catalog, base_dir
 

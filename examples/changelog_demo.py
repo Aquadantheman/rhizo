@@ -30,8 +30,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 import pandas as pd
 
 # Import Armillaria components
-import armillaria
-from armillaria_query import QueryEngine, Subscriber, ChangeEvent
+import rhizo
+import _rhizo
+from rhizo import QueryEngine, Subscriber, ChangeEvent
 
 
 def print_section(title: str):
@@ -59,7 +60,7 @@ def main():
     """)
 
     # Create temporary storage
-    temp_dir = tempfile.mkdtemp(prefix="armillaria_changelog_demo_")
+    temp_dir = tempfile.mkdtemp(prefix="rhizo_changelog_demo_")
     chunks_dir = os.path.join(temp_dir, "chunks")
     catalog_dir = os.path.join(temp_dir, "catalog")
     branches_dir = os.path.join(temp_dir, "branches")
@@ -77,10 +78,10 @@ Same data. Same guarantees. One system.
 
     try:
         # Initialize Armillaria components with full transaction support
-        store = armillaria.PyChunkStore(chunks_dir)
-        catalog = armillaria.PyCatalog(catalog_dir)
-        branches = armillaria.PyBranchManager(branches_dir)
-        tx_manager = armillaria.PyTransactionManager(tx_dir, catalog_dir, branches_dir)
+        store = _rhizo.PyChunkStore(chunks_dir)
+        catalog = _rhizo.PyCatalog(catalog_dir)
+        branches = _rhizo.PyBranchManager(branches_dir)
+        tx_manager = _rhizo.PyTransactionManager(tx_dir, catalog_dir, branches_dir)
 
         engine = QueryEngine(
             store, catalog,

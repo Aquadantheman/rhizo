@@ -12,19 +12,18 @@ import pandas as pd
 import pyarrow as pa
 import pytest
 
-from armillaria_query import QueryEngine, is_datafusion_available
+from rhizo import QueryEngine, is_datafusion_available
 
 
 @pytest.fixture
 def engine_with_versions(tmp_path):
     """Create QueryEngine with multiple versions of data."""
-    import armillaria
-
+    import _rhizo
     chunks_path = str(tmp_path / "chunks")
     catalog_path = str(tmp_path / "catalog")
 
-    store = armillaria.PyChunkStore(chunks_path)
-    catalog = armillaria.PyCatalog(catalog_path)
+    store = _rhizo.PyChunkStore(chunks_path)
+    catalog = _rhizo.PyCatalog(catalog_path)
 
     engine = QueryEngine(
         store, catalog,
@@ -62,15 +61,14 @@ def engine_with_versions(tmp_path):
 @pytest.fixture
 def engine_with_branches(tmp_path):
     """Create QueryEngine with branching support."""
-    import armillaria
-
+    import _rhizo
     chunks_path = str(tmp_path / "chunks")
     catalog_path = str(tmp_path / "catalog")
     branches_path = str(tmp_path / "branches")
 
-    store = armillaria.PyChunkStore(chunks_path)
-    catalog = armillaria.PyCatalog(catalog_path)
-    branch_manager = armillaria.PyBranchManager(branches_path)
+    store = _rhizo.PyChunkStore(chunks_path)
+    catalog = _rhizo.PyCatalog(catalog_path)
+    branch_manager = _rhizo.PyBranchManager(branches_path)
 
     # Note: PyBranchManager auto-creates "main" branch on init
 
@@ -253,13 +251,12 @@ class TestEdgeCases:
 
     def test_time_travel_requires_olap(self, tmp_path):
         """Test that time travel requires OLAP engine."""
-        import armillaria
-
+        import _rhizo
         chunks_path = str(tmp_path / "chunks")
         catalog_path = str(tmp_path / "catalog")
 
-        store = armillaria.PyChunkStore(chunks_path)
-        catalog = armillaria.PyCatalog(catalog_path)
+        store = _rhizo.PyChunkStore(chunks_path)
+        catalog = _rhizo.PyCatalog(catalog_path)
 
         # Disable OLAP
         engine = QueryEngine(store, catalog, enable_olap=False)

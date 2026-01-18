@@ -1,4 +1,4 @@
-# Armillaria Vision: The Significance of Unified Data Infrastructure
+# Rhizo Vision: The Significance of Unified Data Infrastructure
 
 ## The Problem We're Solving
 
@@ -47,11 +47,11 @@ Delta Lake, Apache Iceberg, and Apache Hudi are significant progress, but they s
 | No cross-table deduplication | Path-based file identity, not content identity |
 | Small file problem | Requires explicit compaction; operational burden |
 
-**Armillaria doesn't improve these formats—it replaces the architecture that makes these limitations inevitable.**
+**Rhizo doesn't improve these formats—it replaces the architecture that makes these limitations inevitable.**
 
 ---
 
-## The Armillaria Approach
+## The Rhizo Approach
 
 ### Five Foundational Innovations
 
@@ -97,7 +97,7 @@ Delta Lake, Apache Iceberg, and Apache Hudi are significant progress, but they s
 
 **Current State:** Multiple systems, each optimized for one workload, stitched together with pipelines.
 
-**Armillaria State:** One system that handles all workloads natively, with pipelines eliminated by design.
+**Rhizo State:** One system that handles all workloads natively, with pipelines eliminated by design.
 
 ---
 
@@ -158,7 +158,7 @@ Replication:        None              →      Read replicas
 
 ### Efficiency Gains
 
-| Metric | Current State | With Armillaria | Impact |
+| Metric | Current State | With Rhizo | Impact |
 |--------|--------------|----------|--------|
 | Data engineering time | 60-80% on pipelines | Focus on insights | 3-5x productivity |
 | Storage cost | Multiple copies | 60-85% deduplication | 2-4x savings |
@@ -173,7 +173,7 @@ From the whitepaper analysis:
 - **Network transfer energy:** 0.001-0.1 kWh per GB
 - **Global duplication estimate:** 60-80% of enterprise data
 
-**If Armillaria eliminates half of redundant data movement:**
+**If Rhizo eliminates half of redundant data movement:**
 - Significant reduction in data center energy consumption
 - Reduced network transfer overhead
 - Lower infrastructure footprint per insight generated
@@ -185,7 +185,7 @@ Currently, only the largest tech companies can afford unified data platforms:
 - Meta has their internal unified data platform
 - Most organizations? Dozens of systems, endless pipelines
 
-**Armillaria brings unified infrastructure to everyone:**
+**Rhizo brings unified infrastructure to everyone:**
 - Open source, runs on a laptop
 - Scales to production workloads
 - No vendor lock-in (Arrow, Parquet, SQL standards)
@@ -196,7 +196,7 @@ Currently, only the largest tech companies can afford unified data platforms:
 
 ### Technology Convergence
 
-Several technologies have matured that make Armillaria feasible:
+Several technologies have matured that make Rhizo feasible:
 
 1. **BLAKE3** - Cryptographic hashing at 5+ GB/s (faster than disk)
 2. **Apache Arrow** - Zero-copy columnar format, universal interchange
@@ -217,7 +217,7 @@ Several technologies have matured that make Armillaria feasible:
 
 ### vs. Delta Lake / Iceberg / Hudi
 
-| | Lakehouse Formats | Armillaria |
+| | Lakehouse Formats | Rhizo |
 |---|---|---|
 | Transaction scope | Single table | Cross-table |
 | Deduplication | Per-table | Global |
@@ -227,7 +227,7 @@ Several technologies have matured that make Armillaria feasible:
 
 ### vs. Traditional Databases
 
-| | Traditional DB | Armillaria |
+| | Traditional DB | Rhizo |
 |---|---|---|
 | Analytical queries | Poor performance | DuckDB-powered |
 | Historical queries | Point-in-time recovery only | Full time travel |
@@ -236,7 +236,7 @@ Several technologies have matured that make Armillaria feasible:
 
 ### vs. Building In-House
 
-| | In-House Build | Armillaria |
+| | In-House Build | Rhizo |
 |---|---|---|
 | Development effort | Years, large team | Weeks, small team |
 | Maintenance burden | Ongoing | Community-supported |
@@ -319,7 +319,7 @@ for change in engine.subscribe("events", since_version=100):
 
 ## Summary
 
-Armillaria is not an incremental improvement to existing data infrastructure. It's a fundamental rearchitecting based on content-addressable storage, enabling capabilities that are impossible with current approaches:
+Rhizo is not an incremental improvement to existing data infrastructure. It's a fundamental rearchitecting based on content-addressable storage, enabling capabilities that are impossible with current approaches:
 
 - **Cross-table ACID transactions** (impossible with lakehouse formats)
 - **Zero-copy branching** (impossible with path-based storage)

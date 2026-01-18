@@ -1,4 +1,4 @@
-# Armillaria Read Path Optimization Research
+# Rhizo Read Path Optimization Research
 
 **Created:** January 2026
 **Status:** Active Research
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-After Phase P.4, Armillaria's **write performance is competitive** with Delta Lake (211 MB/s vs 237 MB/s). However, **read performance lags** (183 MB/s vs 366 MB/s - Delta is ~2x faster).
+After Phase P.4, Rhizo's **write performance is competitive** with Delta Lake (211 MB/s vs 237 MB/s). However, **read performance lags** (183 MB/s vs 366 MB/s - Delta is ~2x faster).
 
 This document outlines a research-driven approach to read optimization, starting with proven techniques (projection/predicate pushdown) and progressing to bleeding-edge optimizations (adaptive prefetching, learned indexes).
 
@@ -62,7 +62,7 @@ Example: 10 columns, query needs 2 → 5x speedup on decode phase
 
 #### Step 1.1: Rust Decoder Enhancement
 
-**File:** `udr_core/src/parquet/decoder.rs`
+**File:** `rhizo_core/src/parquet/decoder.rs`
 
 Add method to decode specific columns:
 
@@ -108,7 +108,7 @@ impl ParquetDecoder {
 
 #### Step 1.2: Python Bindings
 
-**File:** `udr_python/src/lib.rs`
+**File:** `rhizo_python/src/lib.rs`
 
 ```rust
 #[pymethods]
@@ -130,7 +130,7 @@ impl PyParquetDecoder {
 
 #### Step 1.3: TableReader Integration
 
-**File:** `python/armillaria_query/reader.py`
+**File:** `python/rhizo/reader.py`
 
 ```python
 def read_arrow(
@@ -326,7 +326,7 @@ let reader = ParquetRecordBatchReaderBuilder::try_new(bytes)?
     .build()?;
 ```
 
-### Armillaria Filter API Design
+### Rhizo Filter API Design
 
 ```rust
 /// Supported comparison operations for predicates.
@@ -385,14 +385,14 @@ impl ParquetDecoder {
 
 ### Competitive Advantage
 
-| Feature | Armillaria | Delta Lake | Iceberg |
+| Feature | Rhizo | Delta Lake | Iceberg |
 |---------|------------|------------|---------|
 | Projection Pushdown | **DONE (R.1)** | Yes | Yes |
 | Predicate Pushdown | **Planned (R.2)** | Yes | Yes |
 | Combined with Dedup | **Unique** | No | No |
 | Combined with Branching | **Unique** | No | No |
 
-The combination of pushdown optimizations WITH content-addressable deduplication is unique to Armillaria.
+The combination of pushdown optimizations WITH content-addressable deduplication is unique to Rhizo.
 
 ---
 
@@ -525,7 +525,7 @@ class LearnedChunkIndex:
 
 ### After Phase R.1 + R.2 (Achievable)
 
-| Metric | Armillaria | Delta Lake | Gap |
+| Metric | Rhizo | Delta Lake | Gap |
 |--------|------------|------------|-----|
 | Full scan read | 183 MB/s | 366 MB/s | 2x slower |
 | Projected read (2/10 cols) | ~500 MB/s | ~500 MB/s | **Parity** |
@@ -535,7 +535,7 @@ class LearnedChunkIndex:
 
 ### Unique Value Proposition
 
-Armillaria with R.1+R.2 offers:
+Rhizo with R.1+R.2 offers:
 1. **Competitive read performance** for analytical queries
 2. **84% storage deduplication** (Delta can't do this)
 3. **280-byte branching** (Delta: 14.70 MB)

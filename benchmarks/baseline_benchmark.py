@@ -25,8 +25,8 @@ import pyarrow.parquet as pq
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 
-from armillaria import PyChunkStore, PyCatalog, PyParquetEncoder, PyParquetDecoder
-from armillaria_query import TableWriter, TableReader, QueryEngine, Filter
+from _rhizo import PyChunkStore, PyCatalog, PyParquetEncoder, PyParquetDecoder
+from rhizo import TableWriter, TableReader, QueryEngine, Filter
 
 
 def generate_test_data(num_rows: int = 100_000) -> pa.Table:
@@ -85,7 +85,7 @@ def run_benchmarks():
     }
 
     # Setup temp directory
-    temp_dir = tempfile.mkdtemp(prefix="armillaria_bench_")
+    temp_dir = tempfile.mkdtemp(prefix="rhizo_bench_")
     chunks_path = os.path.join(temp_dir, "chunks")
     catalog_path = os.path.join(temp_dir, "catalog")
 

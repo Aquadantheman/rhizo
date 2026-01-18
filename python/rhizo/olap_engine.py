@@ -29,7 +29,7 @@ from .reader import TableReader
 
 if TYPE_CHECKING:
     import pandas as pd
-    import armillaria
+    import _rhizo
 
 
 class OLAPEngine:
@@ -48,8 +48,8 @@ class OLAPEngine:
     - Branch-aware queries
 
     Example:
-        >>> from armillaria import PyChunkStore, PyCatalog
-        >>> from armillaria_query import OLAPEngine
+        >>> from _rhizo import PyChunkStore, PyCatalog
+        >>> from rhizo import OLAPEngine
         >>>
         >>> store = PyChunkStore("./data/chunks")
         >>> catalog = PyCatalog("./data/catalog")
@@ -73,9 +73,9 @@ class OLAPEngine:
 
     def __init__(
         self,
-        store: "armillaria.PyChunkStore",
-        catalog: "armillaria.PyCatalog",
-        branch_manager: Optional["armillaria.PyBranchManager"] = None,
+        store: "_rhizo.PyChunkStore",
+        catalog: "_rhizo.PyCatalog",
+        branch_manager: Optional["_rhizo.PyBranchManager"] = None,
         max_cache_size_bytes: int = 1_000_000_000,  # 1GB default
         verify_integrity: bool = False,
     ):
@@ -638,7 +638,7 @@ class OLAPEngine:
 
     def register_changelog(
         self,
-        transaction_manager: "armillaria.PyTransactionManager",
+        transaction_manager: "_rhizo.PyTransactionManager",
         since_tx_id: Optional[int] = None,
         since_timestamp: Optional[int] = None,
         tables: Optional[List[str]] = None,
@@ -745,7 +745,7 @@ class OLAPEngine:
     def query_changelog(
         self,
         sql: str,
-        transaction_manager: "armillaria.PyTransactionManager",
+        transaction_manager: "_rhizo.PyTransactionManager",
         since_tx_id: Optional[int] = None,
         since_timestamp: Optional[int] = None,
         tables: Optional[List[str]] = None,

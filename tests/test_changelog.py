@@ -13,8 +13,8 @@ import threading
 import pandas as pd
 from pathlib import Path
 
-import armillaria
-from armillaria_query import QueryEngine, Subscriber, ChangeEvent
+import _rhizo
+from rhizo import QueryEngine, Subscriber, ChangeEvent
 
 
 @pytest.fixture
@@ -33,10 +33,10 @@ def temp_storage():
 @pytest.fixture
 def engine_with_tx(temp_storage):
     """Create QueryEngine with transaction support."""
-    store = armillaria.PyChunkStore(temp_storage["chunks"])
-    catalog = armillaria.PyCatalog(temp_storage["catalog"])
-    branches = armillaria.PyBranchManager(temp_storage["branches"])
-    tx_manager = armillaria.PyTransactionManager(
+    store = _rhizo.PyChunkStore(temp_storage["chunks"])
+    catalog = _rhizo.PyCatalog(temp_storage["catalog"])
+    branches = _rhizo.PyBranchManager(temp_storage["branches"])
+    tx_manager = _rhizo.PyTransactionManager(
         temp_storage["transactions"],
         temp_storage["catalog"],
         temp_storage["branches"],
@@ -54,8 +54,8 @@ def engine_with_tx(temp_storage):
 @pytest.fixture
 def engine_no_tx(temp_storage):
     """Create QueryEngine without transaction support."""
-    store = armillaria.PyChunkStore(temp_storage["chunks"])
-    catalog = armillaria.PyCatalog(temp_storage["catalog"])
+    store = _rhizo.PyChunkStore(temp_storage["chunks"])
+    catalog = _rhizo.PyCatalog(temp_storage["catalog"])
 
     engine = QueryEngine(store, catalog)
 

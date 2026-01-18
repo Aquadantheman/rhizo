@@ -1,8 +1,8 @@
-# Armillaria Development Roadmap
+# Rhizo Development Roadmap
 
 ## Executive Summary
 
-Armillaria is the next generation of data infrastructure—one system that replaces the fragmented landscape of transactional databases, data warehouses, streaming platforms, and feature stores. This is not incremental improvement; it's architectural unification.
+Rhizo is the next generation of data infrastructure—one system that replaces the fragmented landscape of transactional databases, data warehouses, streaming platforms, and feature stores. This is not incremental improvement; it's architectural unification.
 
 **Current Progress:** Phases 1-4 complete. We have a working proof-of-concept with content-addressable storage, versioned catalogs, time travel queries, DuckDB integration, and Git-like branching with zero-copy semantics.
 
@@ -43,7 +43,7 @@ Armillaria is the next generation of data infrastructure—one system that repla
 
 - [x] Rust toolchain installed and configured
 - [x] VS Code with rust-analyzer
-- [x] Cargo workspace with `udr_core` and `udr_python`
+- [x] Cargo workspace with `rhizo_core` and `rhizo_python`
 - [x] PyO3 bindings working (`maturin develop`)
 - [x] Git repository initialized and pushed to GitHub
 
@@ -62,9 +62,9 @@ Armillaria is the next generation of data infrastructure—one system that repla
 - [x] Comprehensive error types (`HashMismatch`, `NotFound`, etc.)
 
 **Key Files:**
-- `udr_core/src/chunk_store/store.rs`
-- `udr_core/src/chunk_store/error.rs`
-- `udr_python/src/lib.rs`
+- `rhizo_core/src/chunk_store/store.rs`
+- `rhizo_core/src/chunk_store/error.rs`
+- `rhizo_python/src/lib.rs`
 
 ### Phase 2: Table Catalog & Versioning
 
@@ -81,9 +81,9 @@ Armillaria is the next generation of data infrastructure—one system that repla
 - [x] Python bindings (`PyCatalog`, `PyTableVersion`)
 
 **Key Files:**
-- `udr_core/src/catalog/file_catalog.rs`
-- `udr_core/src/catalog/version.rs`
-- `udr_core/src/catalog/error.rs`
+- `rhizo_core/src/catalog/file_catalog.rs`
+- `rhizo_core/src/catalog/version.rs`
+- `rhizo_core/src/catalog/error.rs`
 
 ### Phase 3: Query Layer (DuckDB Integration)
 
@@ -136,11 +136,11 @@ Branch:
 **Completed:**
 
 - [x] **4.1** Define `Branch` struct in Rust
-  - `udr_core/src/branch/branch.rs`
+  - `rhizo_core/src/branch/branch.rs`
   - Includes `BranchDiff` for comparing branches
 
 - [x] **4.2** Implement `BranchManager`
-  - `udr_core/src/branch/manager.rs`
+  - `rhizo_core/src/branch/manager.rs`
   - Full CRUD: create, get, list, delete
   - Head operations: update_head, get_table_version
   - Default branch management
@@ -232,13 +232,13 @@ Branch:
 - [x] Type stubs in `udr.pyi`
 
 **Key Files:**
-- `udr_core/src/transaction/types.rs` - Core types (TxId, TransactionRecord, WriteGranularity)
-- `udr_core/src/transaction/epoch.rs` - Epoch configuration and metadata
-- `udr_core/src/transaction/error.rs` - TransactionError types
-- `udr_core/src/transaction/log.rs` - Persistent transaction log
-- `udr_core/src/transaction/conflict.rs` - Conflict detection (table-level)
-- `udr_core/src/transaction/manager.rs` - TransactionManager coordinator
-- `udr_core/src/transaction/recovery.rs` - RecoveryManager
+- `rhizo_core/src/transaction/types.rs` - Core types (TxId, TransactionRecord, WriteGranularity)
+- `rhizo_core/src/transaction/epoch.rs` - Epoch configuration and metadata
+- `rhizo_core/src/transaction/error.rs` - TransactionError types
+- `rhizo_core/src/transaction/log.rs` - Persistent transaction log
+- `rhizo_core/src/transaction/conflict.rs` - Conflict detection (table-level)
+- `rhizo_core/src/transaction/manager.rs` - TransactionManager coordinator
+- `rhizo_core/src/transaction/recovery.rs` - RecoveryManager
 
 **Test Count:** 71 new Rust tests (110 total)
 
@@ -297,8 +297,8 @@ with engine.transaction() as tx:
 - `auto_recover` parameter - Automatically run recovery on TransactionManager init
 
 **Key Files:**
-- `udr_core/src/transaction/manager.rs` - Added recover(), recover_and_apply(), verify_consistency()
-- `udr_python/src/lib.rs` - Updated Python bindings with recovery methods
+- `rhizo_core/src/transaction/manager.rs` - Added recover(), recover_and_apply(), verify_consistency()
+- `rhizo_python/src/lib.rs` - Updated Python bindings with recovery methods
 - `python/udr_query/engine.py` - Added verify_integrity() and recover() convenience methods
 - `tests/test_recovery.py` - 22 recovery integration tests
 
@@ -351,9 +351,9 @@ if not health["is_healthy"]:
 - [x] 17 new Rust tests (127 total)
 
 **Key Files:**
-- `udr_core/src/changelog/entry.rs` - ChangelogEntry, TableChange
-- `udr_core/src/changelog/query.rs` - ChangelogQuery builder
-- `udr_core/src/changelog/tests.rs` - Comprehensive tests
+- `rhizo_core/src/changelog/entry.rs` - ChangelogEntry, TableChange
+- `rhizo_core/src/changelog/query.rs` - ChangelogQuery builder
+- `rhizo_core/src/changelog/tests.rs` - Comprehensive tests
 
 #### Phase 6.1: Python Bindings
 - [x] `PyChangelogEntry` with helper methods (changed_tables, contains_table, get_change)
@@ -502,13 +502,13 @@ pytest tests/ -v         # 155 tests
 
 ### Phase 7: Production Migration
 
-**Goal:** Run real workloads on Armillaria
+**Goal:** Run real workloads on Rhizo
 
 **Key Steps:**
 1. Audit current data storage and flows
-2. Design Armillaria table schema
+2. Design Rhizo table schema
 3. Zero-copy import from existing Parquet/Iceberg
-4. Adapt queries to Armillaria
+4. Adapt queries to Rhizo
 5. Parallel operation and validation
 6. Cutover with rollback path
 
@@ -654,7 +654,7 @@ cargo test --all
 cargo clippy --all       # Linting
 
 # Python bindings
-cd udr_python && maturin develop --release
+cd rhizo_python && maturin develop --release
 
 # Python tests & linting
 pytest tests/ -v

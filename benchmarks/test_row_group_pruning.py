@@ -18,7 +18,7 @@ import pyarrow.parquet as pq
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 
-from armillaria import PyParquetEncoder, PyParquetDecoder, PyPredicateFilter
+from _rhizo import PyParquetEncoder, PyParquetDecoder, PyPredicateFilter
 
 
 def create_multi_rowgroup_parquet(num_row_groups: int = 10, rows_per_group: int = 10000):

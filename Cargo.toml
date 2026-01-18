@@ -1,5 +1,5 @@
 [workspace]
-members = ["udr_core", "udr_python"]
+members = ["rhizo_core", "rhizo_python"]
 resolver = "2"
 
 [workspace.dependencies]

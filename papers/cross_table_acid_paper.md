@@ -6,7 +6,7 @@
 
 ## Abstract
 
-Modern data lakehouse formats (Delta Lake, Iceberg, Hudi) provide versioning and ACID guarantees for individual tables but cannot atomically commit changes across multiple tables. This limitation forces practitioners to choose between data consistency and architectural flexibility. We present Armillaria, a single-node storage system that achieves cross-table ACID transactions through content-addressable storage and a unified metadata catalog. Our approach requires no coordination service, operates at O(t) complexity for t-table transactions, and maintains backward compatibility with existing query engines. On commodity hardware, we measure 1,500+ MB/s write throughput, sub-2ms branch creation regardless of dataset size, and automatic deduplication of identical data. The system is implemented in Rust with Python bindings and passes 280 tests across both languages. We discuss limitations including single-node deployment and table-level conflict detection, and outline paths to distributed operation.
+Modern data lakehouse formats (Delta Lake, Iceberg, Hudi) provide versioning and ACID guarantees for individual tables but cannot atomically commit changes across multiple tables. This limitation forces practitioners to choose between data consistency and architectural flexibility. We present Rhizo, a single-node storage system that achieves cross-table ACID transactions through content-addressable storage and a unified metadata catalog. Our approach requires no coordination service, operates at O(t) complexity for t-table transactions, and maintains backward compatibility with existing query engines. On commodity hardware, we measure 1,500+ MB/s write throughput, sub-2ms branch creation regardless of dataset size, and automatic deduplication of identical data. The system is implemented in Rust with Python bindings and passes 280 tests across both languages. We discuss limitations including single-node deployment and table-level conflict detection, and outline paths to distributed operation.
 
 ---
 
@@ -24,7 +24,7 @@ This paper makes the following contributions:
 4. **O(1) version lookup** for time travel queries (data access remains O(n))
 5. **A working implementation** with benchmarks on commodity hardware
 
-**Scope and limitations:** Armillaria currently operates on a single node. The atomic commit mechanism relies on filesystem rename operations, which are atomic on local filesystems but not on cloud object stores. Distributed deployment requires additional coordination, discussed in Section 8.
+**Scope and limitations:** Rhizo currently operates on a single node. The atomic commit mechanism relies on filesystem rename operations, which are atomic on local filesystems but not on cloud object stores. Distributed deployment requires additional coordination, discussed in Section 8.
 
 ---
 
@@ -94,7 +94,7 @@ Most importantly for our purposes: **if all tables store chunks in the same CAS,
 
 ### 3.1 Architecture Overview
 
-Armillaria consists of three layers:
+Rhizo consists of three layers:
 
 ```
                     Query Layer
@@ -247,7 +247,7 @@ For comparison, undetected RAM bit flips occur at approximately 10^-13 per year 
 
 ## 5. Implementation
 
-Armillaria is implemented in Rust for the core storage and catalog layers, with Python bindings via PyO3. The query layer is pure Python integrating with DuckDB.
+Rhizo is implemented in Rust for the core storage and catalog layers, with Python bindings via PyO3. The query layer is pure Python integrating with DuckDB.
 
 ### 5.1 Code Statistics
 
@@ -357,7 +357,7 @@ Time travel query time is dominated by data access, not version lookup. Querying
 
 ### 6.5 Comparison with Existing Formats
 
-| Feature | Armillaria | Delta Lake | Iceberg | Hudi |
+| Feature | Rhizo | Delta Lake | Iceberg | Hudi |
 |---------|------------|------------|---------|------|
 | Cross-table ACID | Yes (single-node) | No | No | No |
 | Zero-copy branching | Yes | No | No | No |
@@ -378,13 +378,13 @@ Time travel query time is dominated by data access, not version lookup. Querying
 
 **Apache Hudi** [7] emphasizes incremental processing and record-level updates. It provides upsert capabilities and change streams but not cross-table atomicity.
 
-**LakeFS** [8] provides Git-like branching for data lakes, layered on top of object storage. It operates at the object level rather than the table level, and does not provide cross-table transactions. Armillaria's branching operates at the table version level with tighter integration.
+**LakeFS** [8] provides Git-like branching for data lakes, layered on top of object storage. It operates at the object level rather than the table level, and does not provide cross-table transactions. Rhizo's branching operates at the table version level with tighter integration.
 
 **Nessie** [9] offers Git-like semantics specifically for Iceberg catalogs. It provides branching and tagging but inherits Iceberg's single-table transaction model. Nessie could potentially coordinate cross-table commits through its catalog, but this is not its current design.
 
 **DVC** (Data Version Control) [10] applies Git principles to ML datasets and models. It tracks large files via content hashing but focuses on artifact versioning rather than queryable tables with SQL access.
 
-**Git** pioneered content-addressable storage for version control. Armillaria applies similar principles to structured data, with the key additions of query engine integration and table-level semantics.
+**Git** pioneered content-addressable storage for version control. Rhizo applies similar principles to structured data, with the key additions of query engine integration and table-level semantics.
 
 **IPFS** [11] uses content addressing for distributed file storage. Our work adapts these concepts for the specific requirements of analytical data systems, trading distribution for transactional guarantees.
 
@@ -417,13 +417,13 @@ Time travel query time is dominated by data access, not version lookup. Querying
 
 ## 9. Conclusion
 
-We have presented Armillaria, a single-node data storage system that achieves cross-table ACID transactions through content-addressable storage. By storing all data in a shared ChunkStore and maintaining table metadata in a unified catalog, atomic multi-table commits become possible without external coordination.
+We have presented Rhizo, a single-node data storage system that achieves cross-table ACID transactions through content-addressable storage. By storing all data in a shared ChunkStore and maintaining table metadata in a unified catalog, atomic multi-table commits become possible without external coordination.
 
 Our implementation demonstrates that this approach is practical on a single node: 1,500+ MB/s write throughput, sub-2ms branching, and automatic deduplication of identical content. The system passes 420 tests (173 Rust + 247 Python) and integrates with standard query engines via DuckDB and DataFusion.
 
 The key insight is architectural: per-table transaction logs make cross-table atomicity fundamentally impossible, while a unified content-addressed foundation makes it straightforward—at least on a single node. Extending these guarantees to distributed deployments remains future work.
 
-Armillaria is open source under the MIT license at: https://github.com/aquadantheman/unifieddataruntime
+Rhizo is open source under the MIT license at: https://github.com/aquadantheman/unifieddataruntime
 
 ---
 

@@ -18,8 +18,8 @@ import pyarrow as pa
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 
-from armillaria import PyChunkStore, PyCatalog, PyParquetEncoder
-from armillaria_query import TableWriter
+from _rhizo import PyChunkStore, PyCatalog, PyParquetEncoder
+from rhizo import TableWriter
 
 
 def generate_test_data(num_rows: int) -> pa.Table:

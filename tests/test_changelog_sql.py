@@ -11,24 +11,23 @@ import pandas as pd
 import pyarrow as pa
 import pytest
 
-from armillaria_query import QueryEngine, is_datafusion_available
+from rhizo import QueryEngine, is_datafusion_available
 
 
 @pytest.fixture
 def engine_with_changelog(tmp_path):
     """Create QueryEngine with transaction manager for changelog queries."""
-    import armillaria
-
+    import _rhizo
     chunks_path = str(tmp_path / "chunks")
     catalog_path = str(tmp_path / "catalog")
     branches_path = str(tmp_path / "branches")
     tx_log_path = str(tmp_path / "tx_log")
 
-    store = armillaria.PyChunkStore(chunks_path)
-    catalog = armillaria.PyCatalog(catalog_path)
-    branch_manager = armillaria.PyBranchManager(branches_path)
+    store = _rhizo.PyChunkStore(chunks_path)
+    catalog = _rhizo.PyCatalog(catalog_path)
+    branch_manager = _rhizo.PyBranchManager(branches_path)
     # PyTransactionManager takes paths as strings
-    tx_manager = armillaria.PyTransactionManager(tx_log_path, catalog_path, branches_path)
+    tx_manager = _rhizo.PyTransactionManager(tx_log_path, catalog_path, branches_path)
 
     engine = QueryEngine(
         store, catalog,
@@ -208,13 +207,12 @@ class TestChangelogErrorHandling:
 
     def test_changelog_requires_olap(self, tmp_path):
         """Test changelog queries require OLAP engine."""
-        import armillaria
-
+        import _rhizo
         chunks_path = str(tmp_path / "chunks")
         catalog_path = str(tmp_path / "catalog")
 
-        store = armillaria.PyChunkStore(chunks_path)
-        catalog = armillaria.PyCatalog(catalog_path)
+        store = _rhizo.PyChunkStore(chunks_path)
+        catalog = _rhizo.PyCatalog(catalog_path)
 
         # No OLAP
         engine = QueryEngine(store, catalog, enable_olap=False)
@@ -225,13 +223,12 @@ class TestChangelogErrorHandling:
     @pytest.mark.skipif(not is_datafusion_available(), reason="DataFusion required")
     def test_changelog_requires_tx_manager(self, tmp_path):
         """Test changelog queries require transaction manager."""
-        import armillaria
-
+        import _rhizo
         chunks_path = str(tmp_path / "chunks")
         catalog_path = str(tmp_path / "catalog")
 
-        store = armillaria.PyChunkStore(chunks_path)
-        catalog = armillaria.PyCatalog(catalog_path)
+        store = _rhizo.PyChunkStore(chunks_path)
+        catalog = _rhizo.PyCatalog(catalog_path)
 
         # OLAP but no tx_manager
         engine = QueryEngine(store, catalog, enable_olap=True)

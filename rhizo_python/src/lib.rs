@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyIOError, PyValueError, PyRuntimeError};
-use udr_core::{
+use rhizo_core::{
     ChunkStore, ChunkStoreError,
     FileCatalog, CatalogError, TableVersion,
     Branch, BranchDiff, BranchError, BranchManager,
@@ -1720,7 +1720,7 @@ impl PyTransactionManager {
 }
 
 #[pymodule]
-fn armillaria(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _rhizo(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Core storage
     m.add_class::<PyChunkStore>()?;
     m.add_class::<PyTableVersion>()?;

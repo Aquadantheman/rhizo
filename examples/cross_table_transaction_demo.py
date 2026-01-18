@@ -29,8 +29,9 @@ import pandas as pd
 # Add python directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
-import armillaria
-from armillaria_query import QueryEngine
+import rhizo
+import _rhizo
+from rhizo import QueryEngine
 
 
 def print_header(text: str) -> None:
@@ -72,15 +73,15 @@ def main():
     """)
 
     # Create temporary storage
-    base_dir = tempfile.mkdtemp(prefix="armillaria_tx_demo_")
+    base_dir = tempfile.mkdtemp(prefix="rhizo_tx_demo_")
     print(f"Storage: {base_dir}")
 
     try:
         # Initialize Armillaria
-        store = armillaria.PyChunkStore(os.path.join(base_dir, "chunks"))
-        catalog = armillaria.PyCatalog(os.path.join(base_dir, "catalog"))
-        branches = armillaria.PyBranchManager(os.path.join(base_dir, "branches"))
-        tx_manager = armillaria.PyTransactionManager(
+        store = _rhizo.PyChunkStore(os.path.join(base_dir, "chunks"))
+        catalog = _rhizo.PyCatalog(os.path.join(base_dir, "catalog"))
+        branches = _rhizo.PyBranchManager(os.path.join(base_dir, "branches"))
+        tx_manager = _rhizo.PyTransactionManager(
             os.path.join(base_dir, "transactions"),
             os.path.join(base_dir, "catalog"),
             os.path.join(base_dir, "branches")

@@ -26,7 +26,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use udr_core::parquet::{ParquetEncoder, ParquetDecoder};
+//! use rhizo_core::parquet::{ParquetEncoder, ParquetDecoder};
 //!
 //! // Encode
 //! let encoder = ParquetEncoder::new();

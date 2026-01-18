@@ -35,15 +35,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "armillaria_python"
-version = "0.1.0"
-dependencies = [
- "pyo3",
- "pyo3-arrow",
- "udr_core",
-]
-
-[[package]]
 name = "arrayref"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1063,6 +1054,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
+name = "rhizo_core"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "blake3",
+ "bytes",
+ "memmap2",
+ "parking_lot",
+ "parquet",
+ "rayon",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "uuid",
+]
+
+[[package]]
+name = "rhizo_python"
+version = "0.1.0"
+dependencies = [
+ "pyo3",
+ "pyo3-arrow",
+ "rhizo_core",
+]
+
+[[package]]
 name = "rustc-hash"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1262,24 +1280,6 @@ name = "twox-hash"
 version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea3136b675547379c4bd395ca6b938e5ad3c3d20fad76e7fe85f9e0d011419c"
-
-[[package]]
-name = "udr_core"
-version = "0.1.0"
-dependencies = [
- "arrow",
- "blake3",
- "bytes",
- "memmap2",
- "parking_lot",
- "parquet",
- "rayon",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "uuid",
-]
 
 [[package]]
 name = "unicode-ident"

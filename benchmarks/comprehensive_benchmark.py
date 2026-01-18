@@ -28,13 +28,13 @@ import pyarrow.parquet as pq
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 
 # Armillaria
-from armillaria import PyChunkStore, PyCatalog
-from armillaria_query import QueryEngine, TableWriter, is_datafusion_available
+from _rhizo import PyChunkStore, PyCatalog
+from rhizo import QueryEngine, TableWriter, is_datafusion_available
 
 # Check available systems
 SYSTEMS = {
-    "armillaria_olap": is_datafusion_available(),
-    "armillaria_duckdb": True,
+    "rhizo_olap": is_datafusion_available(),
+    "rhizo_duckdb": True,
     "parquet": True,
 }
 
@@ -127,9 +127,9 @@ def benchmark(func, warmup: int = 2, iterations: int = 10):
     return round(np.median(times), 2) if times else float('inf')
 
 
-def run_armillaria_olap(df: pd.DataFrame, temp_dir: str) -> dict:
+def run_rhizo_olap(df: pd.DataFrame, temp_dir: str) -> dict:
     """Benchmark Armillaria with OLAP (DataFusion)."""
-    if not SYSTEMS["armillaria_olap"]:
+    if not SYSTEMS["rhizo_olap"]:
         return {"error": "DataFusion not installed"}
 
     results = {}
@@ -196,7 +196,7 @@ def run_armillaria_olap(df: pd.DataFrame, temp_dir: str) -> dict:
     return results
 
 
-def run_armillaria_duckdb(df: pd.DataFrame, temp_dir: str) -> dict:
+def run_rhizo_duckdb(df: pd.DataFrame, temp_dir: str) -> dict:
     """Benchmark Armillaria with DuckDB backend (use_olap=False)."""
     results = {}
 
@@ -427,7 +427,7 @@ def run_join_benchmarks(temp_dir: str, num_users: int = 10_000, num_orders: int 
     results = {}
 
     # Armillaria OLAP
-    if SYSTEMS["armillaria_olap"]:
+    if SYSTEMS["rhizo_olap"]:
         chunks_path = os.path.join(temp_dir, "join_olap_chunks")
         catalog_path = os.path.join(temp_dir, "join_olap_catalog")
         store = PyChunkStore(chunks_path)
@@ -437,7 +437,7 @@ def run_join_benchmarks(temp_dir: str, num_users: int = 10_000, num_orders: int 
         engine.write_table("orders", orders)
 
         # Simple JOIN
-        results["armillaria_olap_join"] = benchmark(
+        results["rhizo_olap_join"] = benchmark(
             lambda: engine.query("""
                 SELECT u.user_id, u.name, o.order_id, o.amount
                 FROM users u
@@ -446,7 +446,7 @@ def run_join_benchmarks(temp_dir: str, num_users: int = 10_000, num_orders: int 
         )
 
         # JOIN with filter
-        results["armillaria_olap_join_filter"] = benchmark(
+        results["rhizo_olap_join_filter"] = benchmark(
             lambda: engine.query("""
                 SELECT u.user_id, u.name, o.order_id, o.amount
                 FROM users u
@@ -456,7 +456,7 @@ def run_join_benchmarks(temp_dir: str, num_users: int = 10_000, num_orders: int 
         )
 
         # JOIN with aggregation
-        results["armillaria_olap_join_agg"] = benchmark(
+        results["rhizo_olap_join_agg"] = benchmark(
             lambda: engine.query("""
                 SELECT u.tier, COUNT(*) as order_count, SUM(o.amount) as total
                 FROM users u
@@ -543,7 +543,7 @@ def run_scale_benchmarks(temp_dir: str) -> dict:
         df = generate_test_data(scale)
 
         # Armillaria OLAP
-        if SYSTEMS["armillaria_olap"]:
+        if SYSTEMS["rhizo_olap"]:
             chunks_path = os.path.join(temp_dir, f"scale_{scale}_chunks")
             catalog_path = os.path.join(temp_dir, f"scale_{scale}_catalog")
             store = PyChunkStore(chunks_path)
@@ -559,10 +559,10 @@ def run_scale_benchmarks(temp_dir: str) -> dict:
                 iterations=5
             )
 
-            results[f"armillaria_olap_{scale_label}_write"] = write_time
-            results[f"armillaria_olap_{scale_label}_read"] = read_time
-            results[f"armillaria_olap_{scale_label}_filter"] = filter_time
-            results[f"armillaria_olap_{scale_label}_storage"] = (
+            results[f"rhizo_olap_{scale_label}_write"] = write_time
+            results[f"rhizo_olap_{scale_label}_read"] = read_time
+            results[f"rhizo_olap_{scale_label}_filter"] = filter_time
+            results[f"rhizo_olap_{scale_label}_storage"] = (
                 get_dir_size(chunks_path) + get_dir_size(catalog_path)
             )
 
@@ -636,11 +636,11 @@ def main():
         print("Running benchmarks...")
 
         print("  Armillaria (OLAP/DataFusion)...", end=" ", flush=True)
-        results["armillaria_olap"] = run_armillaria_olap(df, temp_dir)
+        results["rhizo_olap"] = run_rhizo_olap(df, temp_dir)
         print("done")
 
         print("  Armillaria (DuckDB backend)...", end=" ", flush=True)
-        results["armillaria_duckdb"] = run_armillaria_duckdb(df, temp_dir)
+        results["rhizo_duckdb"] = run_rhizo_duckdb(df, temp_dir)
         print("done")
 
         print("  Delta Lake...", end=" ", flush=True)
@@ -671,7 +671,7 @@ def main():
         print("PERFORMANCE RESULTS (lower is better)")
         print("=" * 100)
 
-        systems = ["armillaria_olap", "armillaria_duckdb", "delta_lake", "duckdb", "parquet"]
+        systems = ["rhizo_olap", "rhizo_duckdb", "delta_lake", "duckdb", "parquet"]
         available_systems = [s for s in systems if "error" not in results.get(s, {})]
 
         header = f"{'Metric':<20}" + "".join(f"{s:>18}" for s in available_systems)
@@ -701,7 +701,7 @@ def main():
         print("ARMILLARIA OLAP SPEEDUP ANALYSIS")
         print("=" * 100)
 
-        olap = results.get("armillaria_olap", {})
+        olap = results.get("rhizo_olap", {})
         duck = results.get("duckdb", {})
 
         if olap and duck:
@@ -731,7 +731,7 @@ def main():
                 ("JOIN + Aggregate", "join_agg"),
             ]
             for label, suffix in join_ops:
-                arm_val = join_res.get(f"armillaria_olap_{suffix}", "N/A")
+                arm_val = join_res.get(f"rhizo_olap_{suffix}", "N/A")
                 duck_val = join_res.get(f"duckdb_{suffix}", "N/A")
                 delta_val = join_res.get(f"delta_lake_{suffix}", "N/A")
 
@@ -742,7 +742,7 @@ def main():
                 # Calculate winner
                 times = {}
                 if isinstance(arm_val, (int, float)):
-                    times["Armillaria"] = arm_val
+                    times["Rhizo"] = arm_val
                 if isinstance(duck_val, (int, float)):
                     times["DuckDB"] = duck_val
                 if isinstance(delta_val, (int, float)):
@@ -751,7 +751,7 @@ def main():
                 winner = ""
                 if times:
                     winner_name = min(times, key=lambda x: times[x])
-                    if isinstance(arm_val, (int, float)) and winner_name == "Armillaria":
+                    if isinstance(arm_val, (int, float)) and winner_name == "Rhizo":
                         arm_str += " *"
                     if isinstance(duck_val, (int, float)) and winner_name == "DuckDB":
                         duck_str += " *"
@@ -769,7 +769,7 @@ def main():
             print("-" * 85)
 
             for scale_label in ["100K", "1M"]:
-                for sys in ["armillaria_olap", "duckdb"]:
+                for sys in ["rhizo_olap", "duckdb"]:
                     w = scale_res.get(f"{sys}_{scale_label}_write", "N/A")
                     r = scale_res.get(f"{sys}_{scale_label}_read", "N/A")
                     f = scale_res.get(f"{sys}_{scale_label}_filter", "N/A")
@@ -780,7 +780,7 @@ def main():
                     f_str = f"{f:.1f}ms" if isinstance(f, (int, float)) else str(f)
                     s_str = f"{s/1024/1024:.2f}MB" if isinstance(s, (int, float)) else str(s)
 
-                    sys_name = "Armillaria OLAP" if sys == "armillaria_olap" else "DuckDB"
+                    sys_name = "Armillaria OLAP" if sys == "rhizo_olap" else "DuckDB"
                     print(f"{scale_label:<10} {sys_name:<20} {w_str:>12} {r_str:>12} {f_str:>12} {s_str:>15}")
 
         # Winner analysis
@@ -815,16 +815,16 @@ def main():
         print("=" * 100)
 
         features = [
-            ("OLAP Performance", ["armillaria_olap"], []),
-            ("Time Travel", ["armillaria_olap", "armillaria_duckdb", "delta_lake"], ["duckdb", "parquet"]),
-            ("ACID Transactions", ["armillaria_olap", "armillaria_duckdb", "delta_lake", "duckdb"], ["parquet"]),
-            ("Cross-table TX", ["armillaria_olap", "armillaria_duckdb"], []),
-            ("Git-like Branching", ["armillaria_olap", "armillaria_duckdb"], []),
-            ("CDC/Changelog", ["armillaria_olap", "armillaria_duckdb"], []),
-            ("Content Dedup", ["armillaria_olap", "armillaria_duckdb"], []),
-            ("Merkle Integrity", ["armillaria_olap", "armillaria_duckdb"], []),
-            ("In-Memory Cache", ["armillaria_olap", "duckdb"], []),
-            ("SQL Interface", ["armillaria_olap", "armillaria_duckdb", "duckdb"], []),
+            ("OLAP Performance", ["rhizo_olap"], []),
+            ("Time Travel", ["rhizo_olap", "rhizo_duckdb", "delta_lake"], ["duckdb", "parquet"]),
+            ("ACID Transactions", ["rhizo_olap", "rhizo_duckdb", "delta_lake", "duckdb"], ["parquet"]),
+            ("Cross-table TX", ["rhizo_olap", "rhizo_duckdb"], []),
+            ("Git-like Branching", ["rhizo_olap", "rhizo_duckdb"], []),
+            ("CDC/Changelog", ["rhizo_olap", "rhizo_duckdb"], []),
+            ("Content Dedup", ["rhizo_olap", "rhizo_duckdb"], []),
+            ("Merkle Integrity", ["rhizo_olap", "rhizo_duckdb"], []),
+            ("In-Memory Cache", ["rhizo_olap", "duckdb"], []),
+            ("SQL Interface", ["rhizo_olap", "rhizo_duckdb", "duckdb"], []),
         ]
 
         print(f"\n{'Feature':<20}" + "".join(f"{s:>18}" for s in available_systems))

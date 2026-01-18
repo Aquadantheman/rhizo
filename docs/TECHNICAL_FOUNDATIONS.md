@@ -1,6 +1,6 @@
 # Technical Foundations
 
-Mathematical verification of Armillaria's core claims. All formulas have been verified for correctness.
+Mathematical verification of Rhizo's core claims. All formulas have been verified for correctness.
 
 ---
 
@@ -55,7 +55,7 @@ $$\text{Savings} = 1 - \frac{2.45}{30} = 91.8\%$$
 **O(change) storage confirmed.** Only changed chunks are stored, not full copies.
 
 **Implementation:**
-- Rust: `udr_core/src/merkle/` (build_tree, diff_trees, verify_tree)
+- Rust: `rhizo_core/src/merkle/` (build_tree, diff_trees, verify_tree)
 - Python: `merkle_build_tree()`, `merkle_diff_trees()`, `merkle_verify_tree()`
 - Benchmark: `examples/merkle_benchmark.py`
 
@@ -86,7 +86,7 @@ p = (n ** 2) / (2 ** (b + 1))
 
 ## Snapshot Isolation
 
-Armillaria implements snapshot isolation, the same model used by PostgreSQL and Oracle [4].
+Rhizo implements snapshot isolation, the same model used by PostgreSQL and Oracle [4].
 
 **Properties:**
 1. All reads within a transaction see the same snapshot
@@ -135,7 +135,7 @@ Global data center electricity: 200-250 TWh/year [5]. Storage is ~15%. Deduplica
 
 **Implementation Status:** COMPLETE (January 2026)
 
-| Metric | Armillaria OLAP | DuckDB | Speedup |
+| Metric | Rhizo OLAP | DuckDB | Speedup |
 |--------|-----------------|--------|---------|
 | Read (100K rows) | 0.9ms | 23.8ms | **26x** |
 | Filter (5%) | 1.2ms | 1.8ms | 1.5x |
@@ -143,7 +143,7 @@ Global data center electricity: 200-250 TWh/year [5]. Storage is ~15%. Deduplica
 | Complex query | 2.9ms | 6.6ms | **2.3x** |
 | Read (1M rows) | 5.1ms | 257.2ms | **50x** |
 
-**Extended SQL Features (unique to Armillaria):**
+**Extended SQL Features (unique to Rhizo):**
 - `SELECT * FROM users VERSION 5` - Time travel with VERSION keyword
 - `SELECT * FROM users@feature-branch` - Branch queries with @ notation
 - `SELECT * FROM __changelog WHERE table_name = 'users'` - CDC via SQL

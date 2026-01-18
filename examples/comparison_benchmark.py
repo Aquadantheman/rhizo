@@ -20,8 +20,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 # Armillaria
-import armillaria
-from armillaria_query import QueryEngine
+import rhizo
+import _rhizo
+from rhizo import QueryEngine
 
 # Delta Lake
 import deltalake
@@ -54,10 +55,10 @@ def generate_test_data(rows: int) -> pd.DataFrame:
     })
 
 
-def benchmark_armillaria_write(df: pd.DataFrame, path: str) -> BenchmarkResult:
+def benchmark_rhizo_write(df: pd.DataFrame, path: str) -> BenchmarkResult:
     """Benchmark Armillaria write."""
-    store = armillaria.PyChunkStore(os.path.join(path, "chunks"))
-    catalog = armillaria.PyCatalog(os.path.join(path, "catalog"))
+    store = _rhizo.PyChunkStore(os.path.join(path, "chunks"))
+    catalog = _rhizo.PyCatalog(os.path.join(path, "catalog"))
     engine = QueryEngine(store, catalog)
 
     start = time.perf_counter()
@@ -69,7 +70,7 @@ def benchmark_armillaria_write(df: pd.DataFrame, path: str) -> BenchmarkResult:
 
     return BenchmarkResult(
         operation="write",
-        system="Armillaria",
+        system="Rhizo",
         duration_ms=duration,
         rows=len(df),
         size_mb=size_mb,
@@ -98,10 +99,10 @@ def benchmark_delta_write(df: pd.DataFrame, path: str) -> BenchmarkResult:
     )
 
 
-def benchmark_armillaria_read(path: str) -> BenchmarkResult:
+def benchmark_rhizo_read(path: str) -> BenchmarkResult:
     """Benchmark Armillaria read."""
-    store = armillaria.PyChunkStore(os.path.join(path, "chunks"))
-    catalog = armillaria.PyCatalog(os.path.join(path, "catalog"))
+    store = _rhizo.PyChunkStore(os.path.join(path, "chunks"))
+    catalog = _rhizo.PyCatalog(os.path.join(path, "catalog"))
     engine = QueryEngine(store, catalog)
 
     start = time.perf_counter()
@@ -114,7 +115,7 @@ def benchmark_armillaria_read(path: str) -> BenchmarkResult:
 
     return BenchmarkResult(
         operation="read",
-        system="Armillaria",
+        system="Rhizo",
         duration_ms=duration,
         rows=len(df),
         size_mb=size_mb,
@@ -144,10 +145,10 @@ def benchmark_delta_read(path: str) -> BenchmarkResult:
     )
 
 
-def benchmark_armillaria_versioning(df: pd.DataFrame, path: str, num_versions: int) -> BenchmarkResult:
+def benchmark_rhizo_versioning(df: pd.DataFrame, path: str, num_versions: int) -> BenchmarkResult:
     """Benchmark Armillaria multi-version write."""
-    store = armillaria.PyChunkStore(os.path.join(path, "chunks"))
-    catalog = armillaria.PyCatalog(os.path.join(path, "catalog"))
+    store = _rhizo.PyChunkStore(os.path.join(path, "chunks"))
+    catalog = _rhizo.PyCatalog(os.path.join(path, "catalog"))
     engine = QueryEngine(store, catalog)
 
     start = time.perf_counter()
@@ -170,7 +171,7 @@ def benchmark_armillaria_versioning(df: pd.DataFrame, path: str, num_versions: i
 
     return BenchmarkResult(
         operation=f"write_{num_versions}_versions",
-        system="Armillaria",
+        system="Rhizo",
         duration_ms=duration,
         rows=len(df) * num_versions,
         size_mb=storage_mb,
@@ -212,10 +213,10 @@ def benchmark_delta_versioning(df: pd.DataFrame, path: str, num_versions: int) -
     )
 
 
-def benchmark_armillaria_time_travel(path: str, version: int) -> BenchmarkResult:
+def benchmark_rhizo_time_travel(path: str, version: int) -> BenchmarkResult:
     """Benchmark Armillaria time travel query."""
-    store = armillaria.PyChunkStore(os.path.join(path, "chunks"))
-    catalog = armillaria.PyCatalog(os.path.join(path, "catalog"))
+    store = _rhizo.PyChunkStore(os.path.join(path, "chunks"))
+    catalog = _rhizo.PyCatalog(os.path.join(path, "catalog"))
     engine = QueryEngine(store, catalog)
 
     start = time.perf_counter()
@@ -225,7 +226,7 @@ def benchmark_armillaria_time_travel(path: str, version: int) -> BenchmarkResult
 
     return BenchmarkResult(
         operation=f"time_travel_v{version}",
-        system="Armillaria",
+        system="Rhizo",
         duration_ms=duration,
         rows=len(df),
         size_mb=df.memory_usage(deep=True).sum() / 1024 / 1024,
@@ -250,11 +251,11 @@ def benchmark_delta_time_travel(path: str, version: int) -> BenchmarkResult:
     )
 
 
-def benchmark_armillaria_branching(df: pd.DataFrame, path: str) -> BenchmarkResult:
+def benchmark_rhizo_branching(df: pd.DataFrame, path: str) -> BenchmarkResult:
     """Benchmark Armillaria branch creation."""
-    store = armillaria.PyChunkStore(os.path.join(path, "chunks"))
-    catalog = armillaria.PyCatalog(os.path.join(path, "catalog"))
-    branches = armillaria.PyBranchManager(os.path.join(path, "branches"))
+    store = _rhizo.PyChunkStore(os.path.join(path, "chunks"))
+    catalog = _rhizo.PyCatalog(os.path.join(path, "catalog"))
+    branches = _rhizo.PyBranchManager(os.path.join(path, "branches"))
     engine = QueryEngine(store, catalog, branch_manager=branches)
 
     # Write initial data
@@ -274,7 +275,7 @@ def benchmark_armillaria_branching(df: pd.DataFrame, path: str) -> BenchmarkResu
 
     return BenchmarkResult(
         operation="create_branch",
-        system="Armillaria",
+        system="Rhizo",
         duration_ms=duration,
         rows=len(df),
         size_mb=branch_size / 1024 / 1024,
@@ -329,14 +330,14 @@ def run_comparison_benchmarks():
         print(f"Data size: {data_size_mb:.2f} MB")
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            armillaria_path = os.path.join(tmpdir, "armillaria")
+            rhizo_path = os.path.join(tmpdir, "rhizo")
             delta_path = os.path.join(tmpdir, "delta")
-            os.makedirs(armillaria_path)
+            os.makedirs(rhizo_path)
             os.makedirs(delta_path)
 
             # Write benchmarks
             print("\n--- Write Performance ---")
-            r1 = benchmark_armillaria_write(df, armillaria_path)
+            r1 = benchmark_rhizo_write(df, rhizo_path)
             r2 = benchmark_delta_write(df, delta_path)
             results.extend([r1, r2])
             print(f"Armillaria: {r1.duration_ms:.1f}ms ({r1.throughput_mb_s:.1f} MB/s)")
@@ -344,7 +345,7 @@ def run_comparison_benchmarks():
 
             # Read benchmarks
             print("\n--- Read Performance ---")
-            r3 = benchmark_armillaria_read(armillaria_path)
+            r3 = benchmark_rhizo_read(rhizo_path)
             r4 = benchmark_delta_read(delta_path)
             results.extend([r3, r4])
             print(f"Armillaria: {r3.duration_ms:.1f}ms ({r3.throughput_mb_s:.1f} MB/s)")
@@ -357,12 +358,12 @@ def run_comparison_benchmarks():
 
     df = generate_test_data(100_000)
     with tempfile.TemporaryDirectory() as tmpdir:
-        armillaria_path = os.path.join(tmpdir, "armillaria")
+        rhizo_path = os.path.join(tmpdir, "rhizo")
         delta_path = os.path.join(tmpdir, "delta")
-        os.makedirs(armillaria_path)
+        os.makedirs(rhizo_path)
         os.makedirs(delta_path)
 
-        r5 = benchmark_armillaria_versioning(df, armillaria_path, 10)
+        r5 = benchmark_rhizo_versioning(df, rhizo_path, 10)
         r6 = benchmark_delta_versioning(df, delta_path, 10)
         results.extend([r5, r6])
 
@@ -381,14 +382,14 @@ def run_comparison_benchmarks():
 
     df = generate_test_data(100_000)
     with tempfile.TemporaryDirectory() as tmpdir:
-        armillaria_path = os.path.join(tmpdir, "armillaria")
+        rhizo_path = os.path.join(tmpdir, "rhizo")
         delta_path = os.path.join(tmpdir, "delta")
-        os.makedirs(armillaria_path)
+        os.makedirs(rhizo_path)
         os.makedirs(delta_path)
 
         # Create multiple versions
-        store = armillaria.PyChunkStore(os.path.join(armillaria_path, "chunks"))
-        catalog = armillaria.PyCatalog(os.path.join(armillaria_path, "catalog"))
+        store = _rhizo.PyChunkStore(os.path.join(rhizo_path, "chunks"))
+        catalog = _rhizo.PyCatalog(os.path.join(rhizo_path, "catalog"))
         engine = QueryEngine(store, catalog)
 
         write_deltalake(os.path.join(delta_path, "delta_table"), df, mode="overwrite")
@@ -404,14 +405,14 @@ def run_comparison_benchmarks():
             )
 
         print("\nQuerying version 1 (oldest):")
-        r7 = benchmark_armillaria_time_travel(armillaria_path, 1)
+        r7 = benchmark_rhizo_time_travel(rhizo_path, 1)
         r8 = benchmark_delta_time_travel(delta_path, 0)
         results.extend([r7, r8])
         print(f"Armillaria: {r7.duration_ms:.1f}ms")
         print(f"Delta Lake: {r8.duration_ms:.1f}ms")
 
         print("\nQuerying version 5 (latest):")
-        r9 = benchmark_armillaria_time_travel(armillaria_path, 5)
+        r9 = benchmark_rhizo_time_travel(rhizo_path, 5)
         r10 = benchmark_delta_time_travel(delta_path, 4)
         results.extend([r9, r10])
         print(f"Armillaria: {r9.duration_ms:.1f}ms")
@@ -424,12 +425,12 @@ def run_comparison_benchmarks():
 
     df = generate_test_data(100_000)
     with tempfile.TemporaryDirectory() as tmpdir:
-        armillaria_path = os.path.join(tmpdir, "armillaria")
+        rhizo_path = os.path.join(tmpdir, "rhizo")
         delta_path = os.path.join(tmpdir, "delta")
-        os.makedirs(armillaria_path)
+        os.makedirs(rhizo_path)
         os.makedirs(delta_path)
 
-        r11 = benchmark_armillaria_branching(df, armillaria_path)
+        r11 = benchmark_rhizo_branching(df, rhizo_path)
         r12 = benchmark_delta_branching(df, delta_path)
         results.extend([r11, r12])
 

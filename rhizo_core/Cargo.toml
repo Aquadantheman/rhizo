@@ -1,5 +1,5 @@
 [package]
-name = "udr_core"
+name = "rhizo_core"
 version = "0.1.0"
 edition = "2021"
 

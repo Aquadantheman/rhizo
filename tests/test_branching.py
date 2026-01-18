@@ -10,16 +10,14 @@ import shutil
 
 import pytest
 
-import armillaria
-
-
+import _rhizo
 @pytest.fixture
 def temp_storage():
     """Create temporary storage directories for testing."""
-    base_dir = tempfile.mkdtemp(prefix="armillaria_branch_test_")
+    base_dir = tempfile.mkdtemp(prefix="rhizo_branch_test_")
     branches_dir = os.path.join(base_dir, "branches")
 
-    manager = armillaria.PyBranchManager(branches_dir)
+    manager = _rhizo.PyBranchManager(branches_dir)
 
     yield manager, base_dir
 

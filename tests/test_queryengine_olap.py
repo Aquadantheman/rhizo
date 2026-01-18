@@ -14,19 +14,18 @@ import pandas as pd
 import pyarrow as pa
 import pytest
 
-from armillaria_query import QueryEngine, is_datafusion_available
+from rhizo import QueryEngine, is_datafusion_available
 
 
 @pytest.fixture
 def olap_engine(tmp_path):
     """Create QueryEngine with OLAP enabled."""
-    import armillaria
-
+    import _rhizo
     chunks_path = str(tmp_path / "chunks")
     catalog_path = str(tmp_path / "catalog")
 
-    store = armillaria.PyChunkStore(chunks_path)
-    catalog = armillaria.PyCatalog(catalog_path)
+    store = _rhizo.PyChunkStore(chunks_path)
+    catalog = _rhizo.PyCatalog(catalog_path)
 
     engine = QueryEngine(
         store, catalog,
@@ -50,13 +49,12 @@ def olap_engine(tmp_path):
 @pytest.fixture
 def no_olap_engine(tmp_path):
     """Create QueryEngine with OLAP disabled."""
-    import armillaria
-
+    import _rhizo
     chunks_path = str(tmp_path / "chunks")
     catalog_path = str(tmp_path / "catalog")
 
-    store = armillaria.PyChunkStore(chunks_path)
-    catalog = armillaria.PyCatalog(catalog_path)
+    store = _rhizo.PyChunkStore(chunks_path)
+    catalog = _rhizo.PyCatalog(catalog_path)
 
     engine = QueryEngine(
         store, catalog,
@@ -228,13 +226,12 @@ class TestBackwardCompatibility:
 
     def test_engine_works_without_olap_params(self, tmp_path):
         """Test that QueryEngine works without OLAP params (old API)."""
-        import armillaria
-
+        import _rhizo
         chunks_path = str(tmp_path / "chunks")
         catalog_path = str(tmp_path / "catalog")
 
-        store = armillaria.PyChunkStore(chunks_path)
-        catalog = armillaria.PyCatalog(catalog_path)
+        store = _rhizo.PyChunkStore(chunks_path)
+        catalog = _rhizo.PyCatalog(catalog_path)
 
         # Old-style initialization (should still work)
         engine = QueryEngine(store, catalog)

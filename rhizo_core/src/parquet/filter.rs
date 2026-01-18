@@ -157,7 +157,7 @@ fn compare_ord<T: PartialOrd>(a: T, b: T, op: FilterOp) -> bool {
 /// # Example
 ///
 /// ```ignore
-/// use udr_core::parquet::{PredicateFilter, FilterOp, ScalarValue};
+/// use rhizo_core::parquet::{PredicateFilter, FilterOp, ScalarValue};
 ///
 /// // Create filter: age > 50
 /// let filter = PredicateFilter::new("age", FilterOp::Gt, ScalarValue::Int64(50));

@@ -27,8 +27,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 # Armillaria
-import armillaria
-from armillaria_query import QueryEngine
+import rhizo
+import _rhizo
+from rhizo import QueryEngine
 
 # Delta Lake
 from deltalake import DeltaTable, write_deltalake
@@ -106,13 +107,13 @@ atexit.register(_cleanup_on_exit)
 # Armillaria Benchmarks
 # =============================================================================
 
-def benchmark_armillaria(df: pd.DataFrame, path: str, num_versions: int = 5) -> dict:
+def benchmark_rhizo(df: pd.DataFrame, path: str, num_versions: int = 5) -> dict:
     """Full Armillaria benchmark suite."""
     results = {}
 
-    store = armillaria.PyChunkStore(os.path.join(path, "chunks"))
-    catalog = armillaria.PyCatalog(os.path.join(path, "catalog"))
-    branches = armillaria.PyBranchManager(os.path.join(path, "branches"))
+    store = _rhizo.PyChunkStore(os.path.join(path, "chunks"))
+    catalog = _rhizo.PyCatalog(os.path.join(path, "catalog"))
+    branches = _rhizo.PyBranchManager(os.path.join(path, "branches"))
     engine = QueryEngine(store, catalog, branch_manager=branches)
 
     # Write
@@ -345,7 +346,7 @@ def run_full_benchmark():
     # Armillaria
     print("Running Armillaria benchmark...")
     with tempfile.TemporaryDirectory() as tmpdir:
-        all_results["Armillaria"] = benchmark_armillaria(df, tmpdir, num_versions)
+        all_results["Rhizo"] = benchmark_rhizo(df, tmpdir, num_versions)
     print("  Done")
 
     # Delta Lake

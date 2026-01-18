@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Armillaria Benchmark Suite
+Rhizo Benchmark Suite
 
 Comprehensive benchmarks for the arXiv paper. Measures:
 1. Raw throughput (write/read with hashing)
@@ -27,8 +27,8 @@ import numpy as np
 # Add python directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
-import armillaria
-from armillaria_query import QueryEngine
+import _rhizo
+from rhizo import QueryEngine
 
 
 @dataclass
@@ -71,9 +71,9 @@ def benchmark_throughput(iterations: int = 5) -> List[BenchmarkResult]:
     chunk_size = 10 * 1024 * 1024  # 10 MB
     data = os.urandom(chunk_size)
 
-    base_dir = tempfile.mkdtemp(prefix="armillaria_bench_throughput_")
+    base_dir = tempfile.mkdtemp(prefix="rhizo_bench_throughput_")
     try:
-        store = armillaria.PyChunkStore(base_dir)
+        store = _rhizo.PyChunkStore(base_dir)
 
         # Write benchmark
         write_times = []
@@ -135,11 +135,11 @@ def benchmark_branching(row_counts: Optional[List[int]] = None) -> List[Benchmar
     results = []
 
     for n_rows in row_counts:
-        base_dir = tempfile.mkdtemp(prefix=f"armillaria_bench_branch_{n_rows}_")
+        base_dir = tempfile.mkdtemp(prefix=f"rhizo_bench_branch_{n_rows}_")
         try:
-            store = armillaria.PyChunkStore(os.path.join(base_dir, "chunks"))
-            catalog = armillaria.PyCatalog(os.path.join(base_dir, "catalog"))
-            branches = armillaria.PyBranchManager(os.path.join(base_dir, "branches"))
+            store = _rhizo.PyChunkStore(os.path.join(base_dir, "chunks"))
+            catalog = _rhizo.PyCatalog(os.path.join(base_dir, "catalog"))
+            branches = _rhizo.PyBranchManager(os.path.join(base_dir, "branches"))
             engine = QueryEngine(store, catalog, branch_manager=branches)
 
             # Create dataset
@@ -185,10 +185,10 @@ def benchmark_deduplication() -> List[BenchmarkResult]:
     """Benchmark deduplication with realistic change patterns."""
     results = []
 
-    base_dir = tempfile.mkdtemp(prefix="armillaria_bench_dedup_")
+    base_dir = tempfile.mkdtemp(prefix="rhizo_bench_dedup_")
     try:
-        store = armillaria.PyChunkStore(os.path.join(base_dir, "chunks"))
-        catalog = armillaria.PyCatalog(os.path.join(base_dir, "catalog"))
+        store = _rhizo.PyChunkStore(os.path.join(base_dir, "chunks"))
+        catalog = _rhizo.PyCatalog(os.path.join(base_dir, "catalog"))
         engine = QueryEngine(store, catalog)
 
         # Test 1: Identical data (100% dedup)
@@ -220,10 +220,10 @@ def benchmark_deduplication() -> List[BenchmarkResult]:
         shutil.rmtree(base_dir, ignore_errors=True)
 
     # Test 2: Versioned data with incremental changes
-    base_dir = tempfile.mkdtemp(prefix="armillaria_bench_dedup_versions_")
+    base_dir = tempfile.mkdtemp(prefix="rhizo_bench_dedup_versions_")
     try:
-        store = armillaria.PyChunkStore(os.path.join(base_dir, "chunks"))
-        catalog = armillaria.PyCatalog(os.path.join(base_dir, "catalog"))
+        store = _rhizo.PyChunkStore(os.path.join(base_dir, "chunks"))
+        catalog = _rhizo.PyCatalog(os.path.join(base_dir, "catalog"))
         engine = QueryEngine(store, catalog)
 
         np.random.seed(42)
@@ -279,10 +279,10 @@ def benchmark_time_travel() -> List[BenchmarkResult]:
     """Benchmark time travel query performance."""
     results = []
 
-    base_dir = tempfile.mkdtemp(prefix="armillaria_bench_timetravel_")
+    base_dir = tempfile.mkdtemp(prefix="rhizo_bench_timetravel_")
     try:
-        store = armillaria.PyChunkStore(os.path.join(base_dir, "chunks"))
-        catalog = armillaria.PyCatalog(os.path.join(base_dir, "catalog"))
+        store = _rhizo.PyChunkStore(os.path.join(base_dir, "chunks"))
+        catalog = _rhizo.PyCatalog(os.path.join(base_dir, "catalog"))
         engine = QueryEngine(store, catalog)
 
         # Create 20 versions
@@ -335,12 +335,12 @@ def benchmark_transactions() -> List[BenchmarkResult]:
     """Benchmark cross-table transaction overhead."""
     results = []
 
-    base_dir = tempfile.mkdtemp(prefix="armillaria_bench_tx_")
+    base_dir = tempfile.mkdtemp(prefix="rhizo_bench_tx_")
     try:
-        store = armillaria.PyChunkStore(os.path.join(base_dir, "chunks"))
-        catalog = armillaria.PyCatalog(os.path.join(base_dir, "catalog"))
-        branches = armillaria.PyBranchManager(os.path.join(base_dir, "branches"))
-        tx_manager = armillaria.PyTransactionManager(
+        store = _rhizo.PyChunkStore(os.path.join(base_dir, "chunks"))
+        catalog = _rhizo.PyCatalog(os.path.join(base_dir, "catalog"))
+        branches = _rhizo.PyBranchManager(os.path.join(base_dir, "branches"))
+        tx_manager = _rhizo.PyTransactionManager(
             os.path.join(base_dir, "transactions"),
             os.path.join(base_dir, "catalog"),
             os.path.join(base_dir, "branches")
@@ -416,7 +416,7 @@ def benchmark_transactions() -> List[BenchmarkResult]:
 def run_all_benchmarks():
     """Run all benchmarks and report results."""
     print("=" * 70)
-    print("  ARMILLARIA BENCHMARK SUITE")
+    print("  RHIZO BENCHMARK SUITE")
     print("  Generating numbers for arXiv paper")
     print("=" * 70)
 

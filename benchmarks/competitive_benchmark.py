@@ -28,8 +28,8 @@ import pyarrow.parquet as pq
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 
 # Armillaria imports
-from armillaria import PyChunkStore, PyCatalog
-from armillaria_query import TableWriter, TableReader, Filter
+from _rhizo import PyChunkStore, PyCatalog
+from rhizo import TableWriter, TableReader, Filter
 
 # Delta Lake import
 try:
@@ -75,12 +75,12 @@ def benchmark(func, warmup: int = 1, iterations: int = 5):
     return round(np.median(times), 2)
 
 
-def run_armillaria_benchmarks(df: pd.DataFrame, temp_dir: str) -> dict:
+def run_rhizo_benchmarks(df: pd.DataFrame, temp_dir: str) -> dict:
     """Run Armillaria benchmarks."""
     results = {}
 
-    chunks_path = os.path.join(temp_dir, "armillaria_chunks")
-    catalog_path = os.path.join(temp_dir, "armillaria_catalog")
+    chunks_path = os.path.join(temp_dir, "rhizo_chunks")
+    catalog_path = os.path.join(temp_dir, "rhizo_catalog")
 
     store = PyChunkStore(chunks_path)
     catalog = PyCatalog(catalog_path)
@@ -239,7 +239,7 @@ def main():
         # Run benchmarks
         print("\n" + "-" * 75)
         print("Running Armillaria benchmarks...")
-        armillaria_results = run_armillaria_benchmarks(df, temp_dir)
+        rhizo_results = run_rhizo_benchmarks(df, temp_dir)
 
         print("Running Delta Lake benchmarks...")
         delta_results = run_delta_benchmarks(df, temp_dir)
@@ -261,11 +261,11 @@ def main():
             ("combined", "Combined (filter + projection)"),
         ]
 
-        print(f"\n{'Operation':<35} {'Armillaria':>12} {'Delta Lake':>12} {'Raw Parquet':>12}")
+        print(f"\n{'Operation':<35} {'Rhizo':>12} {'Delta Lake':>12} {'Raw Parquet':>12}")
         print("-" * 75)
 
         for key, name in operations:
-            arm = format_result(armillaria_results.get(key, "N/A"))
+            arm = format_result(rhizo_results.get(key, "N/A"))
             delta = format_result(delta_results.get(key, "N/A"))
             parq = format_result(parquet_results.get(key, "N/A"))
             print(f"{name:<35} {arm:>12} {delta:>12} {parq:>12}")
@@ -277,7 +277,7 @@ def main():
 
         print("\nWhere Armillaria excels:")
         for key, name in operations:
-            arm = armillaria_results.get(key)
+            arm = rhizo_results.get(key)
             delta = delta_results.get(key)
             if isinstance(arm, (int, float)) and isinstance(delta, (int, float)):
                 if arm < delta:
@@ -286,7 +286,7 @@ def main():
 
         print("\nWhere Delta Lake excels:")
         for key, name in operations:
-            arm = armillaria_results.get(key)
+            arm = rhizo_results.get(key)
             delta = delta_results.get(key)
             if isinstance(arm, (int, float)) and isinstance(delta, (int, float)):
                 if delta < arm:
@@ -324,7 +324,7 @@ VERDICT: Armillaria has MORE features AND is faster!
                 "num_rows": num_rows,
                 "num_columns": 10,
             },
-            "armillaria": armillaria_results,
+            "rhizo": rhizo_results,
             "delta_lake": delta_results,
             "raw_parquet": parquet_results,
         }

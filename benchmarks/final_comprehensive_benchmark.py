@@ -25,8 +25,8 @@ import pyarrow.parquet as pq
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 
-from armillaria import PyChunkStore, PyCatalog, PyParquetEncoder, PyParquetDecoder, PyPredicateFilter
-from armillaria_query import TableWriter, TableReader, Filter
+from _rhizo import PyChunkStore, PyCatalog, PyParquetEncoder, PyParquetDecoder, PyPredicateFilter
+from rhizo import TableWriter, TableReader, Filter
 
 
 def benchmark(func, warmup: int = 1, iterations: int = 5):
@@ -91,7 +91,7 @@ def main():
         "optimization_gains": {},
     }
 
-    temp_dir = tempfile.mkdtemp(prefix="armillaria_final_bench_")
+    temp_dir = tempfile.mkdtemp(prefix="rhizo_final_bench_")
     chunks_path = os.path.join(temp_dir, "chunks")
     catalog_path = os.path.join(temp_dir, "catalog")
 

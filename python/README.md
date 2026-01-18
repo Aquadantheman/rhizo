@@ -1,25 +1,23 @@
-# armillaria-query
+# rhizo
 
-Query layer for [Armillaria](https://github.com/aquadantheman/armillaria) - versioned data with SQL, time travel, and cross-table ACID transactions.
+Query layer for [Rhizo](https://rhizodata.dev) - versioned data with SQL, time travel, and cross-table ACID transactions.
 
 ## Installation
 
 ```bash
-pip install armillaria-query
+pip install rhizo
 ```
-
-This will automatically install the `armillaria` core package as a dependency.
 
 ## Quick Start
 
 ```python
-import armillaria
-from armillaria_query import QueryEngine
+import rhizo
+from rhizo import QueryEngine
 import pandas as pd
 
 # Initialize storage
-store = armillaria.PyChunkStore("./data/chunks")
-catalog = armillaria.PyCatalog("./data/catalog")
+store = rhizo.PyChunkStore("./data/chunks")
+catalog = rhizo.PyCatalog("./data/catalog")
 engine = QueryEngine(store, catalog)
 
 # Write data
@@ -44,7 +42,7 @@ result_v1 = engine.query("SELECT * FROM users", versions={"users": 1})
 
 ## Documentation
 
-See the [main repository](https://github.com/aquadantheman/armillaria) for full documentation.
+See [rhizodata.dev](https://rhizodata.dev) for full documentation.
 
 ## License
 

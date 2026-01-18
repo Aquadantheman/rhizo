@@ -1,8 +1,8 @@
-# Armillaria v2: Mathematical Storage Architecture
+# Rhizo v2: Mathematical Storage Architecture
 
 ## Vision
 
-Transform Armillaria from a working prototype into a **mathematically optimal** data system where every claim is provable and every operation approaches theoretical limits.
+Transform Rhizo from a working prototype into a **mathematically optimal** data system where every claim is provable and every operation approaches theoretical limits.
 
 ---
 
@@ -26,7 +26,7 @@ Transform Armillaria from a working prototype into a **mathematically optimal** 
 ```
 
 **Implementation:**
-- Rust: `udr_core/src/merkle/` (error.rs, types.rs, tree.rs, mod.rs)
+- Rust: `rhizo_core/src/merkle/` (error.rs, types.rs, tree.rs, mod.rs)
 - Python bindings: `PyMerkleTree`, `PyMerkleDiff`, `PyMerkleConfig`
 - 15 Rust tests, all passing
 - Benchmark: `examples/merkle_benchmark.py`
@@ -250,7 +250,7 @@ pub struct TableRef {
 
 ### Phase 1: Core Merkle Operations (Rust)
 
-**File:** `udr_core/src/merkle/mod.rs`
+**File:** `rhizo_core/src/merkle/mod.rs`
 
 ```rust
 pub mod chunk;      // Chunk creation and hashing
@@ -338,7 +338,7 @@ fn rows_changed(old_df: &DataFrame, new_df: &DataFrame) -> Vec<usize> {
 
 ### Phase 3: Python Bindings
 
-**File:** `udr_python/src/merkle.rs`
+**File:** `rhizo_python/src/merkle.rs`
 
 ```rust
 #[pyclass]
@@ -597,7 +597,7 @@ The implementation is complete when:
 ## Phase A Next Steps
 
 1. Review and approve this plan
-2. Create `udr_core/src/merkle/` module structure
+2. Create `rhizo_core/src/merkle/` module structure
 3. Implement `chunk_dataframe()` and `build_tree()`
 4. Write initial tests
 5. Iterate until tests pass
@@ -657,7 +657,7 @@ If these hold, **any order of merges produces the same result**.
 
 ---
 
-## CRDT Types for Armillaria
+## CRDT Types for Rhizo
 
 ### 1. LWW-Register (Last-Writer-Wins)
 

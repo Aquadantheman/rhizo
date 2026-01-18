@@ -1,5 +1,5 @@
 """
-Armillaria Query Layer - SQL queries over versioned, content-addressable data.
+Rhizo - Data, connected. SQL queries over versioned, content-addressable data.
 
 This module provides:
 - TableWriter: Write DataFrames as chunked Parquet files

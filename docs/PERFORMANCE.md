@@ -1,6 +1,6 @@
-# Armillaria Performance Guide
+# Rhizo Performance Guide
 
-This document summarizes the performance optimizations implemented in Armillaria and how to use them effectively.
+This document summarizes the performance optimizations implemented in Rhizo and how to use them effectively.
 
 ## Performance Phases
 
@@ -23,7 +23,7 @@ table = reader.read_arrow("my_table", columns=["id", "name", "score"])
 Filter rows during decoding rather than after. Uses min/max statistics to skip entire row groups.
 
 ```python
-from armillaria_query import Filter
+from rhizo import Filter
 
 # Filter during read, not after:
 table = reader.read_arrow(
@@ -42,7 +42,7 @@ Automatically enabled with predicate pushdown. Works best when:
 
 Check pruning effectiveness:
 ```python
-from armillaria import PyParquetDecoder, PyPredicateFilter
+from rhizo import PyParquetDecoder, PyPredicateFilter
 
 decoder = PyParquetDecoder()
 filter = PyPredicateFilter("id", "gt", 9000)
@@ -129,7 +129,7 @@ filters=[Filter("age").gt(50), Filter("status").eq("active")]
 
 ## OLAP Engine (DataFusion)
 
-For analytical workloads, Armillaria includes a high-performance OLAP engine powered by DataFusion.
+For analytical workloads, Rhizo includes a high-performance OLAP engine powered by DataFusion.
 
 ### Enable OLAP
 

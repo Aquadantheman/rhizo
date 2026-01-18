@@ -28,8 +28,9 @@ import numpy as np
 # Add python directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
-import armillaria
-from armillaria_query import QueryEngine
+import rhizo
+import _rhizo
+from rhizo import QueryEngine
 
 
 def print_header(text: str) -> None:
@@ -86,14 +87,14 @@ def main():
     """)
 
     # Create temporary storage
-    base_dir = tempfile.mkdtemp(prefix="armillaria_integrity_demo_")
+    base_dir = tempfile.mkdtemp(prefix="rhizo_integrity_demo_")
     chunks_dir = os.path.join(base_dir, "chunks")
     print(f"Storage: {base_dir}")
 
     try:
         # Initialize Armillaria with integrity verification ENABLED
-        store = armillaria.PyChunkStore(chunks_dir)
-        catalog = armillaria.PyCatalog(os.path.join(base_dir, "catalog"))
+        store = _rhizo.PyChunkStore(chunks_dir)
+        catalog = _rhizo.PyCatalog(os.path.join(base_dir, "catalog"))
 
         # verify_integrity=True ensures every read checks the hash
         engine = QueryEngine(store, catalog, verify_integrity=True)

@@ -13,7 +13,7 @@
 //! # Example
 //!
 //! ```rust
-//! use udr_core::merkle::{build_tree, diff_trees, MerkleConfig};
+//! use rhizo_core::merkle::{build_tree, diff_trees, MerkleConfig};
 //!
 //! // Build a tree from data - use unique bytes per chunk
 //! let config = MerkleConfig::new(1024); // 1KB chunks

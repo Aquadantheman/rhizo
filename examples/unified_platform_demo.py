@@ -30,8 +30,9 @@ import numpy as np
 # Add python directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
-import armillaria
-from armillaria_query import QueryEngine
+import rhizo
+import _rhizo
+from rhizo import QueryEngine
 
 
 def print_header(text: str) -> None:
@@ -92,15 +93,15 @@ def main():
     """)
 
     # Create temporary storage
-    base_dir = tempfile.mkdtemp(prefix="armillaria_unified_demo_")
+    base_dir = tempfile.mkdtemp(prefix="rhizo_unified_demo_")
     print(f"Storage: {base_dir}")
 
     try:
         # Initialize Armillaria with ALL features
-        store = armillaria.PyChunkStore(os.path.join(base_dir, "chunks"))
-        catalog = armillaria.PyCatalog(os.path.join(base_dir, "catalog"))
-        branches = armillaria.PyBranchManager(os.path.join(base_dir, "branches"))
-        tx_manager = armillaria.PyTransactionManager(
+        store = _rhizo.PyChunkStore(os.path.join(base_dir, "chunks"))
+        catalog = _rhizo.PyCatalog(os.path.join(base_dir, "catalog"))
+        branches = _rhizo.PyBranchManager(os.path.join(base_dir, "branches"))
+        tx_manager = _rhizo.PyTransactionManager(
             os.path.join(base_dir, "transactions"),
             os.path.join(base_dir, "catalog"),
             os.path.join(base_dir, "branches")
@@ -162,7 +163,7 @@ Armillaria: A single library that includes:
         print_check("SQL query interface")
         print_check("Python-native API")
         print()
-        print("Required infrastructure: pip install armillaria")
+        print("Required infrastructure: pip install rhizo")
         print("Cluster needed: No")
         print("External services: None")
 
@@ -422,7 +423,7 @@ Final storage breakdown:
 TRADITIONAL APPROACH                    ARMILLARIA APPROACH
 ----------------------                  -------------------
 
-Delta Lake or Iceberg                   pip install armillaria
+Delta Lake or Iceberg                   pip install rhizo
   + Spark Cluster                       engine = QueryEngine(...)
   + lakeFS Server
   + S3/GCS/ADLS

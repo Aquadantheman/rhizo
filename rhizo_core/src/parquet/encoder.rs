@@ -109,7 +109,7 @@ impl ParquetEncoder {
     /// ```ignore
     /// use arrow::array::{Int64Array, StringArray};
     /// use arrow::record_batch::RecordBatch;
-    /// use udr_core::parquet::ParquetEncoder;
+    /// use rhizo_core::parquet::ParquetEncoder;
     ///
     /// let ids = Int64Array::from(vec![1, 2, 3]);
     /// let names = StringArray::from(vec!["Alice", "Bob", "Charlie"]);

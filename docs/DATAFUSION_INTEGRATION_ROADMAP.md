@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document outlines the plan to integrate Apache DataFusion into Armillaria to achieve **OLAP-level query performance** while maintaining all lakehouse features (versioning, branching, transactions, deduplication).
+This document outlines the plan to integrate Apache DataFusion into Rhizo to achieve **OLAP-level query performance** while maintaining all lakehouse features (versioning, branching, transactions, deduplication).
 
 **Goal**: Become #1 in both table formats AND OLAP query performance.
 
@@ -42,10 +42,10 @@ This document outlines the plan to integrate Apache DataFusion into Armillaria t
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Current Armillaria                         │
+│                      Current Rhizo                         │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  Python API (armillaria_query)                                  │
+│  Python API (rhizo)                                  │
 │       │                                                         │
 │       ▼                                                         │
 │  QueryEngine ─────► DuckDB (in-memory)                         │
@@ -76,10 +76,10 @@ This document outlines the plan to integrate Apache DataFusion into Armillaria t
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                   Armillaria + DataFusion                       │
+│                   Rhizo + DataFusion                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  Python API (armillaria_query)                                  │
+│  Python API (rhizo)                                  │
 │       │                                                         │
 │       ├──────────────────────────────────────┐                  │
 │       ▼                                      ▼                  │
@@ -119,7 +119,7 @@ This document outlines the plan to integrate Apache DataFusion into Armillaria t
 
 *Note: These are isolated micro-benchmark results. Actual integrated performance is shown in the Executive Summary.*
 
-| Query Type | Current Armillaria | DuckDB | DataFusion (memory) | Theoretical Max |
+| Query Type | Current Rhizo | DuckDB | DataFusion (memory) | Theoretical Max |
 |------------|-------------------|--------|---------------------|-----------------|
 | Filtered (5%) | 9.4ms | 1.6ms | **0.45ms** | 20.9x |
 | Projection (2 cols) | 6.9ms | 1.6ms | **0.18ms** | 38.3x |
@@ -206,8 +206,8 @@ Aggressive estimate:
 **Status**: COMPLETE (January 2026)
 
 **Files to Create**:
-- `python/armillaria_query/olap_engine.py` - OLAPEngine class
-- `python/armillaria_query/cache.py` - CacheManager class
+- `python/rhizo/olap_engine.py` - OLAPEngine class
+- `python/rhizo/cache.py` - CacheManager class
 - `tests/test_olap_engine.py` - Tests
 
 **OLAPEngine API**:
@@ -217,7 +217,7 @@ class OLAPEngine:
     High-performance OLAP query engine powered by DataFusion.
 
     Provides vectorized, multi-threaded query execution over
-    Armillaria tables with optional in-memory caching.
+    Rhizo tables with optional in-memory caching.
     """
 
     def __init__(
@@ -442,7 +442,7 @@ class QueryEngine:
 
 ### Phase DF.4: Advanced Features - COMPLETE
 
-**Goal**: Add advanced OLAP capabilities unique to Armillaria
+**Goal**: Add advanced OLAP capabilities unique to Rhizo
 
 **Status**: COMPLETE (January 2026)
 
@@ -626,7 +626,7 @@ For each claim, provide:
 
 - [Apache DataFusion](https://datafusion.apache.org/) - Query engine documentation
 - [DataFusion Python](https://github.com/apache/datafusion-python) - Python bindings
-- [Armillaria Architecture](../README.md) - Current system overview
+- [Rhizo Architecture](../README.md) - Current system overview
 - [Technical Foundations](./TECHNICAL_FOUNDATIONS.md) - Mathematical proofs
 - [Performance Guide](./PERFORMANCE.md) - Current optimizations
 
