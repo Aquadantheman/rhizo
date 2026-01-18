@@ -6,6 +6,7 @@
 use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use parquet::arrow::ProjectionMask;
 use rayon::prelude::*;
 
 use super::error::ParquetError;
@@ -91,6 +92,118 @@ impl ParquetDecoder {
             .par_iter()
             .map(|chunk| self.decode(chunk.as_slice()))
             .collect()
+    }
+
+    /// Decode only specific columns by index (projection pushdown).
+    ///
+    /// This is significantly faster when you only need a subset of columns.
+    /// Column indices are 0-based and refer to the schema order.
+    ///
+    /// # Mathematical Model
+    ///
+    /// Without projection: T = Σ(decode_time_i) for all columns
+    /// With projection:    T' = Σ(decode_time_i) for requested columns
+    ///
+    /// Expected speedup ≈ n/k where n=total columns, k=requested columns
+    /// Example: 10 columns, query 2 → ~5x speedup on decode phase
+    ///
+    /// # Arguments
+    /// * `data` - Parquet file bytes
+    /// * `column_indices` - 0-based indices of columns to decode
+    ///
+    /// # Returns
+    /// * `Ok(RecordBatch)` - Decoded Arrow data with only requested columns
+    /// * `Err(ParquetError)` - If decoding fails or indices are invalid
+    pub fn decode_columns(
+        &self,
+        data: &[u8],
+        column_indices: &[usize],
+    ) -> Result<RecordBatch, ParquetError> {
+        if column_indices.is_empty() {
+            return Err(ParquetError::InvalidColumn(
+                "No columns specified for projection".to_string(),
+            ));
+        }
+
+        let bytes = Bytes::copy_from_slice(data);
+        let builder = ParquetRecordBatchReaderBuilder::try_new(bytes)?;
+
+        // Create projection mask for requested columns
+        // ProjectionMask::leaves() selects specific leaf columns by index
+        let parquet_schema = builder.parquet_schema();
+        let mask = ProjectionMask::leaves(parquet_schema, column_indices.iter().copied());
+
+        let reader = builder
+            .with_projection(mask)
+            .with_batch_size(self.batch_size)
+            .build()?;
+
+        // Collect all batches
+        let batches: Vec<RecordBatch> = reader.collect::<Result<Vec<_>, _>>()?;
+
+        if batches.is_empty() {
+            return Err(ParquetError::EmptyData);
+        }
+
+        // If only one batch, return it directly
+        if batches.len() == 1 {
+            return Ok(batches.into_iter().next().unwrap());
+        }
+
+        // Concatenate multiple batches
+        let schema = batches[0].schema();
+        arrow::compute::concat_batches(&schema, &batches).map_err(ParquetError::Arrow)
+    }
+
+    /// Decode only specific columns by name (projection pushdown).
+    ///
+    /// This is a convenience method that resolves column names to indices
+    /// and then applies projection pushdown.
+    ///
+    /// # Arguments
+    /// * `data` - Parquet file bytes
+    /// * `column_names` - Names of columns to decode
+    ///
+    /// # Returns
+    /// * `Ok(RecordBatch)` - Decoded Arrow data with only requested columns
+    /// * `Err(ParquetError)` - If decoding fails or names are invalid
+    pub fn decode_columns_by_name(
+        &self,
+        data: &[u8],
+        column_names: &[&str],
+    ) -> Result<RecordBatch, ParquetError> {
+        if column_names.is_empty() {
+            return Err(ParquetError::InvalidColumn(
+                "No columns specified for projection".to_string(),
+            ));
+        }
+
+        // First, read schema to get column indices
+        let bytes = Bytes::copy_from_slice(data);
+        let builder = ParquetRecordBatchReaderBuilder::try_new(bytes)?;
+        let arrow_schema = builder.schema();
+
+        // Resolve names to indices
+        let mut column_indices = Vec::with_capacity(column_names.len());
+        for name in column_names {
+            match arrow_schema.index_of(name) {
+                Ok(idx) => column_indices.push(idx),
+                Err(_) => {
+                    return Err(ParquetError::InvalidColumn(format!(
+                        "Column '{}' not found in schema. Available: {:?}",
+                        name,
+                        arrow_schema
+                            .fields()
+                            .iter()
+                            .map(|f| f.name())
+                            .collect::<Vec<_>>()
+                    )));
+                }
+            }
+        }
+
+        // Use index-based projection
+        self.decode_columns(data, &column_indices)
     }
 }
 
@@ -229,5 +342,174 @@ mod tests {
 
         // Should still get all rows
         assert_eq!(decoded.num_rows(), 10_000);
+    }
+
+    // ========== Projection Pushdown Tests ==========
+
+    #[test]
+    fn test_projection_single_column() {
+        let original = create_test_batch(1000);
+        let encoded = encode_batch(&original);
+
+        let decoder = ParquetDecoder::new();
+
+        // Decode only the first column (id)
+        let projected = decoder.decode_columns(&encoded, &[0]).unwrap();
+
+        assert_eq!(projected.num_rows(), 1000);
+        assert_eq!(projected.num_columns(), 1);
+        assert_eq!(projected.schema().field(0).name(), "id");
+
+        // Verify data integrity
+        let orig_ids = original
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        let proj_ids = projected
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+
+        for i in 0..orig_ids.len() {
+            assert_eq!(orig_ids.value(i), proj_ids.value(i));
+        }
+    }
+
+    #[test]
+    fn test_projection_multiple_columns() {
+        let original = create_test_batch(1000);
+        let encoded = encode_batch(&original);
+
+        let decoder = ParquetDecoder::new();
+
+        // Decode id and value columns (indices 0 and 1)
+        let projected = decoder.decode_columns(&encoded, &[0, 1]).unwrap();
+
+        assert_eq!(projected.num_rows(), 1000);
+        assert_eq!(projected.num_columns(), 2);
+        assert_eq!(projected.schema().field(0).name(), "id");
+        assert_eq!(projected.schema().field(1).name(), "value");
+    }
+
+    #[test]
+    fn test_projection_by_name_single() {
+        let original = create_test_batch(1000);
+        let encoded = encode_batch(&original);
+
+        let decoder = ParquetDecoder::new();
+
+        // Decode only the value column by name
+        let projected = decoder.decode_columns_by_name(&encoded, &["value"]).unwrap();
+
+        assert_eq!(projected.num_rows(), 1000);
+        assert_eq!(projected.num_columns(), 1);
+        assert_eq!(projected.schema().field(0).name(), "value");
+
+        // Verify data integrity
+        let orig_values = original
+            .column(1)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let proj_values = projected
+            .column(0)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+
+        for i in 0..orig_values.len() {
+            assert!((orig_values.value(i) - proj_values.value(i)).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn test_projection_by_name_multiple() {
+        let original = create_test_batch(1000);
+        let encoded = encode_batch(&original);
+
+        let decoder = ParquetDecoder::new();
+
+        // Decode id and name columns by name
+        let projected = decoder
+            .decode_columns_by_name(&encoded, &["id", "name"])
+            .unwrap();
+
+        assert_eq!(projected.num_rows(), 1000);
+        assert_eq!(projected.num_columns(), 2);
+        assert_eq!(projected.schema().field(0).name(), "id");
+        assert_eq!(projected.schema().field(1).name(), "name");
+    }
+
+    #[test]
+    fn test_projection_empty_columns_error() {
+        let original = create_test_batch(100);
+        let encoded = encode_batch(&original);
+
+        let decoder = ParquetDecoder::new();
+
+        // Empty column list should error
+        let result = decoder.decode_columns(&encoded, &[]);
+        assert!(matches!(result, Err(ParquetError::InvalidColumn(_))));
+    }
+
+    #[test]
+    fn test_projection_invalid_name_error() {
+        let original = create_test_batch(100);
+        let encoded = encode_batch(&original);
+
+        let decoder = ParquetDecoder::new();
+
+        // Invalid column name should error
+        let result = decoder.decode_columns_by_name(&encoded, &["nonexistent"]);
+        assert!(matches!(result, Err(ParquetError::InvalidColumn(_))));
+
+        // Error message should list available columns
+        if let Err(ParquetError::InvalidColumn(msg)) = result {
+            assert!(msg.contains("nonexistent"));
+            assert!(msg.contains("id") || msg.contains("value") || msg.contains("name"));
+        }
+    }
+
+    #[test]
+    fn test_projection_all_columns_equals_full_decode() {
+        let original = create_test_batch(1000);
+        let encoded = encode_batch(&original);
+
+        let decoder = ParquetDecoder::new();
+
+        // Full decode
+        let full = decoder.decode(&encoded).unwrap();
+
+        // Projection with all columns
+        let projected = decoder.decode_columns(&encoded, &[0, 1, 2]).unwrap();
+
+        // Should be equivalent
+        assert_eq!(full.num_rows(), projected.num_rows());
+        assert_eq!(full.num_columns(), projected.num_columns());
+        assert_eq!(full.schema(), projected.schema());
+    }
+
+    #[test]
+    fn test_projection_preserves_data_types() {
+        let original = create_test_batch(100);
+        let encoded = encode_batch(&original);
+
+        let decoder = ParquetDecoder::new();
+
+        // Original schema types
+        let orig_schema = original.schema();
+
+        // Projection by name
+        let projected = decoder
+            .decode_columns_by_name(&encoded, &["id", "value", "name"])
+            .unwrap();
+
+        // Types should match
+        for (i, field) in orig_schema.fields().iter().enumerate() {
+            assert_eq!(field.data_type(), projected.schema().field(i).data_type());
+            assert_eq!(field.is_nullable(), projected.schema().field(i).is_nullable());
+        }
     }
 }

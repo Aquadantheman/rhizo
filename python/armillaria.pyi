@@ -338,3 +338,40 @@ class PyParquetDecoder:
             List of PyArrow RecordBatches for each chunk
         """
         ...
+
+    def decode_columns(self, data: bytes, column_indices: List[int]) -> pa.RecordBatch:
+        """Decode only specific columns by index (projection pushdown).
+
+        This is significantly faster when you only need a subset of columns.
+        Column indices are 0-based and refer to the schema order.
+
+        Mathematical Model:
+            Speedup ≈ n/k where n=total columns, k=requested columns
+            Example: 10 columns, query 2 → ~5x speedup on decode phase
+
+        Args:
+            data: Parquet file bytes
+            column_indices: List of 0-based column indices to decode
+
+        Returns:
+            PyArrow RecordBatch with only requested columns
+        """
+        ...
+
+    def decode_columns_by_name(self, data: bytes, column_names: List[str]) -> pa.RecordBatch:
+        """Decode only specific columns by name (projection pushdown).
+
+        Convenience method that resolves column names to indices and applies
+        projection pushdown.
+
+        Args:
+            data: Parquet file bytes
+            column_names: List of column names to decode
+
+        Returns:
+            PyArrow RecordBatch with only requested columns
+
+        Raises:
+            ValueError: If a column name is not found in schema
+        """
+        ...

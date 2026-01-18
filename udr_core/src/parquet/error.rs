@@ -20,4 +20,8 @@ pub enum ParquetError {
     /// Invalid compression type
     #[error("Invalid compression: {0}")]
     InvalidCompression(String),
+
+    /// Invalid column name or index
+    #[error("Invalid column: {0}")]
+    InvalidColumn(String),
 }

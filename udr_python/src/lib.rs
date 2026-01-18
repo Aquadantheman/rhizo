@@ -115,6 +115,9 @@ fn parquet_err_to_py(e: ParquetError) -> PyErr {
         ParquetError::InvalidCompression(c) => {
             PyValueError::new_err(format!("Invalid compression: {}", c))
         }
+        ParquetError::InvalidColumn(msg) => {
+            PyValueError::new_err(format!("Invalid column: {}", msg))
+        }
     }
 }
 
@@ -235,6 +238,63 @@ impl PyParquetDecoder {
             .into_iter()
             .map(|batch| PyRecordBatch::new(batch).into_pyarrow(py))
             .collect()
+    }
+
+    /// Decode only specific columns by index (projection pushdown).
+    ///
+    /// This is significantly faster when you only need a subset of columns.
+    /// Column indices are 0-based and refer to the schema order.
+    ///
+    /// Mathematical Model:
+    ///     Speedup ≈ n/k where n=total columns, k=requested columns
+    ///     Example: 10 columns, query 2 → ~5x speedup on decode phase
+    ///
+    /// Args:
+    ///     data: Parquet file bytes
+    ///     column_indices: List of 0-based column indices to decode
+    ///
+    /// Returns:
+    ///     PyArrow RecordBatch with only requested columns
+    fn decode_columns<'py>(
+        &self,
+        py: Python<'py>,
+        data: &[u8],
+        column_indices: Vec<usize>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let batch = self
+            .inner
+            .decode_columns(data, &column_indices)
+            .map_err(parquet_err_to_py)?;
+        PyRecordBatch::new(batch).into_pyarrow(py)
+    }
+
+    /// Decode only specific columns by name (projection pushdown).
+    ///
+    /// Convenience method that resolves column names to indices and applies
+    /// projection pushdown.
+    ///
+    /// Args:
+    ///     data: Parquet file bytes
+    ///     column_names: List of column names to decode
+    ///
+    /// Returns:
+    ///     PyArrow RecordBatch with only requested columns
+    ///
+    /// Raises:
+    ///     ValueError: If a column name is not found in schema
+    fn decode_columns_by_name<'py>(
+        &self,
+        py: Python<'py>,
+        data: &[u8],
+        column_names: Vec<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        // Convert Vec<String> to Vec<&str> for the Rust API
+        let names: Vec<&str> = column_names.iter().map(|s| s.as_str()).collect();
+        let batch = self
+            .inner
+            .decode_columns_by_name(data, &names)
+            .map_err(parquet_err_to_py)?;
+        PyRecordBatch::new(batch).into_pyarrow(py)
     }
 }
 

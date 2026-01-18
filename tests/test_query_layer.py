@@ -563,3 +563,131 @@ class TestParallelParsing:
         result_none = reader_none.read_arrow("test_table")
 
         assert result_none.num_rows == 5
+
+
+class TestProjectionPushdown:
+    """Tests for projection pushdown (reading only specific columns)."""
+
+    def test_read_arrow_with_columns(self, temp_storage, sample_dataframe):
+        """Test that read_arrow with columns parameter returns only those columns."""
+        store, catalog, _ = temp_storage
+        writer = TableWriter(store, catalog)
+        writer.write("test_table", sample_dataframe)
+
+        reader = TableReader(store, catalog)
+
+        # Read only id and name columns
+        result = reader.read_arrow("test_table", columns=["id", "name"])
+
+        assert result.num_rows == 5
+        assert result.num_columns == 2
+        assert result.column_names == ["id", "name"]
+
+        # Verify data integrity
+        df = result.to_pandas()
+        pd.testing.assert_series_equal(
+            df["id"],
+            sample_dataframe["id"],
+            check_names=False
+        )
+        pd.testing.assert_series_equal(
+            df["name"],
+            sample_dataframe["name"],
+            check_names=False
+        )
+
+    def test_read_arrow_single_column(self, temp_storage, sample_dataframe):
+        """Test projection with a single column."""
+        store, catalog, _ = temp_storage
+        writer = TableWriter(store, catalog)
+        writer.write("test_table", sample_dataframe)
+
+        reader = TableReader(store, catalog)
+        result = reader.read_arrow("test_table", columns=["score"])
+
+        assert result.num_rows == 5
+        assert result.num_columns == 1
+        assert result.column_names == ["score"]
+
+    def test_read_arrow_all_columns_explicit(self, temp_storage, sample_dataframe):
+        """Test that explicitly requesting all columns works."""
+        store, catalog, _ = temp_storage
+        writer = TableWriter(store, catalog)
+        writer.write("test_table", sample_dataframe)
+
+        reader = TableReader(store, catalog)
+        all_columns = ["id", "name", "age", "score"]
+        result = reader.read_arrow("test_table", columns=all_columns)
+
+        assert result.num_rows == 5
+        assert result.num_columns == 4
+        assert result.column_names == all_columns
+
+    def test_iter_chunks_with_columns(self, temp_storage, large_dataframe):
+        """Test that iter_chunks with columns parameter works correctly."""
+        store, catalog, _ = temp_storage
+        writer = TableWriter(store, catalog, chunk_size_rows=10000)
+        writer.write("test_table", large_dataframe)
+
+        reader = TableReader(store, catalog)
+
+        # Iterate with projection
+        total_rows = 0
+        for chunk in reader.iter_chunks("test_table", columns=["id", "value"]):
+            assert chunk.num_columns == 2
+            assert chunk.column_names == ["id", "value"]
+            total_rows += chunk.num_rows
+
+        assert total_rows == 50000
+
+    def test_projection_invalid_column(self, temp_storage, sample_dataframe):
+        """Test that invalid column names raise appropriate error."""
+        store, catalog, _ = temp_storage
+        writer = TableWriter(store, catalog)
+        writer.write("test_table", sample_dataframe)
+
+        reader = TableReader(store, catalog)
+
+        with pytest.raises(ValueError) as exc_info:
+            reader.read_arrow("test_table", columns=["nonexistent"])
+
+        assert "nonexistent" in str(exc_info.value).lower()
+
+    def test_projection_with_time_travel(self, temp_storage, sample_dataframe):
+        """Test that projection works with time travel (specific version)."""
+        store, catalog, _ = temp_storage
+        writer = TableWriter(store, catalog)
+
+        # Write multiple versions
+        writer.write("test_table", sample_dataframe)  # v1
+        modified = sample_dataframe.copy()
+        modified["score"] = modified["score"] + 10
+        writer.write("test_table", modified)  # v2
+
+        reader = TableReader(store, catalog)
+
+        # Read v1 with projection
+        result_v1 = reader.read_arrow("test_table", version=1, columns=["id", "score"])
+        assert result_v1.num_columns == 2
+
+        # Verify original scores
+        df_v1 = result_v1.to_pandas()
+        pd.testing.assert_series_equal(
+            df_v1["score"],
+            sample_dataframe["score"],
+            check_names=False
+        )
+
+    def test_projection_with_parallel_workers(self, temp_storage, large_dataframe):
+        """Test that projection works with parallel workers."""
+        store, catalog, _ = temp_storage
+        writer = TableWriter(store, catalog, chunk_size_rows=10000)
+        writer.write("test_table", large_dataframe)
+
+        # Read with projection and parallel workers
+        reader = TableReader(store, catalog, parallel_workers=4)
+        result = reader.read_arrow("test_table", columns=["id", "value"])
+
+        assert result.num_rows == 50000
+        assert result.num_columns == 2
+        assert result.column_names == ["id", "value"]

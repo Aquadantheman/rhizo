@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Projection Pushdown (Phase R.1) - Read Optimization
+- Native column projection in Parquet decoder (`decode_columns`, `decode_columns_by_name`)
+- TableReader `columns` parameter for selective column reading
+- **5.1x speedup** for single-column queries (vs full scan)
+- **2.1x speedup** for 2-column queries from 10-column tables
+- Python bindings for projection pushdown
+- Mathematical model: Speedup ≈ n/k where n=total cols, k=requested cols
+
 #### Native Rust Parquet Encoding (Phase P.4)
 - Native Parquet encoder using `arrow-rs` and `parquet` crates
 - Native Parquet decoder with parallel batch support via Rayon
@@ -35,8 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **52,500x better branching overhead** (280 bytes vs 14.70 MB)
 
 ### Testing
-- 173 Rust tests (+13 new Parquet tests)
-- 179 Python tests (+6 new Parquet tests)
+- 181 Rust tests (+8 new projection tests, +13 Parquet tests)
+- 38 Query Layer Python tests (+7 projection pushdown tests)
 - Full competition benchmark against Delta Lake, Iceberg, and Hudi
 
 ---

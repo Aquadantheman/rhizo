@@ -138,6 +138,7 @@ class TableReader:
         self,
         table_name: str,
         version: Optional[int] = None,
+        columns: Optional[List[str]] = None,
     ) -> pa.Table:
         """
         Read a table version as an Arrow Table.
@@ -148,13 +149,17 @@ class TableReader:
         Args:
             table_name: Name of the table
             version: Specific version to read (None for latest)
+            columns: If specified, only read these columns (projection pushdown).
+                     This is significantly faster when you only need a subset
+                     of columns. Expected speedup: n/k where n=total columns,
+                     k=requested columns.
 
         Returns:
-            Arrow Table containing all data
+            Arrow Table containing all data (or selected columns)
 
         Raises:
             IOError: If table or version not found
-            ValueError: If chunk data is corrupted
+            ValueError: If chunk data is corrupted or column not found
         """
         metadata = self.get_metadata(table_name, version)
 
@@ -174,10 +179,13 @@ class TableReader:
         if self.parallel_workers and len(chunk_data_list) > 1:
             # Use thread pool for parallel Parquet parsing
             with ThreadPoolExecutor(max_workers=self.parallel_workers) as executor:
-                arrow_chunks = list(executor.map(self._parquet_to_arrow, chunk_data_list))
+                arrow_chunks = list(executor.map(
+                    lambda data: self._parquet_to_arrow(data, columns=columns),
+                    chunk_data_list
+                ))
         else:
             # Sequential parsing (default, or single chunk)
-            arrow_chunks = [self._parquet_to_arrow(data) for data in chunk_data_list]
+            arrow_chunks = [self._parquet_to_arrow(data, columns=columns) for data in chunk_data_list]
 
         if len(arrow_chunks) == 1:
             return arrow_chunks[0]
@@ -206,6 +214,7 @@ class TableReader:
         self,
         table_name: str,
         version: Optional[int] = None,
+        columns: Optional[List[str]] = None,
     ) -> Iterator[pa.Table]:
         """
         Iterate over table chunks as Arrow Tables.
@@ -215,19 +224,22 @@ class TableReader:
         Args:
             table_name: Name of the table
             version: Specific version to read (None for latest)
+            columns: If specified, only read these columns (projection pushdown).
+                     This is significantly faster when you only need a subset
+                     of columns.
 
         Yields:
-            Arrow Tables, one per chunk
+            Arrow Tables, one per chunk (or with selected columns)
 
         Raises:
             IOError: If table or version not found
-            ValueError: If chunk data is corrupted
+            ValueError: If chunk data is corrupted or column not found
         """
         metadata = self.get_metadata(table_name, version)
 
         for chunk_hash in metadata.chunk_hashes:
             chunk_data = self._fetch_chunk(chunk_hash)
-            arrow_table = self._parquet_to_arrow(chunk_data)
+            arrow_table = self._parquet_to_arrow(chunk_data, columns=columns)
             yield arrow_table
 
     def _fetch_chunk(self, chunk_hash: str) -> bytes:
@@ -239,17 +251,30 @@ class TableReader:
         else:
             return self.store.get(chunk_hash)
 
-    def _parquet_to_arrow(self, data: bytes) -> pa.Table:
-        """Deserialize Parquet bytes to Arrow Table."""
+    def _parquet_to_arrow(
+        self,
+        data: bytes,
+        columns: Optional[List[str]] = None,
+    ) -> pa.Table:
+        """Deserialize Parquet bytes to Arrow Table.
+
+        Args:
+            data: Parquet file bytes
+            columns: If specified, only decode these columns (projection pushdown)
+        """
         if self._native_decoder is not None:
             # Use native Rust decoder for better performance
             # Decoder returns RecordBatch, convert to Table
-            batch = self._native_decoder.decode(data)
+            if columns is not None:
+                # Projection pushdown - only decode requested columns
+                batch = self._native_decoder.decode_columns_by_name(data, columns)
+            else:
+                batch = self._native_decoder.decode(data)
             return pa.Table.from_batches([batch])
 
         # Fallback to PyArrow
         buffer = io.BytesIO(data)
-        return pq.read_table(buffer)
+        return pq.read_table(buffer, columns=columns)
 
     def list_versions(self, table_name: str) -> List[int]:
         """
