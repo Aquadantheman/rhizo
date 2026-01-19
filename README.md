@@ -290,7 +290,7 @@ rhizo/
 ## Documentation
 
 - [Technical Foundations](./docs/TECHNICAL_FOUNDATIONS.md) — Mathematical proofs and complexity analysis
-- [Development Roadmap](./udr_roadmap.md) — Planned features and architecture
+- [Roadmap](./ROADMAP.md) — Current status and what's next
 - [Changelog](./CHANGELOG.md) — Version history
 - [Origin Story](./ORIGIN_STORY.md) — Why I built Rhizo
 - [Contributing](./CONTRIBUTING.md) — How to contribute

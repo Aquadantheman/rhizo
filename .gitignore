@@ -38,6 +38,7 @@ htmlcov/
 *.log
 
 # Internal planning docs (not for public repo)
+/internal/
 PHASE*_PLAN.md
 KILLER_DEMOS.md
 LOTITUDE_MIGRATION.md
