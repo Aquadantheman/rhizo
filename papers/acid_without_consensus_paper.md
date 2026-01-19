@@ -1,8 +1,5 @@
 # ACID Without Consensus: Algebraic Transactions for Geo-Distributed Data
 
-> **Status:** COMPLETE (Phase 6 benchmarks integrated)
-> **Target Venue:** SIGMOD / VLDB / OSDI
-
 ---
 
 ## Abstract
@@ -59,23 +56,23 @@ These operations **commute**: applying them in either order yields the same resu
 
 ### 2.1 Consensus-Based Distributed Databases
 
-**Spanner** [Corbett et al., 2012]: Uses TrueTime and Paxos. Achieves external consistency but requires synchronized clocks and quorum for every write.
+**Spanner** [1]: Uses TrueTime and Paxos. Achieves external consistency but requires synchronized clocks and quorum for every write.
 
-**CockroachDB** [Taft et al., 2020]: Uses Raft consensus. Strong consistency but latency proportional to round-trip time between replicas.
+**CockroachDB** [2]: Uses Raft consensus. Strong consistency but latency proportional to round-trip time between replicas.
 
-**Calvin** [Thomson et al., 2012]: Deterministic execution avoids consensus during execution but requires global ordering of transactions beforehand.
+**Calvin** [3]: Deterministic execution avoids consensus during execution but requires global ordering of transactions beforehand.
 
 ### 2.2 Eventual Consistency and CRDTs
 
-**Dynamo** [DeCandia et al., 2007]: Eventual consistency with vector clocks. Fast but requires application-level conflict resolution.
+**Dynamo** [4]: Eventual consistency with vector clocks. Fast but requires application-level conflict resolution.
 
-**CRDTs** [Shapiro et al., 2011]: Conflict-free Replicated Data Types. Mathematically guaranteed convergence for specific data structures.
+**CRDTs** [5]: Conflict-free Replicated Data Types. Mathematically guaranteed convergence for specific data structures.
 
 Our work differs: CRDTs are data structures; we classify database **operations** algebraically and apply the insight to transactions.
 
 ### 2.3 Hybrid Approaches
 
-**RedBlue consistency** [Li et al., 2012]: Classifies operations as "red" (coordination) or "blue" (local). Requires manual classification.
+**RedBlue consistency** [6]: Classifies operations as "red" (coordination) or "blue" (local). Requires manual classification.
 
 **CRDT-based databases** [Riak, Antidote]: Embed CRDTs as column types. Limited to predefined types.
 
@@ -220,6 +217,8 @@ Classification is automatic based on operation type.
 - **Workloads:** Counter increments (ADD), timestamps (MAX), tag management (UNION)
 - **Baseline:** Simulated consensus latency of 100ms (typical geo-distributed RTT)
 
+**Deployment Context:** This paper evaluates geo-distributed deployments where nodes span multiple continents (e.g., San Francisco, London, Tokyo). The 100ms consensus baseline reflects typical cross-continental round-trip times for quorum-based protocols. For single-datacenter deployments, consensus latency would be lower (~5-10ms), proportionally reducing the speedup factor while maintaining the same absolute local commit latency.
+
 ### 6.2 Latency
 
 Local commit achieves sub-millisecond latency, dramatically outperforming consensus-based approaches:
@@ -332,30 +331,32 @@ We presented Rhizo, a distributed data system that achieves strong consistency w
 
 For common workloads like counters, timestamps, and set operations, coordination-free transactions represent a fundamental improvement over coordination-based approaches. By eliminating coordination, we eliminate not only latency but also the idle energy consumption that dominates distributed system costs. The fastest database is also the greenest.
 
+Rhizo is open source under the MIT license at: https://github.com/rhizodata/rhizo
+
 ---
 
 ## References
 
-[Corbett et al., 2012] Spanner: Google's Globally-Distributed Database. OSDI.
+[1] Corbett, J. C., Dean, J., Epstein, M., et al. (2012). Spanner: Google's Globally-Distributed Database. OSDI.
 
-[Taft et al., 2020] CockroachDB: The Resilient Geo-Distributed SQL Database. SIGMOD.
+[2] Taft, R., Sharber, I., Matei, A., et al. (2020). CockroachDB: The Resilient Geo-Distributed SQL Database. SIGMOD.
 
-[Thomson et al., 2012] Calvin: Fast Distributed Transactions for Partitioned Database Systems. SIGMOD.
+[3] Thomson, A., Diamond, T., Weng, S., et al. (2012). Calvin: Fast Distributed Transactions for Partitioned Database Systems. SIGMOD.
 
-[DeCandia et al., 2007] Dynamo: Amazon's Highly Available Key-value Store. SOSP.
+[4] DeCandia, G., Hastorun, D., Jampani, M., et al. (2007). Dynamo: Amazon's Highly Available Key-value Store. SOSP.
 
-[Shapiro et al., 2011] Conflict-free Replicated Data Types. SSS.
+[5] Shapiro, M., Preguiça, N., Baquero, C., & Zawirski, M. (2011). Conflict-free Replicated Data Types. SSS.
 
-[Li et al., 2012] Making Geo-Replicated Systems Fast as Possible, Consistent when Necessary. OSDI.
+[6] Li, C., Porto, D., Clement, A., et al. (2012). Making Geo-Replicated Systems Fast as Possible, Consistent when Necessary. OSDI.
 
 ---
 
 ## Appendix A: Proofs
 
 See the following for full proofs:
-- `proofs/convergence_proof.md` - Algebraic convergence proof
-- `proofs/causality_proof.md` - Vector clock causality proof
-- `proofs/energy_efficiency_proof.md` - Energy efficiency mathematical derivation
+- `sandbox/coordination_free/proofs/convergence_proof.md` - Algebraic convergence proof
+- `sandbox/coordination_free/proofs/causality_proof.md` - Vector clock causality proof
+- `sandbox/coordination_free/proofs/energy_efficiency_proof.md` - Energy efficiency mathematical derivation
 
 ---
 

@@ -292,11 +292,11 @@ Rhizo implementation statistics:
 
 Component                | Lines of Code  | Tests
 -------------------------|----------------|--------
-Core Engine (Rust)       | ~8,000         | 204
+Core Engine (Rust)       | ~8,000         | 370
 Python Bindings (PyO3)   | ~2,000         | -
-Python Query Layer       | ~3,000         | 247
+Python Query Layer       | ~3,000         | 262
 DataFusion Integration   | ~1,500         | -
-Total                    | ~14,500        | 451
+Total                    | ~14,500        | 632
 
 The implementation demonstrates that a unified data runtime is achievable with focused engineering effort.
 A single developer can produce a working POC in approximately one month. The result demonstrates all core concepts with runnable code.

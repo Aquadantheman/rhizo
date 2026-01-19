@@ -131,6 +131,8 @@ $$T_{eager} = T_{local} + T_{consensus}$$
 
 With $T_{local} \approx 0.1ms$ and $T_{consensus} \approx 5ms$, consensus dominates latency even when no conflicts exist.
 
+**Deployment Context:** The 5ms consensus baseline assumes single-datacenter or regional deployments with low-latency network links. For geo-distributed deployments spanning continents, consensus latency increases to 50-150ms, proportionally increasing POAC's speedup advantage. See our companion paper "ACID Without Consensus" for geo-distributed evaluation with 100ms baseline.
+
 ### 4.2 Speculative Model
 
 Speculative execution commits locally first, confirming asynchronously:
@@ -417,6 +419,8 @@ POAC demonstrates that classical distributed systems limitations can be circumve
 - **Automatic conflict-free merging** for algebraic operations
 
 The key insight is that safety and liveness can be decoupled: POAC preserves safety absolutely while dramatically improving liveness in the common case. This provides a mathematical foundation for the next generation of distributed data systems.
+
+POAC is implemented in Rhizo, open source under the MIT license at: https://github.com/rhizodata/rhizo
 
 ---
 
