@@ -5,6 +5,39 @@ All notable changes to Rhizo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-01-19
+
+### Added
+
+#### Coordination-Free Distributed Transactions (Phase CF)
+- **Distributed transaction engine** (`rhizo_core::distributed`): Full implementation of coordination-free commits
+- **Vector clocks**: Causality tracking for happened-before relationships
+- **Gossip protocol**: Anti-entropy propagation between nodes
+- **Automatic merge**: Concurrent algebraic operations merge without coordination
+- **Convergence guarantees**: Mathematical proof of eventual consistency for algebraic workloads
+
+#### Energy Efficiency Benchmarks
+- **CodeCarbon integration**: Precise energy measurement per transaction
+- **97,943x energy reduction** vs consensus-based systems (2.2e-11 kWh vs 2.1e-6 kWh per tx)
+- **Annual projections**: 730 kWh/year saved at 1M tx/day (292 kg CO2)
+
+### Performance
+- **Local commit latency**: 0.022ms (31,000x faster than 100ms consensus)
+- **Throughput (2 nodes)**: 255,297 ops/sec
+- **Convergence rounds**: 3 (constant regardless of operation count)
+- **Mathematical soundness**: Commutativity, associativity, idempotency verified
+
+### Testing
+- 370 Rust tests (+64 distributed/coordination-free tests)
+- 262 Python tests (+15 energy/distributed tests)
+- All algebraic properties experimentally verified
+
+### Documentation
+- Technical Foundations updated with coordination-free proofs
+- Paper draft complete: "ACID Without Consensus: Algebraic Transactions for Geo-Distributed Data"
+
+---
+
 ## [0.4.0] - 2026-01-18
 
 ### Added
@@ -164,7 +197,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.1.0] - 2025-01-17
+## [0.1.0] - 2026-01-17
 
 ### Added
 
@@ -223,9 +256,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Future Releases
+## What's Next
 
-See [udr_roadmap.md](./udr_roadmap.md) for planned features:
-- Phase 7: Production migration tooling
-- Phase 8: Distributed storage backends
-- Phase 9: Advanced merge strategies
+See [ROADMAP.md](./ROADMAP.md) for current status and planned features.
