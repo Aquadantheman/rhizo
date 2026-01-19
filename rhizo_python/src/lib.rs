@@ -21,6 +21,8 @@ use rhizo_core::{
     TableAlgebraicSchema, AlgebraicSchemaRegistry,
     // Distributed types
     VectorClock, NodeId, CausalOrder,
+    AlgebraicOperation, AlgebraicTransaction, VersionedUpdate,
+    LocalCommitProtocol,
 };
 
 // Phase 4: pyo3-arrow for zero-copy Arrow FFI
@@ -2401,6 +2403,277 @@ impl PyVectorClock {
     }
 }
 
+// ============================================================================
+// Local Commit Protocol Types (Coordination-Free Transactions)
+// ============================================================================
+
+/// A single algebraic operation on a key.
+///
+/// Operations are the building blocks of transactions. Each operation
+/// specifies a key, an algebraic type, and a delta value.
+#[pyclass]
+#[derive(Clone)]
+pub struct PyAlgebraicOperation {
+    inner: AlgebraicOperation,
+}
+
+#[pymethods]
+impl PyAlgebraicOperation {
+    /// Create a new algebraic operation.
+    ///
+    /// Args:
+    ///     key: The key to operate on
+    ///     op_type: The algebraic operation type
+    ///     value: The value or delta to apply
+    #[new]
+    fn new(key: &str, op_type: &PyOpType, value: &PyAlgebraicValue) -> Self {
+        Self {
+            inner: AlgebraicOperation::new(key, op_type.inner, value.inner.clone()),
+        }
+    }
+
+    /// Get the key.
+    #[getter]
+    fn key(&self) -> String {
+        self.inner.key().to_string()
+    }
+
+    /// Get the operation type.
+    #[getter]
+    fn op_type(&self) -> PyOpType {
+        PyOpType { inner: self.inner.op_type() }
+    }
+
+    /// Get the value.
+    #[getter]
+    fn value(&self) -> PyAlgebraicValue {
+        PyAlgebraicValue { inner: self.inner.value().clone() }
+    }
+
+    /// Check if this operation can be committed locally (is algebraic).
+    fn is_algebraic(&self) -> bool {
+        self.inner.is_algebraic()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "AlgebraicOperation(key='{}', op={}, value={})",
+            self.inner.key(),
+            self.inner.op_type(),
+            self.inner.value()
+        )
+    }
+}
+
+/// A transaction containing multiple algebraic operations.
+///
+/// Transactions group operations that should be applied atomically.
+/// For coordination-free commits, all operations must be algebraic.
+#[pyclass]
+#[derive(Clone)]
+pub struct PyAlgebraicTransaction {
+    inner: AlgebraicTransaction,
+}
+
+#[pymethods]
+impl PyAlgebraicTransaction {
+    /// Create a new empty transaction.
+    #[new]
+    fn new() -> Self {
+        Self {
+            inner: AlgebraicTransaction::new(),
+        }
+    }
+
+    /// Add an operation to the transaction.
+    fn add_operation(&mut self, op: &PyAlgebraicOperation) {
+        self.inner.add_operation(op.inner.clone());
+    }
+
+    /// Get the number of operations.
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Check if the transaction is empty.
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    /// Check if all operations in this transaction are algebraic.
+    fn is_fully_algebraic(&self) -> bool {
+        self.inner.is_fully_algebraic()
+    }
+
+    /// Set metadata.
+    fn set_metadata(&mut self, key: &str, value: &str) {
+        self.inner.set_metadata(key, value);
+    }
+
+    /// Get metadata.
+    fn get_metadata(&self, key: &str) -> Option<String> {
+        self.inner.get_metadata(key).map(|s| s.to_string())
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "AlgebraicTransaction(ops={}, algebraic={})",
+            self.inner.len(),
+            self.inner.is_fully_algebraic()
+        )
+    }
+}
+
+/// The result of a local commit: operations with their causal context.
+///
+/// A VersionedUpdate represents a committed set of operations along with
+/// the vector clock at the time of commit. This allows other nodes to:
+/// 1. Determine the causal relationship with their own state
+/// 2. Merge concurrent updates correctly
+#[pyclass]
+#[derive(Clone)]
+pub struct PyVersionedUpdate {
+    inner: VersionedUpdate,
+}
+
+#[pymethods]
+impl PyVersionedUpdate {
+    /// Get all operations.
+    fn operations(&self) -> Vec<PyAlgebraicOperation> {
+        self.inner
+            .operations()
+            .iter()
+            .map(|op| PyAlgebraicOperation { inner: op.clone() })
+            .collect()
+    }
+
+    /// Get the vector clock.
+    #[getter]
+    fn clock(&self) -> PyVectorClock {
+        PyVectorClock {
+            inner: self.inner.clock().clone(),
+        }
+    }
+
+    /// Get the origin node.
+    #[getter]
+    fn origin_node(&self) -> PyNodeId {
+        PyNodeId {
+            inner: self.inner.origin_node().clone(),
+        }
+    }
+
+    /// Get the update ID if set.
+    #[getter]
+    fn update_id(&self) -> Option<String> {
+        self.inner.update_id().map(|s| s.to_string())
+    }
+
+    /// Compare this update's causality with another.
+    fn compare(&self, other: &PyVersionedUpdate) -> PyCausalOrder {
+        PyCausalOrder::from(self.inner.compare(&other.inner))
+    }
+
+    /// Check if this update is concurrent with another.
+    fn is_concurrent_with(&self, other: &PyVersionedUpdate) -> bool {
+        self.inner.is_concurrent_with(&other.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "VersionedUpdate(origin='{}', ops={}, clock={})",
+            self.inner.origin_node(),
+            self.inner.operations().len(),
+            self.inner.clock()
+        )
+    }
+}
+
+/// The local commit protocol for coordination-free transactions.
+///
+/// This class provides the core logic for:
+/// 1. Checking if a transaction can commit locally
+/// 2. Committing a transaction locally (no coordination)
+/// 3. Merging concurrent updates from different nodes
+///
+/// Example:
+///     >>> node = PyNodeId("my-node")
+///     >>> clock = PyVectorClock()
+///     >>> tx = PyAlgebraicTransaction()
+///     >>> tx.add_operation(PyAlgebraicOperation("counter", PyOpType("add"), PyAlgebraicValue(5)))
+///     >>> update = PyLocalCommitProtocol.commit_local(tx, node, clock)
+#[pyclass]
+pub struct PyLocalCommitProtocol;
+
+#[pymethods]
+impl PyLocalCommitProtocol {
+    /// Check if a transaction can be committed locally without coordination.
+    ///
+    /// Returns True if all operations in the transaction are algebraic
+    /// (semilattice or Abelian), meaning they commute and can be applied
+    /// in any order.
+    #[staticmethod]
+    fn can_commit_locally(tx: &PyAlgebraicTransaction) -> bool {
+        LocalCommitProtocol::can_commit_locally(&tx.inner)
+    }
+
+    /// Commit a transaction locally, returning a versioned update.
+    ///
+    /// This operation:
+    /// 1. Validates that all operations are algebraic
+    /// 2. Increments the local vector clock
+    /// 3. Returns a VersionedUpdate that can be sent to other nodes
+    ///
+    /// Args:
+    ///     tx: The transaction to commit
+    ///     node_id: This node's ID
+    ///     clock: This node's vector clock (will be mutated)
+    ///
+    /// Returns:
+    ///     The committed update with causal context
+    ///
+    /// Raises:
+    ///     ValueError: If the transaction cannot be committed locally
+    #[staticmethod]
+    fn commit_local(
+        tx: &PyAlgebraicTransaction,
+        node_id: &PyNodeId,
+        clock: &mut PyVectorClock,
+    ) -> PyResult<PyVersionedUpdate> {
+        LocalCommitProtocol::commit_local(&tx.inner, &node_id.inner, &mut clock.inner)
+            .map(|update| PyVersionedUpdate { inner: update })
+            .map_err(|e| PyValueError::new_err(format!("{}", e)))
+    }
+
+    /// Merge two versioned updates into one.
+    ///
+    /// This is the core of coordination-free merging. Given two updates
+    /// (potentially concurrent), this function:
+    /// 1. Combines operations by key
+    /// 2. Merges values using algebraic operations
+    /// 3. Computes the merged vector clock
+    ///
+    /// For algebraic operations, merge(A, B) = merge(B, A) (commutative).
+    #[staticmethod]
+    fn merge_updates(
+        update1: &PyVersionedUpdate,
+        update2: &PyVersionedUpdate,
+    ) -> PyResult<PyVersionedUpdate> {
+        LocalCommitProtocol::merge_updates(&update1.inner, &update2.inner)
+            .map(|update| PyVersionedUpdate { inner: update })
+            .map_err(|e| PyValueError::new_err(format!("{}", e)))
+    }
+
+    /// Merge multiple updates at once (more efficient than pairwise).
+    #[staticmethod]
+    fn merge_all(updates: Vec<PyVersionedUpdate>) -> PyResult<PyVersionedUpdate> {
+        let inner_updates: Vec<VersionedUpdate> = updates.iter().map(|u| u.inner.clone()).collect();
+        LocalCommitProtocol::merge_all(&inner_updates)
+            .map(|update| PyVersionedUpdate { inner: update })
+            .map_err(|e| PyValueError::new_err(format!("{}", e)))
+    }
+}
+
 /// Analyze merge compatibility using algebraic schemas.
 ///
 /// Args:
@@ -2478,6 +2751,12 @@ fn _rhizo(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyNodeId>()?;
     m.add_class::<PyCausalOrder>()?;
     m.add_class::<PyVectorClock>()?;
+
+    // Local Commit Protocol (Coordination-Free Transactions)
+    m.add_class::<PyAlgebraicOperation>()?;
+    m.add_class::<PyAlgebraicTransaction>()?;
+    m.add_class::<PyVersionedUpdate>()?;
+    m.add_class::<PyLocalCommitProtocol>()?;
 
     Ok(())
 }

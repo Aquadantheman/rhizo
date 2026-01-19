@@ -70,6 +70,11 @@ from _rhizo import (
     PyNodeId,
     PyCausalOrder,
     PyVectorClock,
+    # Local commit protocol (coordination-free transactions)
+    PyAlgebraicOperation,
+    PyAlgebraicTransaction,
+    PyVersionedUpdate,
+    PyLocalCommitProtocol,
 )
 
 __version__ = "0.4.0"
@@ -124,4 +129,9 @@ __all__ = [
     "PyNodeId",
     "PyCausalOrder",
     "PyVectorClock",
+    # Local commit protocol
+    "PyAlgebraicOperation",
+    "PyAlgebraicTransaction",
+    "PyVersionedUpdate",
+    "PyLocalCommitProtocol",
 ]

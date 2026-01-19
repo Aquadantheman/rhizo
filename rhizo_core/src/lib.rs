@@ -32,4 +32,7 @@ pub use transaction::{
     TransactionManager, TransactionRecord, TransactionStatus, TxId, WriteGranularity,
 };
 
-pub use distributed::{CausalOrder, NodeId, VectorClock};
+pub use distributed::{
+    AlgebraicOperation, AlgebraicTransaction, CausalOrder, LocalCommitError, LocalCommitProtocol,
+    NodeId, VectorClock, VersionedUpdate,
+};

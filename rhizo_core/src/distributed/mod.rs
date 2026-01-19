@@ -10,8 +10,9 @@
 //! │                      Distributed Module                      │
 //! ├─────────────────────────────────────────────────────────────┤
 //! │  VectorClock     - Causality tracking                       │
-//! │  (Future) LocalCommit   - Coordination-free commit protocol │
+//! │  LocalCommit     - Coordination-free commit protocol        │
 //! │  (Future) Gossip        - Anti-entropy propagation          │
+//! │  (Future) Simulation    - Multi-node testing                │
 //! └─────────────────────────────────────────────────────────────┘
 //! ```
 //!
@@ -27,7 +28,7 @@
 //!
 //! Vector clocks track causality to determine when merge is needed.
 //!
-//! # Example
+//! # Example: Vector Clocks
 //!
 //! ```
 //! use rhizo_core::distributed::{VectorClock, NodeId, CausalOrder};
@@ -61,12 +62,59 @@
 //!     assert_eq!(v, AlgebraicValue::integer(8));
 //! }
 //! ```
+//!
+//! # Example: Coordination-Free Local Commit
+//!
+//! ```
+//! use rhizo_core::distributed::{
+//!     AlgebraicOperation, AlgebraicTransaction, LocalCommitProtocol,
+//!     NodeId, VectorClock,
+//! };
+//! use rhizo_core::algebraic::{OpType, AlgebraicValue};
+//!
+//! // Two nodes perform concurrent operations
+//! let node_sf = NodeId::new("san-francisco");
+//! let node_tokyo = NodeId::new("tokyo");
+//! let mut clock_sf = VectorClock::new();
+//! let mut clock_tokyo = VectorClock::new();
+//!
+//! // SF increments page_views by 100
+//! let mut tx_sf = AlgebraicTransaction::new();
+//! tx_sf.add_operation(AlgebraicOperation::new(
+//!     "page_views",
+//!     OpType::AbelianAdd,
+//!     AlgebraicValue::integer(100),
+//! ));
+//!
+//! // Tokyo increments page_views by 50 (concurrently!)
+//! let mut tx_tokyo = AlgebraicTransaction::new();
+//! tx_tokyo.add_operation(AlgebraicOperation::new(
+//!     "page_views",
+//!     OpType::AbelianAdd,
+//!     AlgebraicValue::integer(50),
+//! ));
+//!
+//! // Both can commit locally without coordination
+//! let update_sf = LocalCommitProtocol::commit_local(&tx_sf, &node_sf, &mut clock_sf).unwrap();
+//! let update_tokyo = LocalCommitProtocol::commit_local(&tx_tokyo, &node_tokyo, &mut clock_tokyo).unwrap();
+//!
+//! // Later, merge the concurrent updates
+//! let merged = LocalCommitProtocol::merge_updates(&update_sf, &update_tokyo).unwrap();
+//!
+//! // Result: 100 + 50 = 150 (order doesn't matter!)
+//! let page_views = merged.operations()[0].value().as_integer();
+//! assert_eq!(page_views, Some(150));
+//! ```
 
+mod local_commit;
 mod vector_clock;
 
+pub use local_commit::{
+    AlgebraicOperation, AlgebraicTransaction, LocalCommitError, LocalCommitProtocol,
+    VersionedUpdate,
+};
 pub use vector_clock::{CausalOrder, NodeId, VectorClock};
 
-// Future modules (Phase 3+):
-// mod local_commit;
+// Future modules (Phase 4+):
 // mod gossip;
 // mod simulation;

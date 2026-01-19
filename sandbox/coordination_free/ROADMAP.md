@@ -27,11 +27,11 @@ Phase 6: Benchmarks & Paper
 
 ### Tasks
 
-- [ ] **1.1** Write formal proof of algebraic commutativity → convergence
-- [ ] **1.2** Write formal proof of vector clock causality tracking
-- [ ] **1.3** Define exactly which Rhizo operations are algebraic
-- [ ] **1.4** Identify edge cases (overflow, floating point, etc.)
-- [ ] **1.5** Draft paper introduction and related work
+- [x] **1.1** Write formal proof of algebraic commutativity → convergence
+- [x] **1.2** Write formal proof of vector clock causality tracking
+- [x] **1.3** Define exactly which Rhizo operations are algebraic
+- [x] **1.4** Identify edge cases (overflow, floating point, etc.)
+- [x] **1.5** Draft paper introduction and related work
 
 ### Deliverables
 - `sandbox/coordination_free/proofs/convergence_proof.md`
@@ -51,11 +51,13 @@ Phase 6: Benchmarks & Paper
 
 ### Tasks
 
-- [ ] **2.1** Create `rhizo_core/src/distributed/mod.rs`
-- [ ] **2.2** Implement `VectorClock` struct
-- [ ] **2.3** Implement `tick()`, `merge()`, `happened_before()`, `concurrent()`
-- [ ] **2.4** Add serialization (serde)
-- [ ] **2.5** Write comprehensive unit tests
+- [x] **2.1** Create `rhizo_core/src/distributed/mod.rs`
+- [x] **2.2** Implement `VectorClock` struct
+- [x] **2.3** Implement `tick()`, `merge()`, `happened_before()`, `concurrent()`
+- [x] **2.4** Add serialization (serde)
+- [x] **2.5** Write comprehensive unit tests
+- [x] **2.6** Add Python bindings (PyVectorClock, PyNodeId, PyCausalOrder)
+- [x] **2.7** Write Python tests (26 tests)
 
 ### Deliverables
 - `rhizo_core/src/distributed/mod.rs`
@@ -84,11 +86,13 @@ cargo test --all  # All 306 existing tests must pass
 
 ### Tasks
 
-- [ ] **3.1** Define `AlgebraicTransaction` struct (wraps operations + vector clock)
-- [ ] **3.2** Implement `can_commit_locally()` check
-- [ ] **3.3** Implement `commit_local()` that returns versioned update
-- [ ] **3.4** Implement `merge_updates()` using existing AlgebraicMerger
-- [ ] **3.5** Write unit tests
+- [x] **3.1** Define `AlgebraicTransaction` struct (wraps operations + vector clock)
+- [x] **3.2** Implement `can_commit_locally()` check
+- [x] **3.3** Implement `commit_local()` that returns versioned update
+- [x] **3.4** Implement `merge_updates()` using existing AlgebraicMerger
+- [x] **3.5** Write unit tests (32 Rust tests)
+- [x] **3.6** Add Python bindings (PyAlgebraicOperation, PyAlgebraicTransaction, PyVersionedUpdate, PyLocalCommitProtocol)
+- [x] **3.7** Write Python tests (25 tests covering commutativity, associativity, convergence)
 
 ### Deliverables
 - `rhizo_core/src/distributed/local_commit.rs`

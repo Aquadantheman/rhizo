@@ -950,3 +950,255 @@ class PyVectorClock:
 
     def __eq__(self, other: "PyVectorClock") -> bool:
         ...
+
+
+# ============================================================================
+# Local Commit Protocol Types (Coordination-Free Transactions)
+# ============================================================================
+
+
+class PyAlgebraicOperation:
+    """A single algebraic operation on a key.
+
+    Operations are the building blocks of transactions. Each operation
+    specifies a key, an algebraic type, and a delta value.
+
+    Example:
+        >>> op = PyAlgebraicOperation(
+        ...     "page_views",
+        ...     PyOpType("add"),
+        ...     PyAlgebraicValue(1)
+        ... )
+        >>> op.is_algebraic()  # True
+    """
+
+    key: str
+    op_type: PyOpType
+    value: PyAlgebraicValue
+
+    def __init__(
+        self,
+        key: str,
+        op_type: PyOpType,
+        value: PyAlgebraicValue,
+    ) -> None:
+        """Create a new algebraic operation.
+
+        Args:
+            key: The key to operate on (e.g., "page_views", "user:123:tags")
+            op_type: The algebraic operation type
+            value: The value or delta to apply
+        """
+        ...
+
+    def is_algebraic(self) -> bool:
+        """Check if this operation can be committed locally (is algebraic)."""
+        ...
+
+    def __repr__(self) -> str:
+        ...
+
+
+class PyAlgebraicTransaction:
+    """A transaction containing multiple algebraic operations.
+
+    Transactions group operations that should be applied atomically.
+    For coordination-free commits, all operations must be algebraic.
+
+    Example:
+        >>> tx = PyAlgebraicTransaction()
+        >>> tx.add_operation(PyAlgebraicOperation(
+        ...     "counter", PyOpType("add"), PyAlgebraicValue(5)
+        ... ))
+        >>> tx.add_operation(PyAlgebraicOperation(
+        ...     "tags", PyOpType("union"), PyAlgebraicValue(["featured"])
+        ... ))
+        >>> tx.is_fully_algebraic()  # True
+    """
+
+    def __init__(self) -> None:
+        """Create a new empty transaction."""
+        ...
+
+    def add_operation(self, op: PyAlgebraicOperation) -> None:
+        """Add an operation to the transaction."""
+        ...
+
+    def len(self) -> int:
+        """Get the number of operations."""
+        ...
+
+    def is_empty(self) -> bool:
+        """Check if the transaction is empty."""
+        ...
+
+    def is_fully_algebraic(self) -> bool:
+        """Check if all operations in this transaction are algebraic."""
+        ...
+
+    def set_metadata(self, key: str, value: str) -> None:
+        """Set metadata on the transaction."""
+        ...
+
+    def get_metadata(self, key: str) -> Optional[str]:
+        """Get metadata from the transaction."""
+        ...
+
+    def __repr__(self) -> str:
+        ...
+
+
+class PyVersionedUpdate:
+    """The result of a local commit: operations with their causal context.
+
+    A VersionedUpdate represents a committed set of operations along with
+    the vector clock at the time of commit. This allows other nodes to:
+    1. Determine the causal relationship with their own state
+    2. Merge concurrent updates correctly
+
+    Example:
+        >>> # After committing, we get a versioned update
+        >>> update = PyLocalCommitProtocol.commit_local(tx, node, clock)
+        >>> update.origin_node  # PyNodeId
+        >>> update.clock  # PyVectorClock
+    """
+
+    clock: PyVectorClock
+    origin_node: PyNodeId
+    update_id: Optional[str]
+
+    def operations(self) -> List[PyAlgebraicOperation]:
+        """Get all operations in this update."""
+        ...
+
+    def compare(self, other: "PyVersionedUpdate") -> PyCausalOrder:
+        """Compare this update's causality with another."""
+        ...
+
+    def is_concurrent_with(self, other: "PyVersionedUpdate") -> bool:
+        """Check if this update is concurrent with another."""
+        ...
+
+    def __repr__(self) -> str:
+        ...
+
+
+class PyLocalCommitProtocol:
+    """The local commit protocol for coordination-free transactions.
+
+    This class provides the core logic for:
+    1. Checking if a transaction can commit locally
+    2. Committing a transaction locally (no coordination)
+    3. Merging concurrent updates from different nodes
+
+    Mathematical Guarantees:
+    - All algebraic operations are commutative and associative
+    - merge(A, B) = merge(B, A)  (order doesn't matter)
+    - Nodes will converge to the same state regardless of message order
+
+    Example:
+        >>> # Two nodes perform concurrent operations
+        >>> node_sf = PyNodeId("san-francisco")
+        >>> node_tokyo = PyNodeId("tokyo")
+        >>> clock_sf = PyVectorClock()
+        >>> clock_tokyo = PyVectorClock()
+        >>>
+        >>> # SF increments page_views by 100
+        >>> tx_sf = PyAlgebraicTransaction()
+        >>> tx_sf.add_operation(PyAlgebraicOperation(
+        ...     "page_views", PyOpType("add"), PyAlgebraicValue(100)
+        ... ))
+        >>>
+        >>> # Tokyo increments page_views by 50 (concurrently!)
+        >>> tx_tokyo = PyAlgebraicTransaction()
+        >>> tx_tokyo.add_operation(PyAlgebraicOperation(
+        ...     "page_views", PyOpType("add"), PyAlgebraicValue(50)
+        ... ))
+        >>>
+        >>> # Both can commit locally without coordination
+        >>> update_sf = PyLocalCommitProtocol.commit_local(tx_sf, node_sf, clock_sf)
+        >>> update_tokyo = PyLocalCommitProtocol.commit_local(tx_tokyo, node_tokyo, clock_tokyo)
+        >>>
+        >>> # Later, merge the concurrent updates
+        >>> merged = PyLocalCommitProtocol.merge_updates(update_sf, update_tokyo)
+        >>>
+        >>> # Result: 100 + 50 = 150 (order doesn't matter!)
+    """
+
+    @staticmethod
+    def can_commit_locally(tx: PyAlgebraicTransaction) -> bool:
+        """Check if a transaction can be committed locally without coordination.
+
+        Returns True if all operations in the transaction are algebraic
+        (semilattice or Abelian), meaning they commute and can be applied
+        in any order.
+        """
+        ...
+
+    @staticmethod
+    def commit_local(
+        tx: PyAlgebraicTransaction,
+        node_id: PyNodeId,
+        clock: PyVectorClock,
+    ) -> PyVersionedUpdate:
+        """Commit a transaction locally, returning a versioned update.
+
+        This operation:
+        1. Validates that all operations are algebraic
+        2. Increments the local vector clock
+        3. Returns a VersionedUpdate that can be sent to other nodes
+
+        Args:
+            tx: The transaction to commit
+            node_id: This node's ID
+            clock: This node's vector clock (will be mutated)
+
+        Returns:
+            The committed update with causal context
+
+        Raises:
+            ValueError: If the transaction cannot be committed locally
+        """
+        ...
+
+    @staticmethod
+    def merge_updates(
+        update1: PyVersionedUpdate,
+        update2: PyVersionedUpdate,
+    ) -> PyVersionedUpdate:
+        """Merge two versioned updates into one.
+
+        This is the core of coordination-free merging. Given two updates
+        (potentially concurrent), this function:
+        1. Combines operations by key
+        2. Merges values using algebraic operations
+        3. Computes the merged vector clock
+
+        For algebraic operations, merge(A, B) = merge(B, A) (commutative).
+
+        Args:
+            update1: First update
+            update2: Second update
+
+        Returns:
+            Merged update
+
+        Raises:
+            ValueError: If merge fails
+        """
+        ...
+
+    @staticmethod
+    def merge_all(updates: List[PyVersionedUpdate]) -> PyVersionedUpdate:
+        """Merge multiple updates at once (more efficient than pairwise).
+
+        Args:
+            updates: List of updates to merge
+
+        Returns:
+            Merged update
+
+        Raises:
+            ValueError: If merge fails
+        """
+        ...
