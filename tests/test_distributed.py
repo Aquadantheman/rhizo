@@ -375,8 +375,6 @@ class TestDistributedScenarios:
 
     def test_algebraic_merge_with_causality(self):
         """Test combining vector clocks with algebraic merge."""
-        from _rhizo import PyOpType, PyAlgebraicValue, algebraic_merge
-
         node_a = PyNodeId("a")
         node_b = PyNodeId("b")
 
