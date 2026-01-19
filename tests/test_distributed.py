@@ -884,3 +884,259 @@ class TestRealisticScenario:
         assert val_forward == "150"
         assert val_reverse == "150"
         assert val_all == "150"
+
+
+# =============================================================================
+# Phase 4: Simulation Tests (Multi-Node Convergence)
+# =============================================================================
+
+from _rhizo import (
+    PySimulatedCluster,
+    PySimulationConfig,
+    PySimulationStats,
+    PySimulationBuilder,
+    PyNetworkCondition,
+)
+
+
+class TestSimulatedCluster:
+    """Tests for PySimulatedCluster."""
+
+    def test_create_cluster(self):
+        """Test creating a simulated cluster."""
+        cluster = PySimulatedCluster(5)
+        assert cluster.num_nodes == 5
+        assert cluster.round == 0
+
+    def test_single_node_commit(self):
+        """Test committing on a single node."""
+        cluster = PySimulatedCluster(1)
+
+        tx = PyAlgebraicTransaction()
+        tx.add_operation(PyAlgebraicOperation("counter", PyOpType("add"), PyAlgebraicValue.integer(10)))
+
+        update = cluster.commit_on_node(0, tx)
+        assert update is not None
+
+        value = cluster.get_node_state(0, "counter")
+        assert str(value) == "10"
+
+    def test_two_nodes_converge(self):
+        """Test that two nodes converge after propagation."""
+        cluster = PySimulatedCluster(2)
+
+        # Node 0: counter += 10
+        tx0 = PyAlgebraicTransaction()
+        tx0.add_operation(PyAlgebraicOperation("counter", PyOpType("add"), PyAlgebraicValue.integer(10)))
+        cluster.commit_on_node(0, tx0)
+
+        # Node 1: counter += 20
+        tx1 = PyAlgebraicTransaction()
+        tx1.add_operation(PyAlgebraicOperation("counter", PyOpType("add"), PyAlgebraicValue.integer(20)))
+        cluster.commit_on_node(1, tx1)
+
+        # Before propagation: different states
+        assert str(cluster.get_node_state(0, "counter")) == "10"
+        assert str(cluster.get_node_state(1, "counter")) == "20"
+
+        # Propagate
+        cluster.propagate_all()
+
+        # After propagation: converged to 30
+        assert cluster.verify_convergence()
+        assert str(cluster.get_node_state(0, "counter")) == "30"
+        assert str(cluster.get_node_state(1, "counter")) == "30"
+
+    def test_five_nodes_converge(self):
+        """Test that five nodes converge to the same state."""
+        cluster = PySimulatedCluster(5)
+
+        # Each node increments counter by (i+1)*10
+        for i in range(5):
+            tx = PyAlgebraicTransaction()
+            tx.add_operation(PyAlgebraicOperation(
+                "counter", PyOpType("add"), PyAlgebraicValue.integer((i + 1) * 10)
+            ))
+            cluster.commit_on_node(i, tx)
+
+        cluster.propagate_all()
+
+        # All should equal 10 + 20 + 30 + 40 + 50 = 150
+        assert cluster.verify_convergence()
+        for i in range(5):
+            assert str(cluster.get_node_state(i, "counter")) == "150"
+
+    def test_partition_prevents_propagation(self):
+        """Test that network partition prevents convergence."""
+        cluster = PySimulatedCluster(2)
+
+        # Partition nodes 0 and 1
+        cluster.partition(0, 1)
+
+        # Each node commits
+        tx0 = PyAlgebraicTransaction()
+        tx0.add_operation(PyAlgebraicOperation("counter", PyOpType("add"), PyAlgebraicValue.integer(10)))
+        cluster.commit_on_node(0, tx0)
+
+        tx1 = PyAlgebraicTransaction()
+        tx1.add_operation(PyAlgebraicOperation("counter", PyOpType("add"), PyAlgebraicValue.integer(20)))
+        cluster.commit_on_node(1, tx1)
+
+        # Propagate (should not work due to partition)
+        cluster.propagate_all()
+
+        # They should NOT have converged
+        assert not cluster.verify_convergence()
+        assert str(cluster.get_node_state(0, "counter")) == "10"
+        assert str(cluster.get_node_state(1, "counter")) == "20"
+
+    def test_partition_heal_then_converge(self):
+        """Test that nodes converge after partition heals."""
+        cluster = PySimulatedCluster(2)
+
+        # Partition nodes
+        cluster.partition(0, 1)
+
+        # Commit on both
+        tx0 = PyAlgebraicTransaction()
+        tx0.add_operation(PyAlgebraicOperation("counter", PyOpType("add"), PyAlgebraicValue.integer(10)))
+        cluster.commit_on_node(0, tx0)
+
+        tx1 = PyAlgebraicTransaction()
+        tx1.add_operation(PyAlgebraicOperation("counter", PyOpType("add"), PyAlgebraicValue.integer(20)))
+        cluster.commit_on_node(1, tx1)
+
+        # Try to propagate (fails)
+        cluster.propagate_round()
+        assert not cluster.verify_convergence()
+
+        # Heal partition and re-queue updates
+        cluster.heal_partitions()
+        cluster.requeue_all_updates()
+
+        # Now propagate
+        cluster.propagate_all()
+
+        # Should converge
+        assert cluster.verify_convergence()
+        assert str(cluster.get_node_state(0, "counter")) == "30"
+
+    def test_statistics(self):
+        """Test simulation statistics."""
+        cluster = PySimulatedCluster(3)
+
+        for i in range(3):
+            tx = PyAlgebraicTransaction()
+            tx.add_operation(PyAlgebraicOperation("x", PyOpType("add"), PyAlgebraicValue.integer(i + 1)))
+            cluster.commit_on_node(i, tx)
+
+        cluster.propagate_all()
+
+        stats = cluster.get_stats()
+        assert stats.operations_committed == 3
+        assert stats.messages_sent > 0
+        assert stats.messages_delivered > 0
+
+
+class TestSimulationBuilder:
+    """Tests for PySimulationBuilder."""
+
+    def test_builder_basic(self):
+        """Test basic simulation builder usage."""
+        tx0 = PyAlgebraicTransaction()
+        tx0.add_operation(PyAlgebraicOperation("count", PyOpType("add"), PyAlgebraicValue.integer(100)))
+
+        tx1 = PyAlgebraicTransaction()
+        tx1.add_operation(PyAlgebraicOperation("count", PyOpType("add"), PyAlgebraicValue.integer(200)))
+
+        builder = PySimulationBuilder(2)
+        builder.set_max_rounds(50)
+        builder.add_operation(0, tx0)
+        builder.add_operation(1, tx1)
+        cluster = builder.run()
+
+        assert cluster.verify_convergence()
+        assert str(cluster.get_node_state(0, "count")) == "300"
+
+
+class TestNetworkCondition:
+    """Tests for PyNetworkCondition."""
+
+    def test_network_conditions(self):
+        """Test creating different network conditions."""
+        perfect = PyNetworkCondition.perfect()
+        assert "Perfect" in repr(perfect)
+
+        reordered = PyNetworkCondition.reordered()
+        assert "Reordered" in repr(reordered)
+
+        delayed = PyNetworkCondition.delayed(3)
+        assert "Delayed(3)" in repr(delayed)
+
+        partitioned = PyNetworkCondition.partitioned()
+        assert "Partitioned" in repr(partitioned)
+
+
+class TestSimulationConfig:
+    """Tests for PySimulationConfig."""
+
+    def test_config_defaults(self):
+        """Test default configuration values."""
+        config = PySimulationConfig()
+        assert config.max_rounds == 100
+        assert not config.randomize_order
+
+    def test_config_modification(self):
+        """Test modifying configuration."""
+        config = PySimulationConfig()
+        config.max_rounds = 200
+        config.randomize_order = True
+        assert config.max_rounds == 200
+        assert config.randomize_order
+
+
+class TestSimulationEcommerce:
+    """E-commerce scenario tests using simulation."""
+
+    def test_ecommerce_three_datacenters(self):
+        """Simulate an e-commerce scenario with 3 data centers."""
+        cluster = PySimulatedCluster(3)  # SF, Tokyo, London
+
+        # SF: 100 page views, cart items, timestamp
+        tx_sf = PyAlgebraicTransaction()
+        tx_sf.add_operation(PyAlgebraicOperation("page_views", PyOpType("add"), PyAlgebraicValue.integer(100)))
+        tx_sf.add_operation(PyAlgebraicOperation("cart_items", PyOpType("union"), PyAlgebraicValue.string_set(["item-a", "item-b"])))
+        tx_sf.add_operation(PyAlgebraicOperation("last_activity", PyOpType("max"), PyAlgebraicValue.integer(1000)))
+        cluster.commit_on_node(0, tx_sf)
+
+        # Tokyo: 50 page views, different cart items, older timestamp
+        tx_tokyo = PyAlgebraicTransaction()
+        tx_tokyo.add_operation(PyAlgebraicOperation("page_views", PyOpType("add"), PyAlgebraicValue.integer(50)))
+        tx_tokyo.add_operation(PyAlgebraicOperation("cart_items", PyOpType("union"), PyAlgebraicValue.string_set(["item-c"])))
+        tx_tokyo.add_operation(PyAlgebraicOperation("last_activity", PyOpType("max"), PyAlgebraicValue.integer(800)))
+        cluster.commit_on_node(1, tx_tokyo)
+
+        # London: 75 page views, overlapping cart items, newest timestamp
+        tx_london = PyAlgebraicTransaction()
+        tx_london.add_operation(PyAlgebraicOperation("page_views", PyOpType("add"), PyAlgebraicValue.integer(75)))
+        tx_london.add_operation(PyAlgebraicOperation("cart_items", PyOpType("union"), PyAlgebraicValue.string_set(["item-b", "item-d"])))
+        tx_london.add_operation(PyAlgebraicOperation("last_activity", PyOpType("max"), PyAlgebraicValue.integer(1200)))
+        cluster.commit_on_node(2, tx_london)
+
+        cluster.propagate_all()
+
+        # Verify convergence
+        assert cluster.verify_convergence()
+
+        # page_views = 100 + 50 + 75 = 225
+        assert str(cluster.get_node_state(0, "page_views")) == "225"
+
+        # last_activity = max(1000, 800, 1200) = 1200
+        assert str(cluster.get_node_state(0, "last_activity")) == "1200"
+
+        # cart_items = {item-a, item-b, item-c, item-d}
+        cart_str = str(cluster.get_node_state(0, "cart_items"))
+        assert "item-a" in cart_str
+        assert "item-b" in cart_str
+        assert "item-c" in cart_str
+        assert "item-d" in cart_str

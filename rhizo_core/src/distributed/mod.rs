@@ -11,8 +11,8 @@
 //! ├─────────────────────────────────────────────────────────────┤
 //! │  VectorClock     - Causality tracking                       │
 //! │  LocalCommit     - Coordination-free commit protocol        │
+//! │  Simulation      - Multi-node convergence testing           │
 //! │  (Future) Gossip        - Anti-entropy propagation          │
-//! │  (Future) Simulation    - Multi-node testing                │
 //! └─────────────────────────────────────────────────────────────┘
 //! ```
 //!
@@ -107,14 +107,18 @@
 //! ```
 
 mod local_commit;
+pub mod simulation;
 mod vector_clock;
 
 pub use local_commit::{
     AlgebraicOperation, AlgebraicTransaction, LocalCommitError, LocalCommitProtocol,
     VersionedUpdate,
 };
+pub use simulation::{
+    Message, NetworkCondition, SimulatedCluster, SimulatedNode, SimulationBuilder,
+    SimulationConfig, SimulationStats,
+};
 pub use vector_clock::{CausalOrder, NodeId, VectorClock};
 
-// Future modules (Phase 4+):
+// Future modules (Phase 5+):
 // mod gossip;
-// mod simulation;

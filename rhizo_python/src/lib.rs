@@ -23,6 +23,8 @@ use rhizo_core::{
     VectorClock, NodeId, CausalOrder,
     AlgebraicOperation, AlgebraicTransaction, VersionedUpdate,
     LocalCommitProtocol,
+    // Simulation types
+    SimulatedCluster, SimulationConfig, SimulationStats, NetworkCondition,
 };
 
 // Phase 4: pyo3-arrow for zero-copy Arrow FFI
@@ -2674,6 +2676,415 @@ impl PyLocalCommitProtocol {
     }
 }
 
+// ============================================================================
+// Phase 4: Simulation Bindings (Multi-Node Convergence Testing)
+// ============================================================================
+
+/// Network condition for message delivery in simulation.
+///
+/// Example:
+///     >>> condition = PyNetworkCondition.perfect()  # Messages delivered immediately
+///     >>> condition = PyNetworkCondition.reordered()  # Messages may be reordered
+///     >>> condition = PyNetworkCondition.delayed(3)  # Messages delayed 3 rounds
+///     >>> condition = PyNetworkCondition.partitioned()  # No delivery (network partition)
+#[pyclass]
+#[derive(Clone)]
+pub struct PyNetworkCondition {
+    inner: NetworkCondition,
+}
+
+#[pymethods]
+impl PyNetworkCondition {
+    /// Create a perfect network condition (immediate ordered delivery).
+    #[staticmethod]
+    fn perfect() -> Self {
+        Self { inner: NetworkCondition::Perfect }
+    }
+
+    /// Create a reordered network condition (messages may arrive out of order).
+    #[staticmethod]
+    fn reordered() -> Self {
+        Self { inner: NetworkCondition::Reordered }
+    }
+
+    /// Create a delayed network condition (messages delayed by N rounds).
+    #[staticmethod]
+    fn delayed(rounds: usize) -> Self {
+        Self { inner: NetworkCondition::Delayed(rounds) }
+    }
+
+    /// Create a partitioned network condition (no message delivery).
+    #[staticmethod]
+    fn partitioned() -> Self {
+        Self { inner: NetworkCondition::Partitioned }
+    }
+
+    fn __repr__(&self) -> String {
+        match self.inner {
+            NetworkCondition::Perfect => "NetworkCondition.Perfect".to_string(),
+            NetworkCondition::Reordered => "NetworkCondition.Reordered".to_string(),
+            NetworkCondition::Delayed(n) => format!("NetworkCondition.Delayed({})", n),
+            NetworkCondition::Partitioned => "NetworkCondition.Partitioned".to_string(),
+        }
+    }
+}
+
+/// Configuration for the distributed simulation.
+///
+/// Example:
+///     >>> config = PySimulationConfig()
+///     >>> config.max_rounds = 200
+///     >>> config.randomize_order = True
+#[pyclass]
+#[derive(Clone)]
+pub struct PySimulationConfig {
+    inner: SimulationConfig,
+}
+
+#[pymethods]
+impl PySimulationConfig {
+    #[new]
+    fn new() -> Self {
+        Self { inner: SimulationConfig::default() }
+    }
+
+    /// Maximum number of propagation rounds.
+    #[getter]
+    fn max_rounds(&self) -> usize {
+        self.inner.max_rounds
+    }
+
+    #[setter]
+    fn set_max_rounds(&mut self, rounds: usize) {
+        self.inner.max_rounds = rounds;
+    }
+
+    /// Whether to randomize message order.
+    #[getter]
+    fn randomize_order(&self) -> bool {
+        self.inner.randomize_order
+    }
+
+    #[setter]
+    fn set_randomize_order(&mut self, randomize: bool) {
+        self.inner.randomize_order = randomize;
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "SimulationConfig(max_rounds={}, randomize_order={})",
+            self.inner.max_rounds, self.inner.randomize_order
+        )
+    }
+}
+
+/// Statistics from a simulation run.
+///
+/// Attributes:
+///     messages_sent: Total messages sent between nodes
+///     messages_delivered: Total messages successfully delivered
+///     messages_dropped: Total messages dropped (due to partitions)
+///     rounds_to_converge: Number of rounds until convergence (None if not converged)
+///     operations_committed: Total operations committed across all nodes
+#[pyclass]
+#[derive(Clone)]
+pub struct PySimulationStats {
+    inner: SimulationStats,
+}
+
+#[pymethods]
+impl PySimulationStats {
+    #[getter]
+    fn messages_sent(&self) -> usize {
+        self.inner.messages_sent
+    }
+
+    #[getter]
+    fn messages_delivered(&self) -> usize {
+        self.inner.messages_delivered
+    }
+
+    #[getter]
+    fn messages_dropped(&self) -> usize {
+        self.inner.messages_dropped
+    }
+
+    #[getter]
+    fn rounds_to_converge(&self) -> Option<usize> {
+        self.inner.rounds_to_converge
+    }
+
+    #[getter]
+    fn operations_committed(&self) -> usize {
+        self.inner.operations_committed
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "SimulationStats(sent={}, delivered={}, dropped={}, converged={:?}, ops={})",
+            self.inner.messages_sent,
+            self.inner.messages_delivered,
+            self.inner.messages_dropped,
+            self.inner.rounds_to_converge,
+            self.inner.operations_committed
+        )
+    }
+}
+
+/// A simulated node in a distributed cluster.
+///
+/// Each node has:
+/// - A unique node ID
+/// - A vector clock for causality tracking
+/// - Local state (key-value pairs with algebraic operations)
+/// - An outbox of pending updates to propagate
+///
+/// Example:
+///     >>> cluster = PySimulatedCluster(5)
+///     >>> node = cluster.get_node(0)
+///     >>> print(node.node_id)
+#[pyclass]
+pub struct PySimulatedNode {
+    // We'll provide read-only access to node state through the cluster
+    node_id: String,
+    index: usize,
+}
+
+#[pymethods]
+impl PySimulatedNode {
+    /// The node's unique identifier.
+    #[getter]
+    fn node_id(&self) -> &str {
+        &self.node_id
+    }
+
+    /// The node's index in the cluster.
+    #[getter]
+    fn index(&self) -> usize {
+        self.index
+    }
+
+    fn __repr__(&self) -> String {
+        format!("SimulatedNode(id='{}', index={})", self.node_id, self.index)
+    }
+}
+
+/// A simulated cluster of nodes for testing coordination-free convergence.
+///
+/// This class provides a simulation framework to prove that nodes using
+/// coordination-free transactions converge to the same state regardless
+/// of message ordering, network delays, or partitions.
+///
+/// Example:
+///     >>> # Create a 5-node cluster
+///     >>> cluster = PySimulatedCluster(5)
+///     >>>
+///     >>> # Each node performs local operations
+///     >>> for i in range(5):
+///     ...     tx = PyAlgebraicTransaction()
+///     ...     tx.add_operation(PyAlgebraicOperation("counter", PyOpType.add(), PyAlgebraicValue((i + 1) * 10)))
+///     ...     cluster.commit_on_node(i, tx)
+///     >>>
+///     >>> # Propagate all updates (simulated gossip)
+///     >>> cluster.propagate_all()
+///     >>>
+///     >>> # Verify convergence
+///     >>> assert cluster.verify_convergence()
+///     >>> print(cluster.get_node_state(0, "counter"))  # 150
+#[pyclass]
+pub struct PySimulatedCluster {
+    inner: SimulatedCluster,
+}
+
+#[pymethods]
+impl PySimulatedCluster {
+    /// Create a new simulated cluster with N nodes.
+    #[new]
+    fn new(num_nodes: usize) -> Self {
+        Self { inner: SimulatedCluster::new(num_nodes) }
+    }
+
+    /// Create a cluster with custom configuration.
+    #[staticmethod]
+    fn with_config(num_nodes: usize, config: &PySimulationConfig) -> Self {
+        Self { inner: SimulatedCluster::with_config(num_nodes, config.inner.clone()) }
+    }
+
+    /// Get the number of nodes in the cluster.
+    #[getter]
+    fn num_nodes(&self) -> usize {
+        self.inner.num_nodes()
+    }
+
+    /// Get the current simulation round.
+    #[getter]
+    fn round(&self) -> usize {
+        self.inner.round
+    }
+
+    /// Commit a transaction on a specific node.
+    ///
+    /// Args:
+    ///     node_index: The index of the node to commit on
+    ///     tx: The algebraic transaction to commit
+    ///
+    /// Returns:
+    ///     The versioned update that was committed
+    fn commit_on_node(&mut self, node_index: usize, tx: &PyAlgebraicTransaction) -> PyResult<PyVersionedUpdate> {
+        self.inner.commit_on_node(node_index, tx.inner.clone())
+            .map(|update| PyVersionedUpdate { inner: update })
+            .map_err(|e| PyValueError::new_err(format!("{}", e)))
+    }
+
+    /// Run one round of propagation (broadcast + deliver).
+    fn propagate_round(&mut self) {
+        self.inner.propagate_round();
+    }
+
+    /// Propagate until convergence or max rounds.
+    fn propagate_all(&mut self) {
+        self.inner.propagate_all();
+    }
+
+    /// Add a network partition between two nodes.
+    ///
+    /// After calling this, messages between node_a and node_b will be dropped.
+    fn partition(&mut self, node_a: usize, node_b: usize) {
+        self.inner.partition(node_a, node_b);
+    }
+
+    /// Remove all network partitions (heal the network).
+    fn heal_partitions(&mut self) {
+        self.inner.heal_partitions();
+    }
+
+    /// Re-queue all local updates for propagation.
+    ///
+    /// Call this after healing partitions to ensure updates are re-gossiped.
+    fn requeue_all_updates(&mut self) {
+        self.inner.requeue_all_updates();
+    }
+
+    /// Verify that all nodes have converged to the same state.
+    ///
+    /// Returns True if all nodes have identical values for all keys.
+    fn verify_convergence(&self) -> bool {
+        self.inner.verify_convergence()
+    }
+
+    /// Get the value of a key on a specific node.
+    ///
+    /// Returns None if the key doesn't exist on that node.
+    fn get_node_state(&self, node_index: usize, key: &str) -> Option<PyAlgebraicValue> {
+        self.inner.get_node_state(node_index, key).map(|v: &AlgebraicValue| PyAlgebraicValue { inner: v.clone() })
+    }
+
+    /// Get all keys that exist across any node.
+    fn all_keys(&self) -> Vec<String> {
+        self.inner.all_keys()
+    }
+
+    /// Get simulation statistics.
+    fn get_stats(&self) -> PySimulationStats {
+        PySimulationStats { inner: self.inner.get_stats().clone() }
+    }
+
+    /// Get a debug string showing state of all nodes.
+    fn debug_state(&self) -> String {
+        self.inner.debug_state()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "SimulatedCluster(nodes={}, round={}, converged={})",
+            self.inner.num_nodes(),
+            self.inner.round,
+            self.inner.verify_convergence()
+        )
+    }
+}
+
+/// Builder for complex simulation scenarios.
+///
+/// Example:
+///     >>> tx1 = PyAlgebraicTransaction()
+///     >>> tx1.add_operation(PyAlgebraicOperation("count", PyOpType.add(), PyAlgebraicValue(100)))
+///     >>> tx2 = PyAlgebraicTransaction()
+///     >>> tx2.add_operation(PyAlgebraicOperation("count", PyOpType.add(), PyAlgebraicValue(200)))
+///     >>>
+///     >>> builder = PySimulationBuilder(2)
+///     >>> builder.set_max_rounds(50)
+///     >>> builder.add_operation(0, tx1)
+///     >>> builder.add_operation(1, tx2)
+///     >>> cluster = builder.run()
+///     >>>
+///     >>> assert cluster.verify_convergence()
+///     >>> print(cluster.get_node_state(0, "count"))  # 300
+#[pyclass]
+pub struct PySimulationBuilder {
+    num_nodes: usize,
+    config: SimulationConfig,
+    initial_operations: Vec<(usize, AlgebraicTransaction)>,
+}
+
+#[pymethods]
+impl PySimulationBuilder {
+    /// Create a new simulation builder with N nodes.
+    #[new]
+    fn new(num_nodes: usize) -> Self {
+        Self {
+            num_nodes,
+            config: SimulationConfig::default(),
+            initial_operations: Vec::new(),
+        }
+    }
+
+    /// Set maximum propagation rounds.
+    fn set_max_rounds(&mut self, rounds: usize) {
+        self.config.max_rounds = rounds;
+    }
+
+    /// Enable message reordering.
+    fn set_reordering(&mut self, enabled: bool) {
+        self.config.randomize_order = enabled;
+    }
+
+    /// Add a network partition between two nodes.
+    fn add_partition(&mut self, node_a: usize, node_b: usize) {
+        self.config.partitions.push((node_a, node_b));
+    }
+
+    /// Add an initial operation for a node.
+    fn add_operation(&mut self, node: usize, tx: &PyAlgebraicTransaction) {
+        self.initial_operations.push((node, tx.inner.clone()));
+    }
+
+    /// Build and run the simulation.
+    ///
+    /// Returns the cluster after propagation.
+    fn run(&self) -> PyResult<PySimulatedCluster> {
+        let mut cluster = SimulatedCluster::with_config(self.num_nodes, self.config.clone());
+
+        for (node_index, tx) in &self.initial_operations {
+            cluster.commit_on_node(*node_index, tx.clone())
+                .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
+        }
+
+        cluster.propagate_all();
+
+        Ok(PySimulatedCluster { inner: cluster })
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "SimulationBuilder(nodes={}, ops={}, max_rounds={})",
+            self.num_nodes,
+            self.initial_operations.len(),
+            self.config.max_rounds
+        )
+    }
+}
+
 /// Analyze merge compatibility using algebraic schemas.
 ///
 /// Args:
@@ -2757,6 +3168,14 @@ fn _rhizo(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyAlgebraicTransaction>()?;
     m.add_class::<PyVersionedUpdate>()?;
     m.add_class::<PyLocalCommitProtocol>()?;
+
+    // Simulation (Multi-Node Convergence Testing)
+    m.add_class::<PyNetworkCondition>()?;
+    m.add_class::<PySimulationConfig>()?;
+    m.add_class::<PySimulationStats>()?;
+    m.add_class::<PySimulatedNode>()?;
+    m.add_class::<PySimulatedCluster>()?;
+    m.add_class::<PySimulationBuilder>()?;
 
     Ok(())
 }

@@ -35,4 +35,7 @@ pub use transaction::{
 pub use distributed::{
     AlgebraicOperation, AlgebraicTransaction, CausalOrder, LocalCommitError, LocalCommitProtocol,
     NodeId, VectorClock, VersionedUpdate,
+    // Simulation types (Phase 4)
+    Message, NetworkCondition, SimulatedCluster, SimulatedNode, SimulationBuilder,
+    SimulationConfig, SimulationStats,
 };

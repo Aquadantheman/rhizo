@@ -121,15 +121,18 @@ cargo clippy --all-targets -- -D warnings
 
 ### Tasks
 
-- [ ] **4.1** Create `SimulatedNode` that wraps catalog + local commit
-- [ ] **4.2** Create `SimulatedCluster` with N nodes
-- [ ] **4.3** Implement message passing (in-memory channels)
-- [ ] **4.4** Implement various network conditions (delay, partition, reorder)
-- [ ] **4.5** Write convergence tests
+- [x] **4.1** Create `SimulatedNode` that wraps state + clock + local updates
+- [x] **4.2** Create `SimulatedCluster` with N nodes
+- [x] **4.3** Implement message passing (in-memory broadcast/receive)
+- [x] **4.4** Implement various network conditions (partition, heal, requeue)
+- [x] **4.5** Write convergence tests (20 Rust tests)
+- [x] **4.6** Add Python bindings (PySimulatedCluster, PySimulationBuilder, etc.)
+- [x] **4.7** Write Python tests (12 tests)
 
 ### Deliverables
-- `rhizo_core/src/distributed/simulation.rs`
-- `rhizo_core/src/distributed/tests/convergence_tests.rs`
+- `rhizo_core/src/distributed/simulation.rs` (1100+ lines)
+- `tests/test_distributed.py` (simulation tests)
+- `python/_rhizo.pyi` (type stubs)
 
 ### Tests
 ```rust

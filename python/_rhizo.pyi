@@ -1202,3 +1202,249 @@ class PyLocalCommitProtocol:
             ValueError: If merge fails
         """
         ...
+
+
+# ============================================================================
+# Phase 4: Simulation Types (Multi-Node Convergence Testing)
+# ============================================================================
+
+
+class PyNetworkCondition:
+    """Network condition for message delivery in simulation.
+
+    Used to simulate various network behaviors like perfect delivery,
+    message reordering, delays, and partitions.
+    """
+
+    @staticmethod
+    def perfect() -> "PyNetworkCondition":
+        """Create a perfect network condition (immediate ordered delivery)."""
+        ...
+
+    @staticmethod
+    def reordered() -> "PyNetworkCondition":
+        """Create a reordered network condition (messages may arrive out of order)."""
+        ...
+
+    @staticmethod
+    def delayed(rounds: int) -> "PyNetworkCondition":
+        """Create a delayed network condition (messages delayed by N rounds)."""
+        ...
+
+    @staticmethod
+    def partitioned() -> "PyNetworkCondition":
+        """Create a partitioned network condition (no message delivery)."""
+        ...
+
+    def __repr__(self) -> str: ...
+
+
+class PySimulationConfig:
+    """Configuration for the distributed simulation.
+
+    Attributes:
+        max_rounds: Maximum number of propagation rounds
+        randomize_order: Whether to randomize message order
+    """
+
+    max_rounds: int
+    randomize_order: bool
+
+    def __init__(self) -> None:
+        """Create a default simulation configuration."""
+        ...
+
+    def __repr__(self) -> str: ...
+
+
+class PySimulationStats:
+    """Statistics from a simulation run.
+
+    Attributes:
+        messages_sent: Total messages sent between nodes
+        messages_delivered: Total messages successfully delivered
+        messages_dropped: Total messages dropped (due to partitions)
+        rounds_to_converge: Number of rounds until convergence (None if not converged)
+        operations_committed: Total operations committed across all nodes
+    """
+
+    messages_sent: int
+    messages_delivered: int
+    messages_dropped: int
+    rounds_to_converge: Optional[int]
+    operations_committed: int
+
+    def __repr__(self) -> str: ...
+
+
+class PySimulatedNode:
+    """A simulated node in a distributed cluster.
+
+    Each node has:
+    - A unique node ID
+    - A vector clock for causality tracking
+    - Local state (key-value pairs with algebraic operations)
+    - An outbox of pending updates to propagate
+
+    Attributes:
+        node_id: The node's unique identifier
+        index: The node's index in the cluster
+    """
+
+    node_id: str
+    index: int
+
+    def __repr__(self) -> str: ...
+
+
+class PySimulatedCluster:
+    """A simulated cluster of nodes for testing coordination-free convergence.
+
+    This class provides a simulation framework to prove that nodes using
+    coordination-free transactions converge to the same state regardless
+    of message ordering, network delays, or partitions.
+
+    Example:
+        >>> # Create a 5-node cluster
+        >>> cluster = PySimulatedCluster(5)
+        >>>
+        >>> # Each node performs local operations
+        >>> for i in range(5):
+        ...     tx = PyAlgebraicTransaction()
+        ...     tx.add_operation(PyAlgebraicOperation("counter", PyOpType("add"), PyAlgebraicValue((i + 1) * 10)))
+        ...     cluster.commit_on_node(i, tx)
+        >>>
+        >>> # Propagate all updates (simulated gossip)
+        >>> cluster.propagate_all()
+        >>>
+        >>> # Verify convergence
+        >>> assert cluster.verify_convergence()
+        >>> print(cluster.get_node_state(0, "counter"))  # 150
+    """
+
+    num_nodes: int
+    round: int
+
+    def __init__(self, num_nodes: int) -> None:
+        """Create a new simulated cluster with N nodes."""
+        ...
+
+    @staticmethod
+    def with_config(num_nodes: int, config: PySimulationConfig) -> "PySimulatedCluster":
+        """Create a cluster with custom configuration."""
+        ...
+
+    def commit_on_node(self, node_index: int, tx: PyAlgebraicTransaction) -> PyVersionedUpdate:
+        """Commit a transaction on a specific node.
+
+        Args:
+            node_index: The index of the node to commit on
+            tx: The algebraic transaction to commit
+
+        Returns:
+            The versioned update that was committed
+        """
+        ...
+
+    def propagate_round(self) -> None:
+        """Run one round of propagation (broadcast + deliver)."""
+        ...
+
+    def propagate_all(self) -> None:
+        """Propagate until convergence or max rounds."""
+        ...
+
+    def partition(self, node_a: int, node_b: int) -> None:
+        """Add a network partition between two nodes.
+
+        After calling this, messages between node_a and node_b will be dropped.
+        """
+        ...
+
+    def heal_partitions(self) -> None:
+        """Remove all network partitions (heal the network)."""
+        ...
+
+    def requeue_all_updates(self) -> None:
+        """Re-queue all local updates for propagation.
+
+        Call this after healing partitions to ensure updates are re-gossiped.
+        """
+        ...
+
+    def verify_convergence(self) -> bool:
+        """Verify that all nodes have converged to the same state.
+
+        Returns True if all nodes have identical values for all keys.
+        """
+        ...
+
+    def get_node_state(self, node_index: int, key: str) -> Optional[PyAlgebraicValue]:
+        """Get the value of a key on a specific node.
+
+        Returns None if the key doesn't exist on that node.
+        """
+        ...
+
+    def all_keys(self) -> List[str]:
+        """Get all keys that exist across any node."""
+        ...
+
+    def get_stats(self) -> PySimulationStats:
+        """Get simulation statistics."""
+        ...
+
+    def debug_state(self) -> str:
+        """Get a debug string showing state of all nodes."""
+        ...
+
+    def __repr__(self) -> str: ...
+
+
+class PySimulationBuilder:
+    """Builder for complex simulation scenarios.
+
+    Example:
+        >>> tx1 = PyAlgebraicTransaction()
+        >>> tx1.add_operation(PyAlgebraicOperation("count", PyOpType("add"), PyAlgebraicValue(100)))
+        >>> tx2 = PyAlgebraicTransaction()
+        >>> tx2.add_operation(PyAlgebraicOperation("count", PyOpType("add"), PyAlgebraicValue(200)))
+        >>>
+        >>> builder = PySimulationBuilder(2)
+        >>> builder.set_max_rounds(50)
+        >>> builder.add_operation(0, tx1)
+        >>> builder.add_operation(1, tx2)
+        >>> cluster = builder.run()
+        >>>
+        >>> assert cluster.verify_convergence()
+        >>> print(cluster.get_node_state(0, "count"))  # 300
+    """
+
+    def __init__(self, num_nodes: int) -> None:
+        """Create a new simulation builder with N nodes."""
+        ...
+
+    def set_max_rounds(self, rounds: int) -> None:
+        """Set maximum propagation rounds."""
+        ...
+
+    def set_reordering(self, enabled: bool) -> None:
+        """Enable or disable message reordering."""
+        ...
+
+    def add_partition(self, node_a: int, node_b: int) -> None:
+        """Add a network partition between two nodes."""
+        ...
+
+    def add_operation(self, node: int, tx: PyAlgebraicTransaction) -> None:
+        """Add an initial operation for a node."""
+        ...
+
+    def run(self) -> PySimulatedCluster:
+        """Build and run the simulation.
+
+        Returns the cluster after propagation.
+        """
+        ...
+
+    def __repr__(self) -> str: ...

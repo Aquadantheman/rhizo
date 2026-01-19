@@ -75,6 +75,13 @@ from _rhizo import (
     PyAlgebraicTransaction,
     PyVersionedUpdate,
     PyLocalCommitProtocol,
+    # Simulation types (multi-node convergence testing)
+    PyNetworkCondition,
+    PySimulationConfig,
+    PySimulationStats,
+    PySimulatedNode,
+    PySimulatedCluster,
+    PySimulationBuilder,
 )
 
 __version__ = "0.4.0"
@@ -134,4 +141,11 @@ __all__ = [
     "PyAlgebraicTransaction",
     "PyVersionedUpdate",
     "PyLocalCommitProtocol",
+    # Simulation types
+    "PyNetworkCondition",
+    "PySimulationConfig",
+    "PySimulationStats",
+    "PySimulatedNode",
+    "PySimulatedCluster",
+    "PySimulationBuilder",
 ]
