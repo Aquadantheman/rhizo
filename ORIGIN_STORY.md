@@ -30,6 +30,6 @@ So I'm open-sourcing it.
 
 ---
 
-**Rhizo is available now at [github.com/aquadantheman/rhizo](https://github.com/aquadantheman/rhizo)**
+**Rhizo is available now at [github.com/rhizodata/rhizo](https://github.com/rhizodata/rhizo)**
 
 If you've ever held your breath during a data pipeline run, I built this for you.

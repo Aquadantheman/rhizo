@@ -242,7 +242,7 @@ Content-addressable storage enables embarrassingly parallel reads. Each chunk ca
 
 7. Reference Implementation: Rhizo
 7.1 Scope and Objectives
-The concepts described in this paper have been implemented as Rhizo, an open-source reference implementation available at github.com/aquadantheman/rhizo. Rhizo demonstrates that the Unified Data Runtime architecture is not merely theoretical but practically achievable with modest engineering effort.
+The concepts described in this paper have been implemented as Rhizo, an open-source reference implementation available at github.com/rhizodata/rhizo. Rhizo demonstrates that the Unified Data Runtime architecture is not merely theoretical but practically achievable with modest engineering effort.
 The implementation validates all core architectural concepts:
 1. Content-addressable storage enabling zero-copy branching (verified)
 2. Cross-table ACID transactions with 3-layer conflict protection (451 tests passing)

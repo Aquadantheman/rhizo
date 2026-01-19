@@ -13,10 +13,10 @@ In 1980, Deleuze and Guattari contrasted the rhizome with the tree: hierarchies 
 | Branch overhead | 280 bytes | 14.7 MB (Delta Lake) | **52,500x smaller** |
 | OLAP queries | 0.9ms | 23ms (DuckDB) | **26x faster** |
 
-[![CI](https://github.com/Aquadantheman/rhizo/actions/workflows/ci.yml/badge.svg)](https://github.com/Aquadantheman/rhizo/actions/workflows/ci.yml)
+[![CI](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml/badge.svg)](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-370%20tests-blue)](https://github.com/Aquadantheman/rhizo)
-[![Python](https://img.shields.io/badge/python-262%20tests-blue)](https://github.com/Aquadantheman/rhizo)
+[![Rust](https://img.shields.io/badge/rust-370%20tests-blue)](https://github.com/rhizodata/rhizo)
+[![Python](https://img.shields.io/badge/python-262%20tests-blue)](https://github.com/rhizodata/rhizo)
 
 ---
 
@@ -131,7 +131,7 @@ With the new **DataFusion-powered OLAP engine**, Rhizo delivers industry-leading
 # Coming soon: pip install rhizo
 
 # For now, install from source:
-git clone https://github.com/Aquadantheman/rhizo.git
+git clone https://github.com/rhizodata/rhizo.git
 cd rhizo
 pip install -e .
 ```

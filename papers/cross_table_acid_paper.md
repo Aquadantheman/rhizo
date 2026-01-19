@@ -465,7 +465,7 @@ Our implementation demonstrates that this approach is practical on a single node
 
 The key insight is architectural: per-table transaction logs make cross-table atomicity fundamentally impossible, while a unified content-addressed foundation makes it straightforward—at least on a single node. Extending these guarantees to distributed deployments remains future work.
 
-Rhizo is open source under the MIT license at: https://github.com/aquadantheman/rhizo
+Rhizo is open source under the MIT license at: https://github.com/rhizodata/rhizo
 
 ---
 

@@ -14,7 +14,7 @@ Thank you for your interest in contributing to Rhizo! This document provides gui
 
 ```bash
 # Clone the repository
-git clone https://github.com/Aquadantheman/rhizo.git
+git clone https://github.com/rhizodata/rhizo.git
 cd rhizo
 
 # Create a virtual environment

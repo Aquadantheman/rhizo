@@ -90,7 +90,7 @@ Rhizo is feature-complete for single-node deployments with full ACID transaction
 
 ```bash
 # Build from source
-git clone https://github.com/Aquadantheman/rhizo.git
+git clone https://github.com/rhizodata/rhizo.git
 cd rhizo
 
 # Create virtual environment
