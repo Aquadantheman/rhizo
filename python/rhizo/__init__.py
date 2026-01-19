@@ -25,6 +25,7 @@ Low-level types (from _rhizo):
 """
 
 from .writer import TableWriter
+from .database import Database, open
 from .reader import TableReader, Filter
 from .engine import QueryEngine
 from .transaction import TransactionContext
@@ -87,6 +88,8 @@ from _rhizo import (
 __version__ = "0.4.0"
 __all__ = [
     # High-level API
+    "open",
+    "Database",
     "TableWriter",
     "TableReader",
     "QueryEngine",

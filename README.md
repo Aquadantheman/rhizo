@@ -128,25 +128,17 @@ With the new **DataFusion-powered OLAP engine**, Rhizo delivers industry-leading
 ### Installation
 
 ```bash
-# Coming soon: pip install rhizo
-
-# For now, install from source:
-git clone https://github.com/rhizodata/rhizo.git
-cd rhizo
-pip install -e .
+pip install rhizo
 ```
 
 ### Basic Usage
 
 ```python
 import rhizo
-from rhizo import QueryEngine
 import pandas as pd
 
-# Initialize
-store = rhizo.PyChunkStore("./data/chunks")
-catalog = rhizo.PyCatalog("./data/catalog")
-engine = QueryEngine(store, catalog)
+# Open or create a database
+db = rhizo.open("./mydata")
 
 # Write data
 df = pd.DataFrame({
@@ -154,38 +146,57 @@ df = pd.DataFrame({
     "name": ["Alice", "Bob", "Charlie"],
     "score": [85.5, 92.0, 78.5]
 })
-engine.write_table("users", df)
+db.write("users", df)
 
-# Query with DuckDB
-result = engine.query("SELECT * FROM users WHERE score > 80")
+# Query with SQL
+result = db.sql("SELECT * FROM users WHERE score > 80")
+print(result.to_pandas())
+
+# Close when done
+db.close()
+```
+
+Or use as a context manager:
+
+```python
+with rhizo.open("./mydata") as db:
+    db.write("users", df)
+    result = db.sql("SELECT * FROM users")
 ```
 
 ### Time Travel
 
 ```python
 # Query historical versions
-result_v1 = engine.query(
+result_v1 = db.sql(
     "SELECT AVG(score) FROM users",
     versions={"users": 1}
 )
 
-# Compare versions
-diff = engine.diff_versions("users", 1, 2, key_columns=["id"])
+# Read specific version directly
+old_data = db.read("users", version=1)
+
+# Compare versions (via engine for advanced features)
+diff = db.engine.diff_versions("users", 1, 2, key_columns=["id"])
 ```
 
 ### Branching
 
 ```python
+# Access branching through the engine
+engine = db.engine
+
 # Create branch (instant, zero-copy)
 engine.create_branch("experiment/new-scoring")
 engine.checkout("experiment/new-scoring")
 
 # Modify on branch (production unchanged)
-engine.write_table("scores", updated_df)
+db.write("scores", updated_df)
 
 # Query both branches
-main_result = engine.query("SELECT * FROM scores", branch="main")
-exp_result = engine.query("SELECT * FROM scores", branch="experiment/new-scoring")
+main_result = db.sql("SELECT * FROM scores")  # current branch
+engine.checkout("main")
+main_result = db.sql("SELECT * FROM scores")  # main branch
 
 # Merge when ready
 engine.merge_branch("experiment/new-scoring", into="main")
@@ -194,7 +205,7 @@ engine.merge_branch("experiment/new-scoring", into="main")
 ### Cross-Table Transactions
 
 ```python
-with engine.transaction() as tx:
+with db.engine.transaction() as tx:
     tx.write_table("customers", updated_customers)
     tx.write_table("orders", new_order)
     tx.write_table("audit_log", audit_entry)
