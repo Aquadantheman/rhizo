@@ -28,7 +28,7 @@ import pyarrow.parquet as pq
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 
 # Rhizo
-from _rhizo import PyChunkStore, PyCatalog
+from _rhizo import PyChunkStore, PyCatalog, PyBranchManager
 from rhizo import QueryEngine, TableWriter, is_datafusion_available
 
 # Check available systems
@@ -190,6 +190,12 @@ def run_rhizo_olap(df: pd.DataFrame, temp_dir: str) -> dict:
     stats = engine.olap_stats()
     results["cache_hit_rate"] = stats.get("hit_rate", 0)
 
+    # Branching (zero-copy)
+    branches_path = os.path.join(temp_dir, "arm_olap_branches")
+    branches = PyBranchManager(branches_path)
+    results["branch"] = benchmark(lambda: branches.create(f"feature-{time.time()}", from_branch="main"))
+    results["branch_overhead_bytes"] = get_dir_size(branches_path)
+
     # Storage
     results["storage_bytes"] = get_dir_size(chunks_path) + get_dir_size(catalog_path)
 
@@ -304,6 +310,15 @@ def run_delta_lake(df: pd.DataFrame, temp_dir: str) -> dict:
             "id": "count", "score": "mean", "amount": "sum"
         }).sort_values(by="amount", ascending=False)  # type: ignore[call-overload]
     results["complex"] = benchmark(delta_complex)
+
+    # Branching (full copy - no native support)
+    branch_path = os.path.join(temp_dir, "delta_branch")
+    def delta_branch():
+        if os.path.exists(branch_path):
+            shutil.rmtree(branch_path)
+        shutil.copytree(delta_path, branch_path)
+    results["branch"] = benchmark(delta_branch)
+    results["branch_overhead_bytes"] = get_dir_size(branch_path)
 
     # Storage
     results["storage_bytes"] = get_dir_size(delta_path)
@@ -686,6 +701,8 @@ def main():
             ("Projection", "projection", "ms"),
             ("Aggregation", "aggregation", "ms"),
             ("Complex Query", "complex", "ms"),
+            ("Branch Create", "branch", "ms"),
+            ("Branch Overhead", "branch_overhead_bytes", "MB"),
             ("Storage", "storage_bytes", "MB"),
         ]
 
@@ -698,7 +715,7 @@ def main():
 
         # OLAP speedup analysis
         print("\n" + "=" * 100)
-        print("ARMILLARIA OLAP SPEEDUP ANALYSIS")
+        print("RHIZO OLAP SPEEDUP ANALYSIS")
         print("=" * 100)
 
         olap = results.get("rhizo_olap", {})
@@ -714,6 +731,41 @@ def main():
                     if olap_time > 0:
                         speedup = duck_time / olap_time
                         print(f"  {metric:<15}: {olap_time:.1f}ms vs {duck_time:.1f}ms = {speedup:.1f}x faster")
+
+        # Branching comparison
+        print("\n" + "=" * 100)
+        print("BRANCHING COMPARISON")
+        print("=" * 100)
+
+        rhizo_branch = results.get("rhizo_olap", {}).get("branch")
+        rhizo_overhead = results.get("rhizo_olap", {}).get("branch_overhead_bytes", 0)
+        delta_branch = results.get("delta_lake", {}).get("branch")
+        delta_overhead = results.get("delta_lake", {}).get("branch_overhead_bytes", 0)
+
+        if rhizo_branch and delta_branch:
+            print(f"\nRhizo (zero-copy):  {rhizo_branch:.1f}ms, overhead: {rhizo_overhead} bytes")
+            print(f"Delta (full copy):  {delta_branch:.1f}ms, overhead: {delta_overhead/1024/1024:.2f} MB")
+            if rhizo_branch > 0:
+                print(f"Rhizo is {delta_branch/rhizo_branch:.0f}x faster")
+            if rhizo_overhead > 0:
+                print(f"Rhizo uses {delta_overhead/rhizo_overhead:.0f}x less storage")
+
+        # Deduplication ratio (for versioned storage)
+        print("\n" + "=" * 100)
+        print("STORAGE DEDUPLICATION")
+        print("=" * 100)
+
+        data_size_mb = df.memory_usage(deep=True).sum() / 1024 / 1024
+        num_versions = 4  # Initial write + 3 additional versions
+        naive_storage = data_size_mb * num_versions
+
+        print(f"\nNaive storage ({num_versions} full copies): {naive_storage:.2f} MB")
+        for sys in ["rhizo_olap", "rhizo_duckdb", "delta_lake"]:
+            storage = results.get(sys, {}).get("storage_bytes")
+            if storage:
+                storage_mb = storage / 1024 / 1024
+                dedup_ratio = (1 - storage_mb / naive_storage) * 100
+                print(f"{sys}: {storage_mb:.2f} MB (dedup ratio: {dedup_ratio:.1f}%)")
 
         # JOIN Results
         print("\n" + "=" * 100)
