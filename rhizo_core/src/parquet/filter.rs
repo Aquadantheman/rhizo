@@ -271,7 +271,7 @@ mod tests {
     #[test]
     fn test_scalar_value_display() {
         assert_eq!(format!("{}", ScalarValue::Int64(42)), "42");
-        assert_eq!(format!("{}", ScalarValue::Float64(3.14)), "3.14");
+        assert_eq!(format!("{}", ScalarValue::Float64(3.5)), "3.5");
         assert_eq!(format!("{}", ScalarValue::Utf8("hello".to_string())), "'hello'");
         assert_eq!(format!("{}", ScalarValue::Boolean(true)), "true");
     }

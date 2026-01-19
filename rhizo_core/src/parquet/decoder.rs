@@ -672,7 +672,7 @@ mod tests {
     fn test_decode_batch_parallel() {
         let batches: Vec<RecordBatch> = (0..10).map(|_| create_test_batch(1000)).collect();
 
-        let encoded: Vec<Vec<u8>> = batches.iter().map(|b| encode_batch(b)).collect();
+        let encoded: Vec<Vec<u8>> = batches.iter().map(encode_batch).collect();
 
         let decoder = ParquetDecoder::new();
         let decoded = decoder.decode_batch_owned(&encoded).unwrap();

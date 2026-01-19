@@ -151,7 +151,7 @@ mod query_tests {
 
     #[test]
     fn test_query_filter_workflow() {
-        let entries = vec![
+        let entries = [
             make_entry(1, "main", vec![("users", None, 1)]),
             make_entry(2, "main", vec![("orders", None, 1)]),
             make_entry(3, "feature", vec![("users", Some(1), 2)]),

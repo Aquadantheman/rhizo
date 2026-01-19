@@ -305,8 +305,8 @@ mod tests {
 
         // Clone and modify only the last chunk (bytes 3072-4095)
         let mut data2 = data1.clone();
-        for i in 3072..4096 {
-            data2[i] = data2[i].wrapping_add(1);
+        for byte in data2[3072..4096].iter_mut() {
+            *byte = byte.wrapping_add(1);
         }
 
         let config = MerkleConfig::new(1024);

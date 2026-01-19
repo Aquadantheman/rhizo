@@ -423,10 +423,10 @@ mod tests {
     fn test_merge_max_floats() {
         let result = AlgebraicMerger::merge(
             OpType::SemilatticeMax,
-            &AlgebraicValue::float(3.14),
-            &AlgebraicValue::float(2.71),
+            &AlgebraicValue::float(3.5),
+            &AlgebraicValue::float(2.5),
         );
-        assert_eq!(result, MergeResult::Merged(AlgebraicValue::float(3.14)));
+        assert_eq!(result, MergeResult::Merged(AlgebraicValue::float(3.5)));
     }
 
     #[test]
@@ -462,10 +462,10 @@ mod tests {
     fn test_merge_min_floats() {
         let result = AlgebraicMerger::merge(
             OpType::SemilatticeMin,
-            &AlgebraicValue::float(3.14),
-            &AlgebraicValue::float(2.71),
+            &AlgebraicValue::float(3.5),
+            &AlgebraicValue::float(2.5),
         );
-        assert_eq!(result, MergeResult::Merged(AlgebraicValue::float(2.71)));
+        assert_eq!(result, MergeResult::Merged(AlgebraicValue::float(2.5)));
     }
 
     // ============ UNION Tests ============

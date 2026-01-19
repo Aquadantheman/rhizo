@@ -215,7 +215,7 @@ impl std::fmt::Display for OpType {
 ///
 /// This enum wraps various value types and provides type-safe
 /// algebraic operations on them.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum AlgebraicValue {
     /// Signed 64-bit integer
     ///
@@ -245,6 +245,7 @@ pub enum AlgebraicValue {
     /// Null/None value
     ///
     /// Represents absence of value
+    #[default]
     Null,
 }
 
@@ -336,12 +337,6 @@ impl AlgebraicValue {
             Self::Integer(v) => Some(*v as f64),
             _ => None,
         }
-    }
-}
-
-impl Default for AlgebraicValue {
-    fn default() -> Self {
-        Self::Null
     }
 }
 
@@ -502,9 +497,9 @@ mod tests {
 
     #[test]
     fn test_algebraic_value_float() {
-        let v = AlgebraicValue::float(3.14);
+        let v = AlgebraicValue::float(3.5);
         assert!(v.is_numeric());
-        assert_eq!(v.as_float(), Some(3.14));
+        assert_eq!(v.as_float(), Some(3.5));
         assert_eq!(v.as_integer(), Some(3)); // truncates
         assert_eq!(v.type_name(), "Float");
     }
@@ -557,8 +552,8 @@ mod tests {
         let v2: AlgebraicValue = 42i32.into();
         assert_eq!(v2, AlgebraicValue::Integer(42));
 
-        let v3: AlgebraicValue = 3.14f64.into();
-        assert_eq!(v3, AlgebraicValue::Float(3.14));
+        let v3: AlgebraicValue = 3.5f64.into();
+        assert_eq!(v3, AlgebraicValue::Float(3.5));
 
         let v4: AlgebraicValue = true.into();
         assert_eq!(v4, AlgebraicValue::Boolean(true));
