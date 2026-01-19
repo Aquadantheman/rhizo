@@ -1,25 +1,32 @@
-pub mod chunk_store;
-pub mod catalog;
+pub mod algebraic;
 pub mod branch;
-pub mod transaction;
+pub mod catalog;
 pub mod changelog;
+pub mod chunk_store;
 pub mod merkle;
 pub mod parquet;
+pub mod transaction;
 
+pub use algebraic::{
+    AlgebraicMerger, AlgebraicSchemaRegistry, AlgebraicValue, ColumnAlgebraic, MergeResult,
+    OpType, TableAlgebraicSchema,
+};
+pub use branch::{
+    Branch, BranchDiff, BranchError, BranchManager, MergeAnalysis, MergeAnalyzer, MergeOutcome,
+};
+pub use catalog::{CatalogError, FileCatalog, TableVersion};
+pub use changelog::{ChangelogEntry, ChangelogQuery, TableChange};
 pub use chunk_store::{ChunkStore, ChunkStoreError};
-pub use catalog::{FileCatalog, TableVersion, CatalogError};
-pub use branch::{Branch, BranchDiff, BranchError, BranchManager};
-pub use transaction::{
-    TxId, EpochId, TransactionStatus, WriteGranularity, TableWrite, TransactionRecord,
-    EpochConfig, EpochStatus, EpochMetadata,
-    TransactionError, TransactionLog,
-    Conflict, ConflictDetector, TableLevelConflictDetector,
-    TransactionManager,
-    RecoveryReport, RecoveryManager,
-};
-pub use changelog::{ChangelogEntry, TableChange, ChangelogQuery};
 pub use merkle::{
-    MerkleTree, MerkleNode, DataChunk, MerkleDiff, MerkleConfig, MerkleError,
-    build_tree, diff_trees, verify_tree,
+    build_tree, diff_trees, verify_tree, DataChunk, MerkleConfig, MerkleDiff, MerkleError,
+    MerkleNode, MerkleTree,
 };
-pub use parquet::{ParquetEncoder, ParquetDecoder, ParquetCompression, ParquetError, FilterOp, ScalarValue, PredicateFilter};
+pub use parquet::{
+    FilterOp, ParquetCompression, ParquetDecoder, ParquetEncoder, ParquetError, PredicateFilter,
+    ScalarValue,
+};
+pub use transaction::{
+    Conflict, ConflictDetector, EpochConfig, EpochId, EpochMetadata, EpochStatus, RecoveryManager,
+    RecoveryReport, TableLevelConflictDetector, TableWrite, TransactionError, TransactionLog,
+    TransactionManager, TransactionRecord, TransactionStatus, TxId, WriteGranularity,
+};

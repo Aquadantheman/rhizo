@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "timestamp": "2026-01-17 21:39:29",
+    "timestamp": "2026-01-18 22:54:14",
     "num_rows": 100000,
     "systems": [
-      "armillaria",
+      "rhizo",
       "parquet",
       "delta_lake",
       "iceberg",
@@ -12,36 +12,36 @@
     ]
   },
   "results": {
-    "armillaria": {
-      "write": 53.65,
-      "read": 12.44,
-      "time_travel": 11.87,
-      "filtered": 9.42,
-      "projection": 6.87,
+    "rhizo": {
+      "write": 49.76,
+      "read": 0.22,
+      "time_travel": 0.13,
+      "filtered": 0.55,
+      "projection": 0.22,
       "storage_bytes": 3850538
     },
     "delta_lake": {
-      "write": 67.35,
-      "read": 20.68,
-      "time_travel": 18.7,
-      "filtered": 13.65,
-      "projection": 9.94,
+      "write": 64.7,
+      "read": 20.44,
+      "time_travel": 18.69,
+      "filtered": 13.01,
+      "projection": 9.14,
       "storage_bytes": 39702319
     },
     "duckdb": {
-      "write": 46.55,
-      "read": 22.47,
+      "write": 47.19,
+      "read": 24.29,
       "time_travel": "N/A",
-      "filtered": 1.65,
-      "projection": 1.6,
+      "filtered": 1.6,
+      "projection": 2.18,
       "storage_bytes": 6565888
     },
     "parquet": {
-      "write": 50.57,
-      "read": 5.1,
+      "write": 48.38,
+      "read": 5.5,
       "time_travel": "N/A",
-      "filtered": 5.71,
-      "projection": 3.37,
+      "filtered": 5.65,
+      "projection": 2.97,
       "storage_bytes": 3907499
     }
   }

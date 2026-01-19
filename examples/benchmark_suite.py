@@ -413,6 +413,107 @@ def benchmark_transactions() -> List[BenchmarkResult]:
     return results
 
 
+def benchmark_algebraic_merge() -> List[BenchmarkResult]:
+    """Benchmark algebraic merge operations."""
+    results = []
+
+    # Test algebraic merge throughput
+    iterations = 10000
+
+    # Create operation types once
+    op_add = _rhizo.PyOpType("ADD")
+    op_max = _rhizo.PyOpType("MAX")
+    op_union = _rhizo.PyOpType("UNION")
+
+    # Integer addition (counter increment)
+    start = time.perf_counter()
+    for i in range(iterations):
+        v1 = _rhizo.PyAlgebraicValue.integer(i)
+        v2 = _rhizo.PyAlgebraicValue.integer(100)
+        _rhizo.algebraic_merge(op_add, v1, v2)
+    add_time = time.perf_counter() - start
+    ops_per_sec_add = iterations / add_time
+
+    results.append(BenchmarkResult(
+        name="Algebraic merge (ADD)",
+        value=round(ops_per_sec_add / 1000, 1),
+        unit="K ops/sec",
+        details={
+            "iterations": iterations,
+            "operation": "AbelianAdd",
+            "use_case": "Counter increments"
+        }
+    ))
+
+    # Max (timestamp comparison)
+    start = time.perf_counter()
+    for i in range(iterations):
+        v1 = _rhizo.PyAlgebraicValue.integer(i)
+        v2 = _rhizo.PyAlgebraicValue.integer(i + 1)
+        _rhizo.algebraic_merge(op_max, v1, v2)
+    max_time = time.perf_counter() - start
+    ops_per_sec_max = iterations / max_time
+
+    results.append(BenchmarkResult(
+        name="Algebraic merge (MAX)",
+        value=round(ops_per_sec_max / 1000, 1),
+        unit="K ops/sec",
+        details={
+            "iterations": iterations,
+            "operation": "SemilatticeMax",
+            "use_case": "Timestamp comparison"
+        }
+    ))
+
+    # Set union (tags accumulation)
+    start = time.perf_counter()
+    for i in range(iterations):
+        v1 = _rhizo.PyAlgebraicValue.string_set(["tag1", "tag2"])
+        v2 = _rhizo.PyAlgebraicValue.string_set(["tag3", "tag4"])
+        _rhizo.algebraic_merge(op_union, v1, v2)
+    union_time = time.perf_counter() - start
+    ops_per_sec_union = iterations / union_time
+
+    results.append(BenchmarkResult(
+        name="Algebraic merge (UNION)",
+        value=round(ops_per_sec_union / 1000, 1),
+        unit="K ops/sec",
+        details={
+            "iterations": iterations,
+            "operation": "SemilatticeUnion",
+            "use_case": "Tag accumulation"
+        }
+    ))
+
+    # Schema registry lookup
+    registry = _rhizo.PyAlgebraicSchemaRegistry()
+    schema = _rhizo.PyTableAlgebraicSchema("test_table")
+    schema.add_column("counter", op_add)
+    schema.add_column("timestamp", op_max)
+    schema.add_column("tags", op_union)
+    registry.register(schema)
+
+    start = time.perf_counter()
+    for _ in range(iterations):
+        registry.get_op_type("test_table", "counter")
+        registry.get_op_type("test_table", "timestamp")
+        registry.get_op_type("test_table", "tags")
+    lookup_time = time.perf_counter() - start
+    ops_per_sec_lookup = (iterations * 3) / lookup_time
+
+    results.append(BenchmarkResult(
+        name="Schema registry lookup",
+        value=round(ops_per_sec_lookup / 1000, 1),
+        unit="K ops/sec",
+        details={
+            "iterations": iterations * 3,
+            "note": "3 column lookups per iteration"
+        }
+    ))
+
+    return results
+
+
 def run_all_benchmarks():
     """Run all benchmarks and report results."""
     print("=" * 70)
@@ -423,38 +524,45 @@ def run_all_benchmarks():
     all_results = []
 
     # Throughput
-    print("\n[1/5] Measuring throughput...")
+    print("\n[1/6] Measuring throughput...")
     throughput_results = benchmark_throughput()
     all_results.extend(throughput_results)
     for r in throughput_results:
         print(f"  {r.name}: {r.value} {r.unit}")
 
     # Branching
-    print("\n[2/5] Measuring branch creation...")
+    print("\n[2/6] Measuring branch creation...")
     branch_results = benchmark_branching([1000, 10000, 50000, 100000])
     all_results.extend(branch_results)
     for r in branch_results:
         print(f"  {r.name}: {r.value} {r.unit}")
 
     # Deduplication
-    print("\n[3/5] Measuring deduplication...")
+    print("\n[3/6] Measuring deduplication...")
     dedup_results = benchmark_deduplication()
     all_results.extend(dedup_results)
     for r in dedup_results:
         print(f"  {r.name}: {r.value} {r.unit}")
 
     # Time travel
-    print("\n[4/5] Measuring time travel queries...")
+    print("\n[4/6] Measuring time travel queries...")
     tt_results = benchmark_time_travel()
     all_results.extend(tt_results)
     for r in tt_results:
         print(f"  {r.name}: {r.value} {r.unit}")
 
     # Transactions
-    print("\n[5/5] Measuring transaction overhead...")
+    print("\n[5/6] Measuring transaction overhead...")
     tx_results = benchmark_transactions()
     all_results.extend(tx_results)
     for r in tx_results:
+        print(f"  {r.name}: {r.value} {r.unit}")
+
+    # Algebraic merge
+    print("\n[6/6] Measuring algebraic merge operations...")
+    alg_results = benchmark_algebraic_merge()
+    all_results.extend(alg_results)
+    for r in alg_results:
         print(f"  {r.name}: {r.value} {r.unit}")
 
     # Summary

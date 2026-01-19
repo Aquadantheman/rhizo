@@ -25,4 +25,7 @@ pub enum BranchError {
 
     #[error("Cannot fast-forward: {source_branch} is not ahead of {target_branch}")]
     CannotFastForward { source_branch: String, target_branch: String },
+
+    #[error("Algebraic merge conflict on tables: {0:?}")]
+    AlgebraicConflict(Vec<String>),
 }

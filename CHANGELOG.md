@@ -5,6 +5,39 @@ All notable changes to Rhizo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-01-18
+
+### Added
+
+#### Algebraic Classification for Conflict-Free Merge (Phase AF)
+- **Core algebraic module** (`rhizo_core::algebraic`): Complete implementation of CRDT-style algebraic operations
+- **OpType enum**: Classification of operations into semilattice (MAX, MIN, UNION, INTERSECT), Abelian (ADD, MULTIPLY), and generic (OVERWRITE, CONDITIONAL, UNKNOWN)
+- **AlgebraicValue**: Type-safe wrapper for mergeable values (Integer, Float, StringSet, IntSet, Boolean, Null)
+- **AlgebraicMerger**: Stateless merger with mathematical guarantees (commutativity, associativity, idempotency)
+- **TableAlgebraicSchema**: Per-table column annotations for merge behavior
+- **AlgebraicSchemaRegistry**: Centralized lookup for table/column operation types
+- **MergeAnalyzer**: Branch-level merge compatibility analysis
+- **Python bindings**: Full PyO3 integration with `PyOpType`, `PyAlgebraicValue`, `algebraic_merge()`, schema classes
+
+### Performance
+- **ADD operations**: 4,398 K ops/sec
+- **MAX operations**: 4,483 K ops/sec
+- **UNION operations**: 745 K ops/sec
+- **Schema lookups**: 9,097 K ops/sec
+
+### Testing
+- 306 Rust tests (283 unit + 23 integration)
+- Comprehensive property verification (commutativity, idempotency, associativity)
+- Overflow handling with checked arithmetic
+- Null propagation and type mismatch detection
+- Branch merge analysis integration tests
+
+### Documentation
+- Updated POAC paper (Section 6) with implementation details and benchmark results
+- Type stubs for Python IDE support (`_rhizo.pyi`)
+
+---
+
 ## [0.3.2] - 2026-01-18
 
 ### Fixed

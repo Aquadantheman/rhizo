@@ -6,7 +6,7 @@ Rhizo is a next-generation data infrastructure that unifies transactional, analy
 
 [![CI](https://github.com/aquadantheman/unifieddataruntime/actions/workflows/ci.yml/badge.svg)](https://github.com/aquadantheman/unifieddataruntime/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-204%20tests-blue)](https://github.com/aquadantheman/unifieddataruntime)
+[![Rust](https://img.shields.io/badge/rust-306%20tests-blue)](https://github.com/aquadantheman/unifieddataruntime)
 [![Python](https://img.shields.io/badge/python-247%20tests-blue)](https://github.com/aquadantheman/unifieddataruntime)
 
 ---
@@ -84,6 +84,7 @@ With the new **DataFusion-powered OLAP engine**, Rhizo delivers industry-leading
 | **Content Dedup** | **Yes** | No | No | No |
 | **Merkle Integrity** | **Yes** | No | No | No |
 | **Arrow Chunk Cache** | **Yes** (15x speedup) | No | No | No |
+| **Algebraic Merge** | **Yes** (4M+ ops/sec) | No | No | No |
 
 ### Core Operations
 

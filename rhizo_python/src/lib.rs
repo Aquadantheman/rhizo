@@ -8,6 +8,7 @@ use rhizo_core::{
     ChunkStore, ChunkStoreError,
     FileCatalog, CatalogError, TableVersion,
     Branch, BranchDiff, BranchError, BranchManager,
+    MergeAnalysis, MergeAnalyzer, MergeOutcome,
     TransactionManager, TransactionRecord, TransactionError,
     TableWrite, RecoveryReport,
     ChangelogEntry, TableChange, ChangelogQuery,
@@ -15,6 +16,9 @@ use rhizo_core::{
     build_tree, diff_trees, verify_tree,
     ParquetEncoder, ParquetDecoder, ParquetCompression, ParquetError,
     FilterOp, ScalarValue, PredicateFilter,
+    // Algebraic types
+    OpType, AlgebraicValue, AlgebraicMerger, MergeResult,
+    TableAlgebraicSchema, AlgebraicSchemaRegistry,
 };
 
 // Phase 4: pyo3-arrow for zero-copy Arrow FFI
@@ -73,6 +77,9 @@ fn branch_err_to_py(e: BranchError) -> PyErr {
                 "Cannot fast-forward: {} is not ahead of {}",
                 source_branch, target_branch
             ))
+        }
+        BranchError::AlgebraicConflict(tables) => {
+            PyValueError::new_err(format!("Algebraic merge conflict on tables: {:?}", tables))
         }
         BranchError::Io(e) => PyIOError::new_err(e.to_string()),
         BranchError::Json(e) => PyValueError::new_err(format!("JSON error: {}", e)),
@@ -1719,6 +1726,480 @@ impl PyTransactionManager {
     }
 }
 
+// =============================================================================
+// Algebraic Classification Types
+// =============================================================================
+
+/// Algebraic operation classification.
+///
+/// Operations classified as conflict-free can be automatically merged
+/// without requiring manual conflict resolution.
+///
+/// Conflict-free types:
+///   - SemilatticeMax: max(a, b) - last-writer-wins for timestamps
+///   - SemilatticeMin: min(a, b) - first-writer-wins
+///   - SemilatticeUnion: set union - add-only sets
+///   - SemilatticeIntersect: set intersection
+///   - AbelianAdd: a + b - counters, deltas
+///   - AbelianMultiply: a * b - scaling factors
+///
+/// Conflicting types:
+///   - GenericOverwrite: may conflict
+///   - GenericConditional: always conflicts
+///   - Unknown: conservative fallback
+#[pyclass]
+#[derive(Clone)]
+struct PyOpType {
+    inner: OpType,
+}
+
+#[pymethods]
+impl PyOpType {
+    /// Create an operation type from a string.
+    ///
+    /// Valid values: "max", "min", "union", "intersect", "add", "multiply",
+    ///               "overwrite", "conditional", "unknown"
+    #[new]
+    fn new(op_type: &str) -> PyResult<Self> {
+        let inner = match op_type.to_lowercase().as_str() {
+            "max" | "semilattice_max" => OpType::SemilatticeMax,
+            "min" | "semilattice_min" => OpType::SemilatticeMin,
+            "union" | "semilattice_union" => OpType::SemilatticeUnion,
+            "intersect" | "semilattice_intersect" => OpType::SemilatticeIntersect,
+            "add" | "abelian_add" => OpType::AbelianAdd,
+            "multiply" | "abelian_multiply" => OpType::AbelianMultiply,
+            "overwrite" | "generic_overwrite" => OpType::GenericOverwrite,
+            "conditional" | "generic_conditional" => OpType::GenericConditional,
+            "unknown" => OpType::Unknown,
+            _ => return Err(PyValueError::new_err(format!(
+                "Invalid operation type: '{}'. Valid: max, min, union, intersect, add, multiply, overwrite, conditional, unknown",
+                op_type
+            ))),
+        };
+        Ok(Self { inner })
+    }
+
+    /// Check if this operation type is conflict-free.
+    fn is_conflict_free(&self) -> bool {
+        self.inner.is_conflict_free()
+    }
+
+    /// Check if this is a semilattice operation.
+    fn is_semilattice(&self) -> bool {
+        self.inner.is_semilattice()
+    }
+
+    /// Check if this is an Abelian (group) operation.
+    fn is_abelian(&self) -> bool {
+        self.inner.is_abelian()
+    }
+
+    /// Check if this can be merged with another operation type.
+    fn can_merge_with(&self, other: &PyOpType) -> bool {
+        self.inner.can_merge_with(&other.inner)
+    }
+
+    /// Get a description of this operation type.
+    fn description(&self) -> &'static str {
+        self.inner.description()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("PyOpType({})", self.inner)
+    }
+
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+}
+
+/// A value that can be algebraically merged.
+#[pyclass]
+#[derive(Clone)]
+struct PyAlgebraicValue {
+    inner: AlgebraicValue,
+}
+
+#[pymethods]
+impl PyAlgebraicValue {
+    /// Create an algebraic value from a Python value.
+    ///
+    /// Type inference:
+    ///   - int → Integer
+    ///   - float → Float
+    ///   - bool → Boolean
+    ///   - list/set of str → StringSet
+    ///   - list/set of int → IntSet
+    ///   - None → Null
+    #[new]
+    fn new(value: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let inner = if value.is_none() {
+            AlgebraicValue::Null
+        } else if let Ok(v) = value.extract::<bool>() {
+            AlgebraicValue::Boolean(v)
+        } else if let Ok(v) = value.extract::<i64>() {
+            AlgebraicValue::Integer(v)
+        } else if let Ok(v) = value.extract::<f64>() {
+            AlgebraicValue::Float(v)
+        } else if let Ok(v) = value.extract::<std::collections::HashSet<String>>() {
+            AlgebraicValue::StringSet(v)
+        } else if let Ok(v) = value.extract::<std::collections::HashSet<i64>>() {
+            AlgebraicValue::IntSet(v)
+        } else if let Ok(v) = value.extract::<Vec<String>>() {
+            AlgebraicValue::StringSet(v.into_iter().collect())
+        } else if let Ok(v) = value.extract::<Vec<i64>>() {
+            AlgebraicValue::IntSet(v.into_iter().collect())
+        } else {
+            return Err(PyValueError::new_err(
+                "Unsupported value type. Use int, float, bool, set/list of str, set/list of int, or None"
+            ));
+        };
+        Ok(Self { inner })
+    }
+
+    /// Create an integer value.
+    #[staticmethod]
+    fn integer(v: i64) -> Self {
+        Self { inner: AlgebraicValue::Integer(v) }
+    }
+
+    /// Create a float value.
+    #[staticmethod]
+    fn float(v: f64) -> Self {
+        Self { inner: AlgebraicValue::Float(v) }
+    }
+
+    /// Create a string set value.
+    #[staticmethod]
+    fn string_set(values: Vec<String>) -> Self {
+        Self { inner: AlgebraicValue::string_set(values) }
+    }
+
+    /// Create an integer set value.
+    #[staticmethod]
+    fn int_set(values: Vec<i64>) -> Self {
+        Self { inner: AlgebraicValue::int_set(values) }
+    }
+
+    /// Create a boolean value.
+    #[staticmethod]
+    fn boolean(v: bool) -> Self {
+        Self { inner: AlgebraicValue::Boolean(v) }
+    }
+
+    /// Create a null value.
+    #[staticmethod]
+    fn null() -> Self {
+        Self { inner: AlgebraicValue::Null }
+    }
+
+    /// Check if this is a numeric type.
+    fn is_numeric(&self) -> bool {
+        self.inner.is_numeric()
+    }
+
+    /// Check if this is a set type.
+    fn is_set(&self) -> bool {
+        self.inner.is_set()
+    }
+
+    /// Check if this is null.
+    fn is_null(&self) -> bool {
+        self.inner.is_null()
+    }
+
+    /// Get the type name.
+    fn type_name(&self) -> &'static str {
+        self.inner.type_name()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("PyAlgebraicValue({})", self.inner)
+    }
+
+    fn __str__(&self) -> String {
+        format!("{}", self.inner)
+    }
+}
+
+/// Merge two algebraic values.
+///
+/// Args:
+///     op_type: The operation type to use for merging
+///     value1: First value
+///     value2: Second value
+///
+/// Returns:
+///     Merged value if successful
+///
+/// Raises:
+///     ValueError: If merge fails (conflict or type mismatch)
+#[pyfunction]
+fn algebraic_merge(
+    op_type: &PyOpType,
+    value1: &PyAlgebraicValue,
+    value2: &PyAlgebraicValue,
+) -> PyResult<PyAlgebraicValue> {
+    match AlgebraicMerger::merge(op_type.inner, &value1.inner, &value2.inner) {
+        MergeResult::Merged(v) => Ok(PyAlgebraicValue { inner: v }),
+        MergeResult::Conflict { reason, .. } => {
+            Err(PyValueError::new_err(format!("Merge conflict: {}", reason)))
+        }
+        MergeResult::TypeMismatch { type1, type2, operation } => {
+            Err(PyValueError::new_err(format!(
+                "Type mismatch: cannot merge {} with {} using {:?}",
+                type1, type2, operation
+            )))
+        }
+    }
+}
+
+/// Schema-level algebraic configuration for a table.
+#[pyclass]
+#[derive(Clone)]
+struct PyTableAlgebraicSchema {
+    inner: TableAlgebraicSchema,
+}
+
+#[pymethods]
+impl PyTableAlgebraicSchema {
+    /// Create a new schema for a table.
+    ///
+    /// Args:
+    ///     table: Table name
+    ///     default_op_type: Default operation type for unannotated columns
+    #[new]
+    #[pyo3(signature = (table, default_op_type=None))]
+    fn new(table: &str, default_op_type: Option<&PyOpType>) -> Self {
+        let mut inner = TableAlgebraicSchema::new(table);
+        if let Some(op) = default_op_type {
+            inner.set_default(op.inner);
+        }
+        Self { inner }
+    }
+
+    /// Create a schema where all columns use additive merge.
+    #[staticmethod]
+    fn all_additive(table: &str) -> Self {
+        Self { inner: TableAlgebraicSchema::all_additive(table) }
+    }
+
+    /// Create a schema where all columns use max merge.
+    #[staticmethod]
+    fn all_max(table: &str) -> Self {
+        Self { inner: TableAlgebraicSchema::all_max(table) }
+    }
+
+    /// Add a column with the specified operation type.
+    fn add_column(&mut self, column: &str, op_type: &PyOpType) {
+        self.inner.add_column(column, op_type.inner);
+    }
+
+    /// Get the operation type for a column.
+    fn get_op_type(&self, column: &str) -> PyOpType {
+        PyOpType { inner: self.inner.get_op_type(column) }
+    }
+
+    /// Check if all columns are conflict-free.
+    fn is_fully_conflict_free(&self) -> bool {
+        self.inner.is_fully_conflict_free()
+    }
+
+    /// Get list of conflict-free columns.
+    fn conflict_free_columns(&self) -> Vec<String> {
+        self.inner.conflict_free_columns().into_iter().map(|s| s.to_string()).collect()
+    }
+
+    /// Get list of conflicting columns.
+    fn conflicting_columns(&self) -> Vec<String> {
+        self.inner.conflicting_columns().into_iter().map(|s| s.to_string()).collect()
+    }
+
+    /// Check if writes to these columns can be auto-merged.
+    fn can_auto_merge(&self, columns: Vec<String>) -> bool {
+        let refs: Vec<&str> = columns.iter().map(|s| s.as_str()).collect();
+        self.inner.can_auto_merge(&refs)
+    }
+
+    #[getter]
+    fn table(&self) -> String {
+        self.inner.table.clone()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "PyTableAlgebraicSchema(table={}, columns={})",
+            self.inner.table,
+            self.inner.columns.len()
+        )
+    }
+}
+
+/// Registry for table algebraic schemas.
+#[pyclass]
+struct PyAlgebraicSchemaRegistry {
+    inner: AlgebraicSchemaRegistry,
+}
+
+#[pymethods]
+impl PyAlgebraicSchemaRegistry {
+    /// Create an empty registry.
+    #[new]
+    fn new() -> Self {
+        Self { inner: AlgebraicSchemaRegistry::new() }
+    }
+
+    /// Register a schema for a table.
+    fn register(&mut self, schema: PyTableAlgebraicSchema) {
+        self.inner.register(schema.inner);
+    }
+
+    /// Get the schema for a table.
+    fn get(&self, table: &str) -> Option<PyTableAlgebraicSchema> {
+        self.inner.get(table).map(|s| PyTableAlgebraicSchema { inner: s.clone() })
+    }
+
+    /// Get the operation type for a table/column.
+    fn get_op_type(&self, table: &str, column: &str) -> PyOpType {
+        PyOpType { inner: self.inner.get_op_type(table, column) }
+    }
+
+    /// Check if a table is registered.
+    fn has_table(&self, table: &str) -> bool {
+        self.inner.has_table(table)
+    }
+
+    /// Get all registered table names.
+    fn tables(&self) -> Vec<String> {
+        self.inner.tables().into_iter().map(|s| s.to_string()).collect()
+    }
+
+    /// Remove a schema from the registry.
+    fn unregister(&mut self, table: &str) -> Option<PyTableAlgebraicSchema> {
+        self.inner.unregister(table).map(|s| PyTableAlgebraicSchema { inner: s })
+    }
+
+    fn __repr__(&self) -> String {
+        format!("PyAlgebraicSchemaRegistry(tables={})", self.inner.tables().len())
+    }
+}
+
+/// Result of analyzing merge compatibility.
+#[pyclass]
+#[derive(Clone)]
+struct PyMergeAnalysis {
+    #[pyo3(get)]
+    auto_mergeable: Vec<String>,
+    #[pyo3(get)]
+    conflicting: Vec<String>,
+    #[pyo3(get)]
+    source_only: Vec<String>,
+    #[pyo3(get)]
+    target_only: Vec<String>,
+    #[pyo3(get)]
+    unchanged: Vec<String>,
+}
+
+impl From<MergeAnalysis> for PyMergeAnalysis {
+    fn from(a: MergeAnalysis) -> Self {
+        Self {
+            auto_mergeable: a.auto_mergeable,
+            conflicting: a.conflicting,
+            source_only: a.source_only,
+            target_only: a.target_only,
+            unchanged: a.unchanged,
+        }
+    }
+}
+
+#[pymethods]
+impl PyMergeAnalysis {
+    /// Check if merge can proceed without conflicts.
+    fn can_merge(&self) -> bool {
+        self.conflicting.is_empty()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "PyMergeAnalysis(auto_mergeable={}, conflicting={}, source_only={}, target_only={})",
+            self.auto_mergeable.len(),
+            self.conflicting.len(),
+            self.source_only.len(),
+            self.target_only.len()
+        )
+    }
+}
+
+/// Outcome of an algebraic merge operation.
+#[pyclass]
+#[derive(Clone)]
+struct PyMergeOutcome {
+    #[pyo3(get)]
+    source_branch: String,
+    #[pyo3(get)]
+    target_branch: String,
+    #[pyo3(get)]
+    fast_forwarded: Vec<String>,
+    #[pyo3(get)]
+    algebraically_merged: Vec<String>,
+    #[pyo3(get)]
+    conflicts: Vec<String>,
+    #[pyo3(get)]
+    success: bool,
+    #[pyo3(get)]
+    description: Option<String>,
+}
+
+impl From<MergeOutcome> for PyMergeOutcome {
+    fn from(o: MergeOutcome) -> Self {
+        Self {
+            source_branch: o.source_branch,
+            target_branch: o.target_branch,
+            fast_forwarded: o.fast_forwarded,
+            algebraically_merged: o.algebraically_merged,
+            conflicts: o.conflicts,
+            success: o.success,
+            description: o.description,
+        }
+    }
+}
+
+#[pymethods]
+impl PyMergeOutcome {
+    fn __repr__(&self) -> String {
+        format!(
+            "PyMergeOutcome(success={}, fast_forwarded={}, algebraically_merged={}, conflicts={})",
+            self.success,
+            self.fast_forwarded.len(),
+            self.algebraically_merged.len(),
+            self.conflicts.len()
+        )
+    }
+}
+
+/// Analyze merge compatibility using algebraic schemas.
+///
+/// Args:
+///     diff: Branch diff to analyze
+///     registry: Schema registry with table schemas
+///
+/// Returns:
+///     PyMergeAnalysis indicating which tables can be auto-merged
+#[pyfunction]
+fn analyze_merge(diff: &PyBranchDiff, registry: &PyAlgebraicSchemaRegistry) -> PyMergeAnalysis {
+    let rust_diff = BranchDiff {
+        source_branch: diff.source_branch.clone(),
+        target_branch: diff.target_branch.clone(),
+        unchanged: diff.unchanged.clone(),
+        modified: diff.modified.clone(),
+        added_in_source: diff.added_in_source.clone(),
+        added_in_target: diff.added_in_target.clone(),
+        has_conflicts: diff.has_conflicts,
+    };
+    let analyzer = MergeAnalyzer::new(&registry.inner);
+    PyMergeAnalysis::from(analyzer.analyze(&rust_diff))
+}
+
 #[pymodule]
 fn _rhizo(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Core storage
@@ -1758,6 +2239,16 @@ fn _rhizo(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFilterOp>()?;
     m.add_class::<PyScalarValue>()?;
     m.add_class::<PyPredicateFilter>()?;
+
+    // Algebraic Classification
+    m.add_class::<PyOpType>()?;
+    m.add_class::<PyAlgebraicValue>()?;
+    m.add_class::<PyTableAlgebraicSchema>()?;
+    m.add_class::<PyAlgebraicSchemaRegistry>()?;
+    m.add_class::<PyMergeAnalysis>()?;
+    m.add_class::<PyMergeOutcome>()?;
+    m.add_function(wrap_pyfunction!(algebraic_merge, m)?)?;
+    m.add_function(wrap_pyfunction!(analyze_merge, m)?)?;
 
     Ok(())
 }

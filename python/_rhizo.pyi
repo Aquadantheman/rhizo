@@ -1,6 +1,6 @@
 """Type stubs for the _rhizo Rust extension module (rhizo-core)."""
 
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Union
 import pyarrow as pa
 
 class PyChunkStore:
@@ -447,8 +447,6 @@ class PyParquetDecoder:
 # Phase R.2: Predicate Pushdown Types
 # =============================================================================
 
-from typing import Union
-
 ScalarValueType = Union[int, float, str, bool, None]
 
 class PyFilterOp:
@@ -522,3 +520,253 @@ class PyPredicateFilter:
             value: Value to compare against (int, float, str, bool, or None)
         """
         ...
+
+
+# =============================================================================
+# Phase AF: Algebraic Classification for Conflict-Free Merge
+# =============================================================================
+
+class PyOpType:
+    """Algebraic operation type classification.
+
+    Operations are classified by their algebraic properties:
+    - Semilattice: Associative, commutative, idempotent (MAX, MIN, UNION, INTERSECT)
+    - Abelian: Associative, commutative, has identity and inverse (ADD, MULTIPLY)
+    - Generic: No special properties (OVERWRITE, CONDITIONAL, UNKNOWN)
+
+    Conflict-free operations (semilattice and Abelian) can be automatically merged.
+    """
+
+    def __init__(self, op_type: str) -> None:
+        """Create an operation type from string.
+
+        Args:
+            op_type: One of "MAX", "MIN", "UNION", "INTERSECT", "ADD",
+                    "MULTIPLY", "OVERWRITE", "CONDITIONAL", "UNKNOWN"
+        """
+        ...
+
+    def is_conflict_free(self) -> bool:
+        """Check if this operation type can be auto-merged."""
+        ...
+
+    def is_semilattice(self) -> bool:
+        """Check if this is a semilattice operation (idempotent)."""
+        ...
+
+    def is_abelian(self) -> bool:
+        """Check if this is an Abelian group operation."""
+        ...
+
+    def description(self) -> str:
+        """Get a description of this operation type."""
+        ...
+
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
+
+
+class PyAlgebraicValue:
+    """A value that can be algebraically merged.
+
+    Supports various types for different merge operations:
+    - Integer: For counters, timestamps, numeric comparisons
+    - Float: For continuous values
+    - StringSet: For tags, permissions (set operations)
+    - IntSet: For ID collections
+    - Boolean: For flags
+    """
+
+    def __init__(self, value: Optional[Union[int, float, bool, List[str], List[int]]]) -> None:
+        """Create an algebraic value from a Python value (type inferred)."""
+        ...
+
+    @staticmethod
+    def integer(value: int) -> "PyAlgebraicValue":
+        """Create an integer value."""
+        ...
+
+    @staticmethod
+    def float(value: float) -> "PyAlgebraicValue":
+        """Create a float value."""
+        ...
+
+    @staticmethod
+    def string_set(values: List[str]) -> "PyAlgebraicValue":
+        """Create a string set value."""
+        ...
+
+    @staticmethod
+    def int_set(values: List[int]) -> "PyAlgebraicValue":
+        """Create an integer set value."""
+        ...
+
+    @staticmethod
+    def boolean(value: bool) -> "PyAlgebraicValue":
+        """Create a boolean value."""
+        ...
+
+    @staticmethod
+    def null() -> "PyAlgebraicValue":
+        """Create a null value."""
+        ...
+
+    def is_numeric(self) -> bool:
+        """Check if this is a numeric type."""
+        ...
+
+    def is_set(self) -> bool:
+        """Check if this is a set type."""
+        ...
+
+    def is_null(self) -> bool:
+        """Check if this is null."""
+        ...
+
+    def type_name(self) -> str:
+        """Get the type name."""
+        ...
+
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
+
+
+class PyTableAlgebraicSchema:
+    """Schema-level algebraic configuration for a table.
+
+    Defines how each column should be merged when concurrent changes occur.
+    """
+
+    def __init__(self, table_name: str, default_op_type: Optional[PyOpType] = None) -> None:
+        """Create a new schema for the given table."""
+        ...
+
+    @staticmethod
+    def all_additive(table_name: str) -> "PyTableAlgebraicSchema":
+        """Create a schema where all columns use additive merge."""
+        ...
+
+    @staticmethod
+    def all_max(table_name: str) -> "PyTableAlgebraicSchema":
+        """Create a schema where all columns use max merge."""
+        ...
+
+    def add_column(self, column: str, op_type: PyOpType) -> None:
+        """Add a column with the specified operation type."""
+        ...
+
+    def get_op_type(self, column: str) -> PyOpType:
+        """Get the operation type for a column."""
+        ...
+
+    def is_fully_conflict_free(self) -> bool:
+        """Check if all columns can be auto-merged."""
+        ...
+
+    def conflict_free_columns(self) -> List[str]:
+        """Get list of columns that can be auto-merged."""
+        ...
+
+    def conflicting_columns(self) -> List[str]:
+        """Get list of columns that may conflict."""
+        ...
+
+
+class PyAlgebraicSchemaRegistry:
+    """Registry for table algebraic schemas.
+
+    Provides centralized lookup for schemas across all tables.
+    """
+
+    def __init__(self) -> None:
+        """Create an empty registry."""
+        ...
+
+    def register(self, schema: PyTableAlgebraicSchema) -> None:
+        """Register a schema for a table."""
+        ...
+
+    def get(self, table: str) -> Optional[PyTableAlgebraicSchema]:
+        """Get the schema for a table."""
+        ...
+
+    def get_op_type(self, table: str, column: str) -> PyOpType:
+        """Get the operation type for a table/column."""
+        ...
+
+    def has_table(self, table: str) -> bool:
+        """Check if a table is registered."""
+        ...
+
+    def tables(self) -> List[str]:
+        """Get all registered table names."""
+        ...
+
+
+class PyMergeAnalysis:
+    """Result of analyzing merge compatibility between branches."""
+
+    auto_mergeable: List[str]
+    conflicting: List[str]
+    source_only: List[str]
+    target_only: List[str]
+    unchanged: List[str]
+
+    def can_merge(self) -> bool:
+        """Check if merge can proceed without conflicts."""
+        ...
+
+    def tables_to_merge(self) -> List[str]:
+        """Get all tables that need merging."""
+        ...
+
+
+class PyMergeOutcome:
+    """Outcome of an algebraic merge operation."""
+
+    source_branch: str
+    target_branch: str
+    fast_forwarded: List[str]
+    algebraically_merged: List[str]
+    conflicts: List[str]
+    success: bool
+    description: Optional[str]
+
+
+def algebraic_merge(
+    op_type: PyOpType,
+    value1: PyAlgebraicValue,
+    value2: PyAlgebraicValue,
+) -> PyAlgebraicValue:
+    """Merge two values using the specified algebraic operation.
+
+    Args:
+        op_type: Operation type (PyOpType object)
+        value1: First value
+        value2: Second value
+
+    Returns:
+        Merged value if successful
+
+    Raises:
+        ValueError: If merge fails (conflict or type mismatch)
+    """
+    ...
+
+
+def analyze_merge(
+    registry: PyAlgebraicSchemaRegistry,
+    source_branch: PyBranch,
+    target_branch: PyBranch,
+) -> PyMergeAnalysis:
+    """Analyze merge compatibility between two branches.
+
+    Args:
+        registry: Schema registry with algebraic annotations
+        source_branch: Branch to merge from
+        target_branch: Branch to merge into
+
+    Returns:
+        Analysis indicating which tables can be auto-merged
+    """
+    ...
