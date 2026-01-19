@@ -1,0 +1,495 @@
+//! Coordination-free transaction support for algebraic operations.
+//!
+//! This module provides the bridge between the transaction system and the
+//! distributed coordination-free protocol. It allows transactions containing
+//! only algebraic operations to commit locally without coordination, producing
+//! a `VersionedUpdate` that can be merged with updates from other nodes.
+//!
+//! # Theory
+//!
+//! For algebraic operations (commutative + associative), we can achieve
+//! strong eventual consistency without coordination:
+//!
+//! - **Semilattice operations** (MAX, MIN, UNION): Idempotent merge
+//! - **Abelian operations** (ADD, MULTIPLY): Combine deltas
+//!
+//! Vector clocks track causality to determine when merge is needed.
+//!
+//! # Usage
+//!
+//! ```ignore
+//! use rhizo_core::transaction::CoordinationFreeManager;
+//!
+//! // Create a coordination-free manager
+//! let cf_manager = CoordinationFreeManager::new(NodeId::new("node-1"));
+//!
+//! // Create an algebraic transaction
+//! let mut tx = AlgebraicTransaction::new();
+//! tx.add_operation(AlgebraicOperation::new(
+//!     "page_views",
+//!     OpType::AbelianAdd,
+//!     AlgebraicValue::integer(100),
+//! ));
+//!
+//! // Commit locally (no coordination!)
+//! let update = cf_manager.commit_local(&tx)?;
+//!
+//! // Later, merge with updates from other nodes
+//! let merged = cf_manager.merge_update(&update, &remote_update)?;
+//! ```
+
+use std::sync::RwLock;
+
+use crate::algebraic::{AlgebraicSchemaRegistry, AlgebraicValue, OpType};
+use crate::distributed::{
+    AlgebraicTransaction, LocalCommitError, LocalCommitProtocol, NodeId, VectorClock,
+    VersionedUpdate,
+};
+
+/// Error type for coordination-free operations
+#[derive(Debug, thiserror::Error)]
+pub enum CoordinationFreeError {
+    /// Transaction contains non-algebraic operations
+    #[error("Transaction contains non-algebraic operations and cannot be committed coordination-free")]
+    NotFullyAlgebraic,
+
+    /// Local commit protocol error
+    #[error("Local commit error: {0}")]
+    LocalCommit(#[from] LocalCommitError),
+
+    /// Lock acquisition failed
+    #[error("Failed to acquire lock: {0}")]
+    LockError(String),
+
+    /// Schema validation error
+    #[error("Schema validation error: {0}")]
+    SchemaError(String),
+
+    /// Merge error
+    #[error("Merge error: {0}")]
+    MergeError(String),
+}
+
+/// Configuration for coordination-free mode
+#[derive(Debug, Clone)]
+pub struct CoordinationFreeConfig {
+    /// Require all operations to be algebraic (reject non-algebraic)
+    pub require_fully_algebraic: bool,
+
+    /// Optional schema registry for validation
+    pub schema_registry: Option<AlgebraicSchemaRegistry>,
+}
+
+impl Default for CoordinationFreeConfig {
+    fn default() -> Self {
+        Self {
+            require_fully_algebraic: true,
+            schema_registry: None,
+        }
+    }
+}
+
+/// Manages coordination-free transactions for a single node.
+///
+/// This manager maintains:
+/// - A vector clock for causality tracking
+/// - The node's identity
+/// - Local state for algebraic operations
+/// - Configuration for validation
+pub struct CoordinationFreeManager {
+    /// This node's identifier
+    node_id: NodeId,
+
+    /// Vector clock for causality tracking
+    clock: RwLock<VectorClock>,
+
+    /// Configuration
+    config: CoordinationFreeConfig,
+
+    /// Committed updates (for replay/recovery)
+    committed_updates: RwLock<Vec<VersionedUpdate>>,
+
+    /// Current local state (key -> (op_type, value))
+    local_state: RwLock<std::collections::HashMap<String, (OpType, AlgebraicValue)>>,
+}
+
+impl CoordinationFreeManager {
+    /// Create a new coordination-free manager with default config
+    pub fn new(node_id: NodeId) -> Self {
+        Self::with_config(node_id, CoordinationFreeConfig::default())
+    }
+
+    /// Create a new coordination-free manager with custom config
+    pub fn with_config(node_id: NodeId, config: CoordinationFreeConfig) -> Self {
+        Self {
+            node_id,
+            clock: RwLock::new(VectorClock::new()),
+            config,
+            committed_updates: RwLock::new(Vec::new()),
+            local_state: RwLock::new(std::collections::HashMap::new()),
+        }
+    }
+
+    /// Get this node's identifier
+    pub fn node_id(&self) -> &NodeId {
+        &self.node_id
+    }
+
+    /// Get a copy of the current vector clock
+    pub fn clock(&self) -> Result<VectorClock, CoordinationFreeError> {
+        self.clock
+            .read()
+            .map(|c| c.clone())
+            .map_err(|_| CoordinationFreeError::LockError("clock".to_string()))
+    }
+
+    /// Check if a transaction can be committed coordination-free
+    pub fn can_commit_locally(&self, tx: &AlgebraicTransaction) -> bool {
+        LocalCommitProtocol::can_commit_locally(tx)
+    }
+
+    /// Commit a transaction locally without coordination.
+    ///
+    /// This operation:
+    /// 1. Validates that all operations are algebraic
+    /// 2. Increments the local vector clock
+    /// 3. Applies operations to local state
+    /// 4. Returns a VersionedUpdate for propagation
+    ///
+    /// # Errors
+    ///
+    /// Returns error if transaction contains non-algebraic operations.
+    pub fn commit_local(
+        &self,
+        tx: &AlgebraicTransaction,
+    ) -> Result<VersionedUpdate, CoordinationFreeError> {
+        // Validate transaction is fully algebraic
+        if self.config.require_fully_algebraic && !tx.is_fully_algebraic() {
+            return Err(CoordinationFreeError::NotFullyAlgebraic);
+        }
+
+        // Get write lock on clock
+        let mut clock = self
+            .clock
+            .write()
+            .map_err(|_| CoordinationFreeError::LockError("clock".to_string()))?;
+
+        // Commit using LocalCommitProtocol
+        let update = LocalCommitProtocol::commit_local(tx, &self.node_id, &mut clock)?;
+
+        // Apply to local state
+        self.apply_update_to_state(&update)?;
+
+        // Store update for replay
+        {
+            let mut committed = self
+                .committed_updates
+                .write()
+                .map_err(|_| CoordinationFreeError::LockError("committed_updates".to_string()))?;
+            committed.push(update.clone());
+        }
+
+        Ok(update)
+    }
+
+    /// Receive and apply an update from another node.
+    ///
+    /// This merges the remote update with local state using algebraic rules.
+    pub fn receive_update(
+        &self,
+        remote_update: &VersionedUpdate,
+    ) -> Result<(), CoordinationFreeError> {
+        // Merge clock
+        {
+            let mut clock = self
+                .clock
+                .write()
+                .map_err(|_| CoordinationFreeError::LockError("clock".to_string()))?;
+            clock.merge(remote_update.clock());
+        }
+
+        // Apply to local state
+        self.apply_update_to_state(remote_update)?;
+
+        Ok(())
+    }
+
+    /// Merge two updates using algebraic rules.
+    ///
+    /// This is a static operation that doesn't affect local state.
+    pub fn merge_updates(
+        &self,
+        update1: &VersionedUpdate,
+        update2: &VersionedUpdate,
+    ) -> Result<VersionedUpdate, CoordinationFreeError> {
+        LocalCommitProtocol::merge_updates(update1, update2)
+            .map_err(CoordinationFreeError::LocalCommit)
+    }
+
+    /// Get the current value for a key in local state
+    pub fn get_state(&self, key: &str) -> Result<Option<AlgebraicValue>, CoordinationFreeError> {
+        let state = self
+            .local_state
+            .read()
+            .map_err(|_| CoordinationFreeError::LockError("local_state".to_string()))?;
+        Ok(state.get(key).map(|(_, v)| v.clone()))
+    }
+
+    /// Get all keys in local state
+    pub fn keys(&self) -> Result<Vec<String>, CoordinationFreeError> {
+        let state = self
+            .local_state
+            .read()
+            .map_err(|_| CoordinationFreeError::LockError("local_state".to_string()))?;
+        Ok(state.keys().cloned().collect())
+    }
+
+    /// Get number of committed updates
+    pub fn update_count(&self) -> Result<usize, CoordinationFreeError> {
+        let committed = self
+            .committed_updates
+            .read()
+            .map_err(|_| CoordinationFreeError::LockError("committed_updates".to_string()))?;
+        Ok(committed.len())
+    }
+
+    /// Apply an update to local state using algebraic merge rules
+    fn apply_update_to_state(
+        &self,
+        update: &VersionedUpdate,
+    ) -> Result<(), CoordinationFreeError> {
+        use crate::algebraic::{AlgebraicMerger, MergeResult};
+
+        let mut state = self
+            .local_state
+            .write()
+            .map_err(|_| CoordinationFreeError::LockError("local_state".to_string()))?;
+
+        for op in update.operations() {
+            let key = op.key().to_string();
+
+            if let Some((existing_op_type, existing_value)) = state.get(&key) {
+                // Merge with existing value
+                if *existing_op_type == op.op_type() {
+                    let merge_result =
+                        AlgebraicMerger::merge(op.op_type(), existing_value, op.value());
+                    match merge_result {
+                        MergeResult::Merged(merged_value) => {
+                            state.insert(key, (op.op_type(), merged_value));
+                        }
+                        MergeResult::Conflict { reason, .. } => {
+                            return Err(CoordinationFreeError::MergeError(format!(
+                                "Conflict merging key '{}': {}",
+                                op.key(),
+                                reason
+                            )));
+                        }
+                        MergeResult::TypeMismatch { type1, type2, .. } => {
+                            return Err(CoordinationFreeError::MergeError(format!(
+                                "Type mismatch merging key '{}': {:?} vs {:?}",
+                                op.key(),
+                                type1,
+                                type2
+                            )));
+                        }
+                    }
+                } else {
+                    // Different operation types on same key - this is a conflict
+                    return Err(CoordinationFreeError::MergeError(format!(
+                        "Operation type mismatch for key '{}': {:?} vs {:?}",
+                        op.key(),
+                        existing_op_type,
+                        op.op_type()
+                    )));
+                }
+            } else {
+                // First value for this key
+                state.insert(key, (op.op_type(), op.value().clone()));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::distributed::AlgebraicOperation;
+
+    fn add_op(key: &str, value: i64) -> AlgebraicOperation {
+        AlgebraicOperation::new(key, OpType::AbelianAdd, AlgebraicValue::integer(value))
+    }
+
+    fn max_op(key: &str, value: i64) -> AlgebraicOperation {
+        AlgebraicOperation::new(key, OpType::SemilatticeMax, AlgebraicValue::integer(value))
+    }
+
+    #[test]
+    fn test_create_manager() {
+        let manager = CoordinationFreeManager::new(NodeId::new("node-1"));
+        assert_eq!(manager.node_id().as_str(), "node-1");
+    }
+
+    #[test]
+    fn test_commit_local() {
+        let manager = CoordinationFreeManager::new(NodeId::new("node-1"));
+
+        let mut tx = AlgebraicTransaction::new();
+        tx.add_operation(add_op("counter", 10));
+
+        let update = manager.commit_local(&tx).unwrap();
+
+        assert_eq!(update.origin_node().as_str(), "node-1");
+        assert_eq!(update.operations().len(), 1);
+    }
+
+    #[test]
+    fn test_local_state_updated() {
+        let manager = CoordinationFreeManager::new(NodeId::new("node-1"));
+
+        let mut tx = AlgebraicTransaction::new();
+        tx.add_operation(add_op("counter", 10));
+
+        manager.commit_local(&tx).unwrap();
+
+        let value = manager.get_state("counter").unwrap().unwrap();
+        assert_eq!(value.as_integer(), Some(10));
+    }
+
+    #[test]
+    fn test_multiple_commits_accumulate() {
+        let manager = CoordinationFreeManager::new(NodeId::new("node-1"));
+
+        // First commit: counter = 10
+        let mut tx1 = AlgebraicTransaction::new();
+        tx1.add_operation(add_op("counter", 10));
+        manager.commit_local(&tx1).unwrap();
+
+        // Second commit: counter += 20
+        let mut tx2 = AlgebraicTransaction::new();
+        tx2.add_operation(add_op("counter", 20));
+        manager.commit_local(&tx2).unwrap();
+
+        // Should be 30
+        let value = manager.get_state("counter").unwrap().unwrap();
+        assert_eq!(value.as_integer(), Some(30));
+    }
+
+    #[test]
+    fn test_receive_remote_update() {
+        let manager1 = CoordinationFreeManager::new(NodeId::new("node-1"));
+        let manager2 = CoordinationFreeManager::new(NodeId::new("node-2"));
+
+        // Node 1 commits
+        let mut tx1 = AlgebraicTransaction::new();
+        tx1.add_operation(add_op("counter", 10));
+        let update1 = manager1.commit_local(&tx1).unwrap();
+
+        // Node 2 commits
+        let mut tx2 = AlgebraicTransaction::new();
+        tx2.add_operation(add_op("counter", 20));
+        manager2.commit_local(&tx2).unwrap();
+
+        // Node 2 receives update from Node 1
+        manager2.receive_update(&update1).unwrap();
+
+        // Node 2 should have 30
+        let value = manager2.get_state("counter").unwrap().unwrap();
+        assert_eq!(value.as_integer(), Some(30));
+    }
+
+    #[test]
+    fn test_merge_updates() {
+        let manager1 = CoordinationFreeManager::new(NodeId::new("node-1"));
+        let manager2 = CoordinationFreeManager::new(NodeId::new("node-2"));
+
+        let mut tx1 = AlgebraicTransaction::new();
+        tx1.add_operation(add_op("counter", 10));
+        let update1 = manager1.commit_local(&tx1).unwrap();
+
+        let mut tx2 = AlgebraicTransaction::new();
+        tx2.add_operation(add_op("counter", 20));
+        let update2 = manager2.commit_local(&tx2).unwrap();
+
+        let merged = manager1.merge_updates(&update1, &update2).unwrap();
+        assert_eq!(merged.operations().len(), 1);
+
+        // The merged value should be 30
+        let merged_value = merged.operations()[0].value();
+        assert_eq!(merged_value.as_integer(), Some(30));
+    }
+
+    #[test]
+    fn test_max_operation() {
+        let manager = CoordinationFreeManager::new(NodeId::new("node-1"));
+
+        let mut tx1 = AlgebraicTransaction::new();
+        tx1.add_operation(max_op("timestamp", 100));
+        manager.commit_local(&tx1).unwrap();
+
+        let mut tx2 = AlgebraicTransaction::new();
+        tx2.add_operation(max_op("timestamp", 50)); // Less than 100
+        manager.commit_local(&tx2).unwrap();
+
+        // Should still be 100 (max)
+        let value = manager.get_state("timestamp").unwrap().unwrap();
+        assert_eq!(value.as_integer(), Some(100));
+
+        let mut tx3 = AlgebraicTransaction::new();
+        tx3.add_operation(max_op("timestamp", 200)); // Greater than 100
+        manager.commit_local(&tx3).unwrap();
+
+        // Now should be 200
+        let value = manager.get_state("timestamp").unwrap().unwrap();
+        assert_eq!(value.as_integer(), Some(200));
+    }
+
+    #[test]
+    fn test_clock_advances() {
+        let manager = CoordinationFreeManager::new(NodeId::new("node-1"));
+
+        let clock_before = manager.clock().unwrap();
+        assert!(clock_before.is_empty());
+
+        let mut tx = AlgebraicTransaction::new();
+        tx.add_operation(add_op("counter", 10));
+        manager.commit_local(&tx).unwrap();
+
+        let clock_after = manager.clock().unwrap();
+        assert!(!clock_after.is_empty());
+        assert!(clock_after.get(&NodeId::new("node-1")) > 0);
+    }
+
+    #[test]
+    fn test_non_algebraic_rejected() {
+        let manager = CoordinationFreeManager::new(NodeId::new("node-1"));
+
+        let mut tx = AlgebraicTransaction::new();
+        tx.add_operation(AlgebraicOperation::new(
+            "data",
+            OpType::GenericOverwrite, // Not algebraic
+            AlgebraicValue::integer(42),
+        ));
+
+        let result = manager.commit_local(&tx);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            CoordinationFreeError::NotFullyAlgebraic
+        ));
+    }
+
+    #[test]
+    fn test_update_count() {
+        let manager = CoordinationFreeManager::new(NodeId::new("node-1"));
+
+        assert_eq!(manager.update_count().unwrap(), 0);
+
+        let mut tx = AlgebraicTransaction::new();
+        tx.add_operation(add_op("counter", 10));
+        manager.commit_local(&tx).unwrap();
+
+        assert_eq!(manager.update_count().unwrap(), 1);
+    }
+}

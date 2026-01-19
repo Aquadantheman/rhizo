@@ -30,6 +30,8 @@ pub use transaction::{
     Conflict, ConflictDetector, EpochConfig, EpochId, EpochMetadata, EpochStatus, RecoveryManager,
     RecoveryReport, TableLevelConflictDetector, TableWrite, TransactionError, TransactionLog,
     TransactionManager, TransactionRecord, TransactionStatus, TxId, WriteGranularity,
+    // Coordination-free mode (Phase 5)
+    TransactionMode, CoordinationFreeConfig, CoordinationFreeError, CoordinationFreeManager,
 };
 
 pub use distributed::{

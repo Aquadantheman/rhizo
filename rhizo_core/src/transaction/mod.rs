@@ -6,6 +6,7 @@
 //! - `TransactionLog` - Persistent storage for transaction records
 //! - `EpochConfig` / `EpochMetadata` - Epoch-based organization
 //! - `ConflictDetector` - Pluggable conflict detection strategies
+//! - `CoordinationFreeManager` - Coordination-free mode for algebraic operations
 
 mod types;
 mod epoch;
@@ -14,10 +15,11 @@ mod log;
 mod conflict;
 mod manager;
 mod recovery;
+mod coordination_free;
 
 pub use types::{
     TxId, EpochId, TransactionStatus, WriteGranularity,
-    TableWrite, TransactionRecord,
+    TableWrite, TransactionRecord, TransactionMode,
 };
 pub use epoch::{EpochConfig, EpochStatus, EpochMetadata};
 pub use error::TransactionError;
@@ -25,3 +27,6 @@ pub use log::TransactionLog;
 pub use conflict::{Conflict, ConflictDetector, TableLevelConflictDetector};
 pub use manager::TransactionManager;
 pub use recovery::{RecoveryReport, RecoveryManager};
+pub use coordination_free::{
+    CoordinationFreeConfig, CoordinationFreeError, CoordinationFreeManager,
+};

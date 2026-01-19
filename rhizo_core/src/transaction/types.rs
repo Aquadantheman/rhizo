@@ -57,6 +57,59 @@ pub enum WriteGranularity {
     },
 }
 
+/// Transaction mode - determines commit behavior
+///
+/// # Modes
+///
+/// - **Coordinated** (default): Traditional ACID transactions with conflict detection.
+///   All writes go through snapshot validation and conflict checking.
+///
+/// - **CoordinationFree**: For algebraic operations only. Commits locally without
+///   coordination, producing a `VersionedUpdate` that can be merged with other
+///   nodes' updates using algebraic merge rules (commutativity + associativity).
+///
+/// # Example
+///
+/// ```ignore
+/// // Default coordinated mode (unchanged behavior)
+/// let tx = manager.begin(None)?;
+///
+/// // Coordination-free mode for algebraic operations
+/// let tx = manager.begin_coordination_free(None)?;
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TransactionMode {
+    /// Traditional ACID transactions with conflict detection (default)
+    #[default]
+    Coordinated,
+
+    /// Coordination-free mode for algebraic operations only.
+    /// Commits locally without distributed coordination, using
+    /// vector clocks for causality and algebraic merge for convergence.
+    CoordinationFree,
+}
+
+impl TransactionMode {
+    /// Check if this is coordination-free mode
+    pub fn is_coordination_free(&self) -> bool {
+        matches!(self, TransactionMode::CoordinationFree)
+    }
+
+    /// Check if this is coordinated mode
+    pub fn is_coordinated(&self) -> bool {
+        matches!(self, TransactionMode::Coordinated)
+    }
+}
+
+impl std::fmt::Display for TransactionMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TransactionMode::Coordinated => write!(f, "Coordinated"),
+            TransactionMode::CoordinationFree => write!(f, "CoordinationFree"),
+        }
+    }
+}
+
 /// A single table write within a transaction
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableWrite {
@@ -145,6 +198,11 @@ pub struct TransactionRecord {
     /// Branch this transaction operates on
     pub branch: String,
 
+    // === Mode ===
+    /// Transaction mode (Coordinated or CoordinationFree)
+    #[serde(default)]
+    pub mode: TransactionMode,
+
     // === Metadata ===
     /// User-provided metadata
     pub metadata: HashMap<String, String>,
@@ -161,8 +219,13 @@ impl TransactionRecord {
     /// Current format version
     pub const CURRENT_FORMAT_VERSION: u32 = 1;
 
-    /// Create a new transaction record
+    /// Create a new transaction record with default (Coordinated) mode
     pub fn new(tx_id: TxId, epoch_id: EpochId, branch: String) -> Self {
+        Self::with_mode(tx_id, epoch_id, branch, TransactionMode::default())
+    }
+
+    /// Create a new transaction record with specific mode
+    pub fn with_mode(tx_id: TxId, epoch_id: EpochId, branch: String, mode: TransactionMode) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -177,10 +240,16 @@ impl TransactionRecord {
             writes: Vec::new(),
             status: TransactionStatus::Active,
             branch,
+            mode,
             metadata: HashMap::new(),
             format_version: Self::CURRENT_FORMAT_VERSION,
             extensions: None,
         }
+    }
+
+    /// Check if this transaction is in coordination-free mode
+    pub fn is_coordination_free(&self) -> bool {
+        self.mode.is_coordination_free()
     }
 
     /// Check if transaction is still active
