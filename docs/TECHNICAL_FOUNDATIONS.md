@@ -22,7 +22,7 @@ Operations are constant with respect to total stored data. A 1PB system performs
 
 ## Storage Deduplication
 
-For a dataset with original size S, V versions, and change rate r per version:
+For a dataset with original size $S$, $V$ versions, and change rate $r$ per version:
 
 **Naive storage:**
 $$S_{naive} = S \times V$$
@@ -69,11 +69,11 @@ BLAKE3 produces 256-bit hashes. Collision probability follows the birthday bound
 
 $$P(\text{collision}) \approx \frac{n^2}{2^{b+1}}$$
 
-For 10^15 chunks (exabyte scale):
+For $10^{15}$ chunks (exabyte scale):
 
 $$P(\text{collision}) = \frac{10^{30}}{2^{257}} \approx 4.3 \times 10^{-48}$$
 
-For comparison: undetected RAM bit flips occur at ~10^-13 per year [3]. Hash collision is not a practical concern.
+For comparison: undetected RAM bit flips occur at ~$10^{-13}$ per year [3]. Hash collision is not a practical concern.
 
 ```python
 n = 10**15  # chunks
@@ -93,7 +93,7 @@ Rhizo implements snapshot isolation, the same model used by PostgreSQL and Oracl
 2. Uncommitted changes are invisible to other transactions
 3. Concurrent writes to the same table are detected and one is aborted
 
-**Conflict condition** for transactions T_i and T_j:
+**Conflict condition** for transactions $T_i$ and $T_j$:
 
 $$\text{Conflict}(T_i, T_j) = (W_i \cap W_j \neq \emptyset) \land (\text{concurrent})$$
 
@@ -147,7 +147,7 @@ Measured hit rates: **91%+** for typical workloads, **97%+** with time travel qu
 
 ## Parallel Speedup
 
-Amdahl's Law for serial fraction s:
+Amdahl's Law for serial fraction $s$:
 
 $$\text{Speedup}(N) = \frac{1}{s + \frac{1-s}{N}}$$
 
@@ -165,13 +165,13 @@ Storage energy consumption:
 
 $$E = C \times P_{base} \times PUE \times T$$
 
-Where C = capacity, P_base = watts/TB, PUE = power usage effectiveness, T = time.
+Where $C$ = capacity, $P_{base}$ = watts/TB, $PUE$ = power usage effectiveness, $T$ = time.
 
-If deduplication reduces storage by factor D:
+If deduplication reduces storage by factor $D$:
 
 $$E_{saved} = E_{baseline} \times (1 - \frac{1}{D})$$
 
-At 75% deduplication (D=4), energy consumption drops 75%.
+At 75% deduplication ($D=4$), energy consumption drops 75%.
 
 ### Transaction Energy (Coordination-Free)
 
