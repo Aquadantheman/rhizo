@@ -1,5 +1,5 @@
 """
-Tests for the Armillaria Query Layer.
+Tests for the Rhizo Query Layer.
 
 Run with: pytest tests/test_query_layer.py -v
 Requires:
@@ -15,7 +15,7 @@ import pytest
 import pyarrow as pa
 import pandas as pd
 
-# Import Armillaria components - conftest.py adds python/ to sys.path
+# Import Rhizo components - conftest.py adds python/ to sys.path
 import _rhizo
 from rhizo import TableWriter, TableReader, QueryEngine
 

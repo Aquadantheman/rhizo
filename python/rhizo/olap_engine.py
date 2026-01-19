@@ -1,7 +1,7 @@
 """
 OLAPEngine - High-performance OLAP query engine powered by Apache DataFusion.
 
-Provides vectorized, multi-threaded query execution over Armillaria tables
+Provides vectorized, multi-threaded query execution over Rhizo tables
 with in-memory caching for maximum performance.
 
 Performance (100k rows, measured):
@@ -36,7 +36,7 @@ class OLAPEngine:
     """
     High-performance OLAP query engine powered by Apache DataFusion.
 
-    Provides vectorized, multi-threaded query execution over Armillaria
+    Provides vectorized, multi-threaded query execution over Rhizo
     tables with optional in-memory caching for maximum performance.
 
     Key Features:

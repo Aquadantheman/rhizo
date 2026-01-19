@@ -1,5 +1,5 @@
 """
-Tests for Armillaria Branching functionality.
+Tests for Rhizo Branching functionality.
 
 Run with: pytest tests/test_branching.py -v
 """

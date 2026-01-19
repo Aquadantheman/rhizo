@@ -102,7 +102,7 @@ class QueryEngine:
     """
     SQL query engine with time travel and branching support.
 
-    Provides a DuckDB-based SQL interface over versioned Armillaria tables.
+    Provides a DuckDB-based SQL interface over versioned Rhizo tables.
     Tables are loaded on-demand and cached for performance.
 
     Example:

@@ -1,5 +1,5 @@
 """
-Tests for Armillaria Recovery functionality (Phase 5.2).
+Tests for Rhizo Recovery functionality (Phase 5.2).
 
 Run with: pytest tests/test_recovery.py -v
 

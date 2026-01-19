@@ -103,7 +103,7 @@ class TableMetadata:
 
 class TableReader:
     """
-    Reads versioned tables from Armillaria storage.
+    Reads versioned tables from Rhizo storage.
 
     Supports:
     - Reading specific versions (time travel)

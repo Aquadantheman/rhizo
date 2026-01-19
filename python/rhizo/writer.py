@@ -64,7 +64,7 @@ class ChunkWriteResult:
 
 class TableWriter:
     """
-    Writes data to Armillaria as versioned, content-addressable Parquet chunks.
+    Writes data to Rhizo as versioned, content-addressable Parquet chunks.
 
     Example:
         >>> from _rhizo import PyChunkStore, PyCatalog

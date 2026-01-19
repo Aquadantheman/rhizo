@@ -1,5 +1,5 @@
 """
-Tests for Armillaria Transaction functionality (Phase 5.1).
+Tests for Rhizo Transaction functionality (Phase 5.1).
 
 Run with: pytest tests/test_transactions.py -v
 

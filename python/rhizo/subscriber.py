@@ -1,5 +1,5 @@
 """
-Subscriber for Armillaria changelog events.
+Subscriber for Rhizo changelog events.
 
 Provides both polling-based iteration and callback interfaces
 for processing changelog entries as they become available.
