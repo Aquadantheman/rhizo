@@ -1,6 +1,6 @@
 [package]
 name = "rhizo_python"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 description = "Data, connected. Content-addressable storage with cross-table ACID transactions."
 
