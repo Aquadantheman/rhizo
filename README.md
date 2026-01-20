@@ -167,6 +167,28 @@ with rhizo.open("./mydata") as db:
     result = db.sql("SELECT * FROM users")
 ```
 
+### Command Line Interface
+
+```bash
+# Show database information
+rhizo info ./mydata
+
+# List tables
+rhizo tables ./mydata
+
+# List versions of a table
+rhizo versions ./mydata users
+
+# Verify database integrity
+rhizo verify ./mydata
+```
+
+Or via Python module:
+
+```bash
+python -m rhizo info ./mydata
+```
+
 ### Time Travel
 
 ```python

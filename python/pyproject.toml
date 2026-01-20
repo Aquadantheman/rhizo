@@ -33,6 +33,9 @@ dependencies = [
 Homepage = "https://rhizodata.dev"
 Repository = "https://github.com/rhizodata/rhizo"
 
+[project.scripts]
+rhizo = "rhizo.cli:main"
+
 [project.optional-dependencies]
 fast = [
     "datafusion>=35.0.0",

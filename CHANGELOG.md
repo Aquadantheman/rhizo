@@ -24,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Silent exception handlers now log**: OLAP fallbacks, deregistration errors, and subscriber errors are logged instead of silently swallowed
 - **Zero overhead when disabled**: Default `WARNING` level produces no output for normal operations
 
+#### Command Line Interface
+- **New `rhizo` CLI**: Database inspection and verification from command line
+  - `rhizo info <path>`: Show database summary (tables, versions, row counts)
+  - `rhizo tables <path>`: List all tables
+  - `rhizo versions <path> <table>`: List versions of a table
+  - `rhizo verify <path>`: Verify database integrity using BLAKE3 hashes
+- **`python -m rhizo` support**: Run CLI via Python module
+- **Uses stdlib argparse**: No additional dependencies required
+
 ### Documentation
 - **PERFORMANCE.md**: Added "Configuration" section documenting environment variables
 - Updated docstrings for `verify_integrity` parameter across all modules
