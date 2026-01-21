@@ -1,0 +1,63 @@
+{
+  "workload_results": [
+    {
+      "workload": "LLM Training (GPT-scale)",
+      "energy_saved_kwh": 5.1200000000000045,
+      "carbon_saved_kg": 2.0479999999999983,
+      "reduction_pct": 7.692307692307699
+    },
+    {
+      "workload": "Recommendation System",
+      "energy_saved_kwh": 0.9599999999999973,
+      "carbon_saved_kg": 0.38399999999999856,
+      "reduction_pct": 5.08474576271185
+    },
+    {
+      "workload": "Distributed Database",
+      "energy_saved_kwh": 0.3999999999999999,
+      "carbon_saved_kg": 0.15999999999999992,
+      "reduction_pct": 11.111111111111107
+    },
+    {
+      "workload": "Federated Learning",
+      "energy_saved_kwh": 35.0,
+      "carbon_saved_kg": 14.0,
+      "reduction_pct": 22.58064516129032
+    }
+  ],
+  "datacenter_results": [
+    {
+      "name": "Small ML Cluster",
+      "gpus": 100,
+      "savings_gwh": 0.09811200000000002,
+      "carbon_tons": 0.03924480000000001,
+      "cost_savings": 9811.200000000003
+    },
+    {
+      "name": "Medium ML Facility",
+      "gpus": 1000,
+      "savings_gwh": 0.98112,
+      "carbon_tons": 0.392448,
+      "cost_savings": 98112.0
+    },
+    {
+      "name": "Large Training Center",
+      "gpus": 10000,
+      "savings_gwh": 9.8112,
+      "carbon_tons": 3.9244799999999995,
+      "cost_savings": 981120.0
+    },
+    {
+      "name": "Hyperscale (Meta/Google)",
+      "gpus": 100000,
+      "savings_gwh": 98.112,
+      "carbon_tons": 39.2448,
+      "cost_savings": 9811200.0
+    }
+  ],
+  "totals": {
+    "total_savings_gwh": 109.002432,
+    "total_carbon_tons": 43.6009728,
+    "total_cost_savings": 10900243.2
+  }
+}

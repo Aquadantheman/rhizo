@@ -1,0 +1,52 @@
+{
+  "sync": {
+    "method": "Synchronous (AllReduce)",
+    "total_time_ms": 2060.9137999708764,
+    "blocking_time_ms": 602.0775001379661,
+    "efficiency": 0.5689961414748479
+  },
+  "async": {
+    "method": "Asynchronous (Gossip)",
+    "total_time_ms": 2565.538800030481,
+    "blocking_time_ms": 0.0,
+    "efficiency": 0.998889512004103
+  },
+  "speedup": 0.8033064243450112,
+  "scaling": [
+    {
+      "workers": 2,
+      "sync_time_ms": 277.76740002445877,
+      "async_time_ms": 228.3508999971673,
+      "speedup": 1.2164059788155182,
+      "sync_blocking_pct": 35.1147399556654
+    },
+    {
+      "workers": 4,
+      "sync_time_ms": 544.5845000213012,
+      "async_time_ms": 545.8919000229798,
+      "speedup": 0.9976050203316379,
+      "sync_blocking_pct": 33.6997840249406
+    },
+    {
+      "workers": 8,
+      "sync_time_ms": 1024.3826999794692,
+      "async_time_ms": 1326.220499991905,
+      "speedup": 0.7724075295063844,
+      "sync_blocking_pct": 29.366817701581372
+    },
+    {
+      "workers": 16,
+      "sync_time_ms": 1985.6533000129275,
+      "async_time_ms": 2938.8500999775715,
+      "speedup": 0.6756565433630254,
+      "sync_blocking_pct": 24.951762719687494
+    },
+    {
+      "workers": 32,
+      "sync_time_ms": 3757.0660000201315,
+      "async_time_ms": 6698.2435999671,
+      "speedup": 0.560903159753489,
+      "sync_blocking_pct": 21.425790768488863
+    }
+  ]
+}
