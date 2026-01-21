@@ -1,0 +1,42 @@
+[
+  {
+    "system": "Rhizo (Algebraic)",
+    "operation_type": "ADD/INCREMENT",
+    "num_operations": 100,
+    "total_time_ms": 0.3696000203490257,
+    "avg_latency_ms": 0.0036960002034902573,
+    "throughput_ops_sec": 270562.75566642726,
+    "coordination_rounds": 0,
+    "notes": "Final value: 100"
+  },
+  {
+    "system": "CockroachDB (Raft)",
+    "operation_type": "ADD/INCREMENT",
+    "num_operations": 100,
+    "total_time_ms": 5032.9299999866635,
+    "avg_latency_ms": 50.329299999866635,
+    "throughput_ops_sec": 19.86914183194779,
+    "coordination_rounds": 2,
+    "notes": "Final value: 100"
+  },
+  {
+    "system": "Redis Cluster",
+    "operation_type": "ADD/INCREMENT",
+    "num_operations": 100,
+    "total_time_ms": 105.3237000014633,
+    "avg_latency_ms": 1.053237000014633,
+    "throughput_ops_sec": 949.4539215638139,
+    "coordination_rounds": 0,
+    "notes": "Final value: 100"
+  },
+  {
+    "system": "PostgreSQL",
+    "operation_type": "ADD/INCREMENT",
+    "num_operations": 100,
+    "total_time_ms": 155.11839999817312,
+    "avg_latency_ms": 1.5511839999817312,
+    "throughput_ops_sec": 644.6688465145188,
+    "coordination_rounds": 0,
+    "notes": "Final value: 100"
+  }
+]
