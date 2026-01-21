@@ -479,7 +479,7 @@ Rhizo is open source under the MIT license at: https://github.com/rhizodata/rhiz
 
 [4] Berenson, H., Bernstein, P., Gray, J., Melton, J., O'Neil, E., & O'Neil, P. (1995). A Critique of ANSI SQL Isolation Levels. SIGMOD. doi:10.1145/223784.223785
 
-[5] Armbrust, M., et al. (2020). Delta Lake: High-Performance ACID Table Storage over Cloud Object Stores. VLDB.
+[5] Armbrust, M., et al. (2020). Delta Lake: High-Performance ACID Table Storage over Cloud Object Stores. VLDB. doi:10.14778/3415478.3415560
 
 [6] Apache Iceberg. https://iceberg.apache.org/
 

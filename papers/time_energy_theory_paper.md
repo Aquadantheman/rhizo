@@ -361,19 +361,19 @@ For algebraic workloads on geo-distributed systems, coordination-free approaches
 
 ## References
 
-[1] Lamport, L. (1998). The Part-Time Parliament. ACM TOCS.
+[1] Lamport, L. (1998). The Part-Time Parliament. ACM TOCS. doi:10.1145/279227.279229
 
 [2] Ongaro, D., & Ousterhout, J. (2014). In Search of an Understandable Consensus Algorithm. USENIX ATC.
 
-[3] Demers, A., Greene, D., Hauser, C., et al. (1987). Epidemic Algorithms for Replicated Database Maintenance. PODC.
+[3] Demers, A., Greene, D., Hauser, C., et al. (1987). Epidemic Algorithms for Replicated Database Maintenance. PODC. doi:10.1145/43921.43922
 
-[4] Shapiro, M., Preguiça, N., Baquero, C., & Zawirski, M. (2011). Conflict-free Replicated Data Types. SSS.
+[4] Shapiro, M., Preguiça, N., Baquero, C., & Zawirski, M. (2011). Conflict-free Replicated Data Types. SSS. doi:10.1007/978-3-642-24550-3_29
 
-[5] Halpern, J., & Moses, Y. (1990). Knowledge and Common Knowledge in a Distributed Environment. JACM.
+[5] Halpern, J., & Moses, Y. (1990). Knowledge and Common Knowledge in a Distributed Environment. JACM. doi:10.1145/79147.79161
 
-[6] Barroso, L., & Hölzle, U. (2007). The Case for Energy-Proportional Computing. IEEE Computer.
+[6] Barroso, L., & Hölzle, U. (2007). The Case for Energy-Proportional Computing. IEEE Computer. doi:10.1109/MC.2007.443
 
-[7] Bailis, P., Fekete, A., Franklin, M. J., et al. (2014). Coordination Avoidance in Database Systems. VLDB.
+[7] Bailis, P., Fekete, A., Franklin, M. J., et al. (2014). Coordination Avoidance in Database Systems. VLDB. doi:10.14778/2735508.2735509
 
 ---
 

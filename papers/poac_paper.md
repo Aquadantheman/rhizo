@@ -439,13 +439,13 @@ POAC is implemented in Rhizo, open source under the MIT license at: https://gith
 
 [1] Brewer, E. (2000). Towards Robust Distributed Systems. PODC Keynote.
 
-[2] Shapiro, M., Preguiça, N., Baquero, C., & Zawirski, M. (2011). Conflict-free Replicated Data Types. SSS.
+[2] Shapiro, M., Preguiça, N., Baquero, C., & Zawirski, M. (2011). Conflict-free Replicated Data Types. SSS. doi:10.1007/978-3-642-24550-3_29
 
-[3] Kung, H. T., & Robinson, J. T. (1981). On Optimistic Methods for Concurrency Control. TODS.
+[3] Kung, H. T., & Robinson, J. T. (1981). On Optimistic Methods for Concurrency Control. TODS. doi:10.1145/319566.319567
 
-[4] O'Neil, P. E. (1986). The Escrow Transactional Method. TODS.
+[4] O'Neil, P. E. (1986). The Escrow Transactional Method. TODS. doi:10.1145/7239.7265
 
-[5] Bloom, B. H. (1970). Space/Time Trade-offs in Hash Coding with Allowable Errors. CACM.
+[5] Bloom, B. H. (1970). Space/Time Trade-offs in Hash Coding with Allowable Errors. CACM. doi:10.1145/362686.362692
 
 [6] Lamport, L. (2001). Paxos Made Simple. SIGACT News.
 

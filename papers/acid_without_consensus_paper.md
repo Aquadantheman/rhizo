@@ -345,13 +345,13 @@ Rhizo is open source under the MIT license at: https://github.com/rhizodata/rhiz
 
 [1] Corbett, J. C., Dean, J., Epstein, M., et al. (2012). Spanner: Google's Globally-Distributed Database. OSDI.
 
-[2] Taft, R., Sharber, I., Matei, A., et al. (2020). CockroachDB: The Resilient Geo-Distributed SQL Database. SIGMOD.
+[2] Taft, R., Sharif, I., Matei, A., et al. (2020). CockroachDB: The Resilient Geo-Distributed SQL Database. SIGMOD. doi:10.1145/3318464.3386134
 
-[3] Thomson, A., Diamond, T., Weng, S., et al. (2012). Calvin: Fast Distributed Transactions for Partitioned Database Systems. SIGMOD.
+[3] Thomson, A., Diamond, T., Weng, S., et al. (2012). Calvin: Fast Distributed Transactions for Partitioned Database Systems. SIGMOD. doi:10.1145/2213836.2213838
 
-[4] DeCandia, G., Hastorun, D., Jampani, M., et al. (2007). Dynamo: Amazon's Highly Available Key-value Store. SOSP.
+[4] DeCandia, G., Hastorun, D., Jampani, M., et al. (2007). Dynamo: Amazon's Highly Available Key-value Store. SOSP. doi:10.1145/1294261.1294281
 
-[5] Shapiro, M., Preguiça, N., Baquero, C., & Zawirski, M. (2011). Conflict-free Replicated Data Types. SSS.
+[5] Shapiro, M., Preguiça, N., Baquero, C., & Zawirski, M. (2011). Conflict-free Replicated Data Types. SSS. doi:10.1007/978-3-642-24550-3_29
 
 [6] Li, C., Porto, D., Clement, A., et al. (2012). Making Geo-Replicated Systems Fast as Possible, Consistent when Necessary. OSDI.
 
