@@ -161,6 +161,11 @@ POAC uses exponential moving average to estimate conflict probability per table:
 
 $$\hat{p}_{t+1} = \hat{p}_t + \alpha \cdot (observed_t - \hat{p}_t)$$
 
+Where:
+- $\hat{p}_t$ = estimated conflict probability at time $t$
+- $\alpha \in (0, 1]$ = learning rate (controls adaptation speed; typical value 0.1)
+- $observed_t \in \{0, 1\}$ = whether a conflict was observed at time $t$
+
 The system speculatively executes when $\hat{p} < threshold$ and falls back to eager consensus otherwise.
 
 ### 4.4 Safety Guarantee
@@ -210,17 +215,23 @@ Where $n$ is node count and $P_{exhaust}$ is probability of quota exhaustion.
 
 ### 5.3 Quota Exhaustion Probability
 
-Requests follow a Poisson process with rate $\lambda$. For interval $T$ and $n$ nodes:
+Requests follow a Poisson process with rate $\lambda$ (requests per second). For interval $T$ and $n$ nodes, the expected requests per node is:
 
 $$\lambda_{node} = \frac{\lambda \cdot T}{n}$$
 
+The probability of exhausting quota $q$ is:
+
 $$P_{exhaust} = P(\text{Poisson}(\lambda_{node}) > q) = 1 - F_{Poisson}(q; \lambda_{node})$$
+
+Where $F_{Poisson}(k; \mu)$ denotes the cumulative distribution function of the Poisson distribution—the probability of observing at most $k$ events given mean $\mu$.
 
 **Optimal Quota:**
 
 To achieve target exhaustion rate $\epsilon$:
 
 $$q^* = F^{-1}_{Poisson}(1 - \epsilon; \lambda_{node})$$
+
+Where $F^{-1}_{Poisson}$ is the inverse CDF (quantile function).
 
 ### 5.4 Experimental Validation
 

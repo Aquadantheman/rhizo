@@ -84,9 +84,11 @@ Our work differs: CRDTs are data structures; we classify database **operations**
 
 ### 3.1 Definitions
 
+**Notation:** We write $o_1 \circ o_2$ to denote the composition (sequential application) of operations—applying $o_1$ then $o_2$ to a state.
+
 **Definition 1 (Algebraic Operation):** An operation $o$ is algebraic if it satisfies:
-- **Commutative:** $o_1 \circ o_2 = o_2 \circ o_1$
-- **Associative:** $(o_1 \circ o_2) \circ o_3 = o_1 \circ (o_2 \circ o_3)$
+- **Commutative:** $o_1 \circ o_2 = o_2 \circ o_1$ (order doesn't matter)
+- **Associative:** $(o_1 \circ o_2) \circ o_3 = o_1 \circ (o_2 \circ o_3)$ (grouping doesn't matter)
 
 **Definition 2 (Operation Types):**
 
@@ -152,13 +154,17 @@ This is the theoretical foundation for our system.
 
 ### 4.3 Causality Tracking
 
-We use **vector clocks** to track happened-before relationships:
+We use **vector clocks** to track happened-before relationships. A vector clock $V$ is a mapping from node IDs to logical timestamps.
 
 ```rust
 struct VectorClock {
     clocks: HashMap<NodeId, u64>,
 }
 ```
+
+**Notation for vector clock comparison:**
+- $V_A < V_B$ (A happened-before B): $\forall i: V_A[i] \leq V_B[i]$ and $\exists j: V_A[j] < V_B[j]$
+- $V_A \| V_B$ (A and B are concurrent): $\neg(V_A < V_B) \land \neg(V_B < V_A)$
 
 On merge:
 - If $V_A < V_B$: A happened-before B, apply B
