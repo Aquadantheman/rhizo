@@ -1,0 +1,111 @@
+{
+  "boundary_validation": {
+    "add_accepted": true,
+    "max_accepted": true,
+    "overwrite_rejected": true,
+    "rejection_message": "Non-algebraic operations on keys [\"value\"]: Operations OVERWRITE require coordination"
+  },
+  "propagation_results": {
+    "add": {
+      "2": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "4": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "8": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "16": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "32": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "max": {
+      "2": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "4": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "8": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "16": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "32": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  "log_n_fit": {
+    "cluster_sizes": [
+      2,
+      4,
+      8,
+      16,
+      32
+    ],
+    "measured_rounds": [
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "theoretical_log_n": [
+      1.0,
+      2.0,
+      3.0,
+      4.0,
+      5.0
+    ],
+    "r_squared": 0,
+    "slope": 0.0,
+    "intercept": 1.0,
+    "validated": false
+  }
+}
