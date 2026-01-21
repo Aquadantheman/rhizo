@@ -241,36 +241,25 @@ with db.engine.transaction() as tx:
 ## Architecture
 
 ```mermaid
-flowchart TD
-    subgraph APP["Application Layer"]
-        A1[Python]
-        A2[Rust]
-        A3[CLI]
-        A4[TableWriter]
-        A5[TableReader]
-        A6[QueryEngine]
+flowchart LR
+    subgraph APP["Application"]
+        A1[Python / Rust / CLI]
+        A2[TableWriter / TableReader / QueryEngine]
     end
 
-    subgraph CAT["FileCatalog"]
-        B1[Versioned metadata]
-        B2[Time travel]
-        B3[Atomic commits]
+    subgraph CAT["Catalog"]
+        B1[Versioned metadata<br/>Time travel<br/>Atomic commits]
     end
 
     subgraph STORE["ChunkStore"]
-        C1[Content-addressed storage]
-        C2[BLAKE3 hashing]
-        C3[Auto-deduplication]
+        C1[Content-addressed<br/>BLAKE3 / Dedup]
     end
 
-    subgraph FS["File System"]
-        D1[Parquet chunks]
-        D2[JSON metadata]
+    subgraph FS["Storage"]
+        D1[Parquet + JSON]
     end
 
-    APP --> CAT
-    CAT --> STORE
-    STORE --> FS
+    APP --> CAT --> STORE --> FS
 ```
 
 ---
