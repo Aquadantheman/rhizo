@@ -240,33 +240,26 @@ with db.engine.transaction() as tx:
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph API["Python API"]
-        DB[rhizo.open]
-        OLAP[DataFusion OLAP]
-        CDC[Changelog]
-    end
-
-    subgraph CORE["Rust Core"]
-        TX[Transactions]
-        BR[Branching]
-        ALG[Algebraic Merge]
-        DIST[Distributed]
-    end
-
-    subgraph STORAGE["Storage Layer"]
-        CAT[Catalog]
-        CHK[ChunkStore]
-        MRK[Merkle Trees]
-    end
-
-    subgraph FS["File System"]
-        PAR[Parquet chunks]
-        JSON[JSON metadata]
-    end
-
-    API --> CORE --> STORAGE --> FS
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Python API                              │
+│          rhizo.open  ·  DataFusion OLAP  ·  Changelog           │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+┌─────────────────────────────▼───────────────────────────────────┐
+│                         Rust Core                               │
+│    Transactions  ·  Branching  ·  Algebraic Merge  ·  Distributed│
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+┌─────────────────────────────▼───────────────────────────────────┐
+│                       Storage Layer                             │
+│           Catalog  ·  ChunkStore  ·  Merkle Trees               │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+┌─────────────────────────────▼───────────────────────────────────┐
+│                        File System                              │
+│              Parquet chunks  ·  JSON metadata                   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
