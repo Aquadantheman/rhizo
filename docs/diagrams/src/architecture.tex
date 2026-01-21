@@ -1,55 +1,67 @@
-\documentclass{article}
-\usepackage[margin=1in]{geometry}
+\documentclass[tikz,border=10pt]{standalone}
 \usepackage{tikz}
-\usetikzlibrary{positioning}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
 
 \begin{document}
 
-\begin{center}
-\begin{tikzpicture}
+% Color scheme
+\definecolor{pythonblue}{RGB}{55, 118, 171}
+\definecolor{rustorange}{RGB}{222, 165, 132}
+\definecolor{storagegray}{RGB}{180, 180, 180}
+\definecolor{filesystemgreen}{RGB}{144, 190, 109}
+
+\begin{tikzpicture}[
+    % Styles
+    layer/.style={
+        rectangle,
+        rounded corners=3pt,
+        minimum width=14cm,
+        minimum height=1.8cm,
+        draw=#1!80!black,
+        fill=#1!30,
+        line width=1pt,
+        font=\sffamily
+    },
+    layerlabel/.style={
+        font=\sffamily\bfseries\large,
+        text=#1!80!black
+    },
+    component/.style={
+        font=\sffamily\small,
+        text=#1!80!black
+    },
+    arrow/.style={
+        -{Stealth[length=8pt]},
+        line width=1.5pt,
+        draw=gray!60
+    }
+]
 
 % Python API Layer
-\node[rectangle, rounded corners, minimum width=12cm, minimum height=1.5cm,
-      draw=gray, fill=blue!20, line width=1pt] (python) at (0,0) {
-  \begin{tabular}{c}
-    \textbf{Python API} \\
-    \small rhizo.open \quad DataFusion OLAP \quad Changelog
-  \end{tabular}
-};
+\node[layer=pythonblue] (python) at (0,0) {};
+\node[layerlabel=pythonblue, above=0.2cm] at (python.north) {Python API};
+\node[component=pythonblue] at (python.center) {rhizo.open \quad $\cdot$ \quad DataFusion OLAP \quad $\cdot$ \quad Changelog};
 
 % Rust Core Layer
-\node[rectangle, rounded corners, minimum width=12cm, minimum height=1.5cm,
-      draw=gray, fill=orange!20, line width=1pt, below=0.5cm of python] (rust) {
-  \begin{tabular}{c}
-    \textbf{Rust Core} \\
-    \small Transactions \quad Branching \quad Algebraic Merge \quad Distributed
-  \end{tabular}
-};
+\node[layer=rustorange, below=0.8cm of python] (rust) {};
+\node[layerlabel=rustorange, above=0.2cm] at (rust.north) {Rust Core};
+\node[component=rustorange] at (rust.center) {Transactions \quad $\cdot$ \quad Branching \quad $\cdot$ \quad Algebraic Merge \quad $\cdot$ \quad Distributed};
 
 % Storage Layer
-\node[rectangle, rounded corners, minimum width=12cm, minimum height=1.5cm,
-      draw=gray, fill=gray!20, line width=1pt, below=0.5cm of rust] (storage) {
-  \begin{tabular}{c}
-    \textbf{Storage Layer} \\
-    \small Catalog \quad ChunkStore \quad Merkle Trees
-  \end{tabular}
-};
+\node[layer=storagegray, below=0.8cm of rust] (storage) {};
+\node[layerlabel=storagegray, above=0.2cm] at (storage.north) {Storage Layer};
+\node[component=storagegray] at (storage.center) {Catalog \quad $\cdot$ \quad ChunkStore \quad $\cdot$ \quad Merkle Trees};
 
 % File System Layer
-\node[rectangle, rounded corners, minimum width=12cm, minimum height=1.5cm,
-      draw=gray, fill=green!20, line width=1pt, below=0.5cm of storage] (fs) {
-  \begin{tabular}{c}
-    \textbf{File System} \\
-    \small Parquet chunks \quad JSON metadata
-  \end{tabular}
-};
+\node[layer=filesystemgreen, below=0.8cm of storage] (fs) {};
+\node[layerlabel=filesystemgreen, above=0.2cm] at (fs.north) {File System};
+\node[component=filesystemgreen] at (fs.center) {Parquet chunks \quad $\cdot$ \quad JSON metadata};
 
-% Arrows
-\draw[->, thick, gray] (python.south) -- (rust.north);
-\draw[->, thick, gray] (rust.south) -- (storage.north);
-\draw[->, thick, gray] (storage.south) -- (fs.north);
+% Arrows between layers
+\draw[arrow] (python.south) -- (rust.north);
+\draw[arrow] (rust.south) -- (storage.north);
+\draw[arrow] (storage.south) -- (fs.north);
 
 \end{tikzpicture}
-\end{center}
 
 \end{document}
