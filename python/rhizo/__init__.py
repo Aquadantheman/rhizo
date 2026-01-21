@@ -32,6 +32,14 @@ from .transaction import TransactionContext
 from .subscriber import Subscriber, ChangeEvent
 from .cache import CacheManager, CacheKey, CacheStats
 from .olap_engine import OLAPEngine, is_datafusion_available
+from .metrics import (
+    AlgebraicSignature,
+    CommitMetrics,
+    OperationClassifier,
+    MetricsCollector,
+    InstrumentedWriter,
+    run_validation_benchmark,
+)
 from .exceptions import (
     RhizoError,
     TableNotFoundError,
@@ -112,6 +120,13 @@ __all__ = [
     "Subscriber",
     "ChangeEvent",
     "Filter",
+    # Metrics & Instrumentation (Coordination Bounds Validation)
+    "AlgebraicSignature",
+    "CommitMetrics",
+    "OperationClassifier",
+    "MetricsCollector",
+    "InstrumentedWriter",
+    "run_validation_benchmark",
     # Exceptions
     "RhizoError",
     "TableNotFoundError",
