@@ -431,7 +431,7 @@ def prove_separation_theorems() -> List[SeparationTheorem]:
 
         - Communication complexity R(f) counts total bits exchanged.
         - Each round can exchange O(N) bits (all-to-all broadcast).
-        - Therefore CC(f) × N ~= bits per round × rounds <= R(f).
+        - Therefore CC(f) × N ≈ bits per round × rounds <= R(f).
         - Hence CC(f) <= R(f) / N.
 
         This gives us tools to prove coordination lower bounds
@@ -704,14 +704,14 @@ def analyze_complexity_relationships() -> Dict:
             "answer": """
             Interesting parallel:
 
-            - Circuit DEPTH ~= Coordination ROUNDS
-            - Circuit SIZE ~= Total COMMUNICATION
+            - Circuit DEPTH ≈ Coordination ROUNDS
+            - Circuit SIZE ≈ Total COMMUNICATION
 
-            NC^k (polylog depth circuits) ~= CC_log (polylog coordination)
+            NC^k (polylog depth circuits) ≈ CC_log (polylog coordination)
 
             Conjecture: NC SUBSET_EQ CC_poly (anything parallelizable is coordinatable)
             """,
-            "relationship": "ANALOGOUS - Depth <-> Rounds"
+            "relationship": "ANALOGOUS - Depth ↔ Rounds"
         }
     }
 
@@ -761,9 +761,9 @@ def practical_implications() -> Dict:
         "cost_model": {
             "principle": "Coordination has real cost: time, energy, money",
             "quantification": [
-                "Each round ~= network RTT (1-100ms typically)",
-                "CC_log problem with N=1000: ~10 rounds ~= 100ms-1s",
-                "CC_0 problem with N=1000: ~1 round ~= 10-100ms",
+                "Each round ≈ network RTT (1-100ms typically)",
+                "CC_log problem with N=1000: ~10 rounds ≈ 100ms-1s",
+                "CC_0 problem with N=1000: ~1 round ≈ 10-100ms",
                 "10x difference in latency, often 100x in throughput",
             ],
             "impact": "$18B/year global coordination waste is PROVABLY REDUCIBLE"
@@ -792,7 +792,7 @@ def new_questions() -> List[Dict]:
         },
         {
             "id": "Q88",
-            "question": "What is the exact relationship: CC <-> NC?",
+            "question": "What is the exact relationship: CC ↔ NC?",
             "details": "Is CC_log = NC¹? Is CC_poly = NC?",
             "priority": "HIGH",
             "approach": "Prove reductions between circuit depth and coordination rounds"
@@ -896,7 +896,7 @@ def synthesize_results() -> Dict:
 
         "relationship_to_existing_theory": {
             "communication_complexity": "CC counts rounds, R counts bits; CC <= R/N",
-            "circuit_complexity": "CC_log ~= NC¹ (polylog depth)",
+            "circuit_complexity": "CC_log ≈ NC¹ (polylog depth)",
             "distributed_computing": "Formalizes intuitions about consensus",
         },
 
@@ -982,7 +982,7 @@ def main():
     relationships = analyze_complexity_relationships()
     print("\nCC vs P/NP: ORTHOGONAL (different dimensions)")
     print("CC vs Communication Complexity: RELATED (rounds vs bits)")
-    print("CC vs Circuit Complexity: ANALOGOUS (depth ~= rounds)")
+    print("CC vs Circuit Complexity: ANALOGOUS (depth ≈ rounds)")
 
     # Practical implications
     print()
