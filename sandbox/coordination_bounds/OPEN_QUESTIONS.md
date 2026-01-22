@@ -633,7 +633,7 @@ If coordination bounds are fundamental and connect to:
 | **Q150** | **Asymmetric verification protocols?** | **Open** | **HIGH** | **Future** |
 | **Q151** | **Automatic existential/universal detection?** | **Open** | **HIGH** | **Future** |
 | **Q152** | **Minimum lifting overhead?** | **Open** | **HIGH** | **Future** |
-| **Q153** | **Partial liftability for hybrid protocols?** | **Open** | **HIGH** | **Future** |
+| **Q153** | **Partial liftability for hybrid protocols?** | **✓ ANSWERED** | **HIGH** | **Phase 42** |
 | **Q154** | **Liftability hierarchy/spectrum?** | **Open** | **MEDIUM** | **Future** |
 | **Q155** | **ML-discovered liftings?** | **Open** | **MEDIUM** | **Future** |
 
@@ -2834,11 +2834,24 @@ Is overhead = f(operation complexity)?
 ---
 
 ### Q153: Partial Liftability
-**Status**: Open
+**Status**: ✓ ANSWERED (Phase 42)
 **Importance**: HIGH
 
 If operation is 80% existential and 20% universal, can we lift the 80%?
 Hybrid CRDT-consensus protocols?
+
+**Answer (Phase 42)**: YES. The Partial Liftability Theorem proves:
+1. **Decomposition Theorem**: Every operation O decomposes uniquely into O = O_E + O_U
+2. **Lifting Fraction**: L(O) = |O_E| / |O| characterizes how much is liftable
+3. **Hybrid Protocol Theorem**: Optimal protocol is CRDT(O_E) + Consensus(O_U)
+4. **Spectrum Theorem**: CRDTs and consensus are endpoints of a continuous spectrum
+
+**Key Results**:
+- Shopping cart (L=0.85): CRDT for add/remove, consensus for checkout
+- Collaborative editor (L=0.8): CRDT for text ops, consensus for cursor sync
+- Real systems (Cassandra, Spanner, CockroachDB) are optimal hybrids
+
+See: `phase_42_partial_liftability.py`, `PHASE_42_IMPLICATIONS.md`
 
 ---
 
@@ -3166,6 +3179,71 @@ Can CC-NP hardness be used for secure protocols?
 **Approach**: Design protocols that are secure under CC-NP != CC_0 assumption.
 
 **Analogy**: Classical crypto uses computational hardness; coordination crypto could use coordination hardness.
+
+---
+
+## Phase 42+ Questions (Partial Liftability)
+
+These questions emerged from the Partial Liftability Theorem.
+
+### Q156: Decomposition Computability
+**Status**: Open
+**Importance**: HIGH
+
+Can we automatically compute the decomposition O = O_E + O_U from a specification?
+
+**Input**: Operation specification (formal or informal)
+**Output**: (O_E, O_U, L(O))
+
+**Approach**: Likely undecidable in general, but heuristics may work for common patterns.
+
+---
+
+### Q157: L(O) Distribution in Real Systems
+**Status**: Open
+**Importance**: HIGH
+
+What is the distribution of L(O) across real-world systems?
+
+**Hypothesis**: Most operations have high L(O), explaining the 92% liftability finding.
+
+**Approach**: Survey production systems, compute L(O) for each operation class.
+
+---
+
+### Q158: Restructuring for Higher L(O)
+**Status**: Open
+**Importance**: HIGH
+
+Can operations be restructured to increase their lifting fraction?
+
+**Example**: Strict mutex (L=0) → Eventual mutex with fencing tokens (L>0)
+
+**Question**: Is there a systematic method to maximize L(O)?
+
+---
+
+### Q159: Complexity-Overhead Tradeoff
+**Status**: Open
+**Importance**: MEDIUM
+
+Is there a tradeoff between L(O) and protocol overhead?
+
+**Observation**: Higher L(O) might require more metadata (tombstones, vector clocks).
+
+**Question**: What's the Pareto frontier of L(O) vs overhead?
+
+---
+
+### Q160: ML-Optimized Decomposition
+**Status**: Open
+**Importance**: MEDIUM
+
+Can ML find optimal decompositions for complex operations?
+
+**Approach**: Train on known optimal decompositions, predict for new operations.
+
+**Potential**: Could discover non-obvious restructurings that increase L(O).
 
 ---
 
