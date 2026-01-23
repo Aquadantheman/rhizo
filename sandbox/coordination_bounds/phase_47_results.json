@@ -1,0 +1,35 @@
+{
+  "phase": 47,
+  "question": "Q172",
+  "title": "Restructuring Composition Theory",
+  "status": "ANSWERED",
+  "answer": "Restructurings form a non-commutative monoid with canonical ordering",
+  "theorems": [
+    "Identity Element Theorem",
+    "Associativity Theorem",
+    "Non-Commutativity Theorem",
+    "Monoid Structure Theorem",
+    "Partial Order Theorem",
+    "Canonical Ordering Theorem",
+    "NP-Hardness Theorem"
+  ],
+  "key_findings": [
+    "Restructuring composition is ASSOCIATIVE",
+    "Restructuring composition is NOT COMMUTATIVE",
+    "Restructurings form a MONOID (not a group - no inverses)",
+    "Restructurings induce a PARTIAL ORDER on operations",
+    "Canonical ordering enables POLYNOMIAL TIME optimization",
+    "General optimal restructuring is NP-HARD"
+  ],
+  "commutative_pairs_count": 17,
+  "non_commutative_pairs_count": 43,
+  "commutativity_ratio": 0.2833333333333333,
+  "new_questions": [
+    "Q181",
+    "Q182",
+    "Q183",
+    "Q184",
+    "Q185"
+  ],
+  "confidence": "VERY HIGH"
+}
