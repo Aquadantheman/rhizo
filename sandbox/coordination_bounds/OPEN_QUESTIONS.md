@@ -757,11 +757,16 @@ If coordination bounds are fundamental and connect to:
 | **Q238** | **What is the coordination complexity of NC^1-complete problems?** | **Open** | **HIGH** | **Future** |
 | **Q239** | **Does the NC hierarchy collapse at any level via CC analysis?** | **Open** | **HIGH** | **Future** |
 | **Q240** | **Can CC techniques improve NC circuit lower bounds?** | **Open** | **CRITICAL** | **Future** |
-| **Q241** | **Does CC-LOGSPACE = L exactly?** | **Open** | **CRITICAL** | **Future** |
+| **Q241** | **Does CC-LOGSPACE = L exactly?** | **ANSWERED** | **CRITICAL** | **60** |
 | **Q242** | **Does CC-NLOGSPACE = NL exactly?** | **Open** | **CRITICAL** | **Future** |
 | **Q243** | **What is the exact gap between CC-LOGSPACE and CC-NLOGSPACE?** | **Open** | **HIGH** | **Future** |
 | **Q244** | **Are there natural problems in CC-NLOGSPACE \ CC-LOGSPACE?** | **Open** | **HIGH** | **Future** |
 | **Q245** | **Does CC-LOGSPACE have a circuit characterization below NC^1?** | **Open** | **MEDIUM** | **Future** |
+| **Q246** | **What is the exact simulation overhead between L and CC-LOGSPACE?** | **Open** | **MEDIUM** | **Future** |
+| **Q247** | **Does L = CC-LOGSPACE extend to space hierarchy? (L^k = CC-LOGSPACE^k?)** | **Open** | **HIGH** | **Future** |
+| **Q248** | **Can we characterize L-complete problems via coordination?** | **Open** | **HIGH** | **Future** |
+| **Q249** | **What is the coordination interpretation of L vs RL (randomized log space)?** | **Open** | **MEDIUM** | **Future** |
+| **Q250** | **Does CC-LOGSPACE = L provide new algorithms for L problems?** | **Open** | **HIGH** | **Future** |
 
 
 
