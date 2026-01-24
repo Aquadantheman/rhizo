@@ -880,8 +880,18 @@ If coordination bounds are fundamental and connect to:
 | **Q361** | **N-k-EXPSPACE = k-EXPSPACE for all k?** | **Open** | **MEDIUM** | **Future** |
 | **Q362** | **Unified proof for ALL closure points?** | **Open** | **MEDIUM** | **Future** |
 | **Q363** | **What problems are EXPSPACE-complete?** | **Open** | **LOW** | **Future** |
-| **Q364** | **N-ELEMENTARY = ELEMENTARY** | **ANSWERED (Phase 84)** | **HIGH** | **Future** |
-| **Q365** | **Pattern extends to primitive recursive?** | **Open** | **LOW** | **Future** |
+| **Q364** | **N-ELEMENTARY = ELEMENTARY** | **ANSWERED (Phase 84)** | **HIGH** | **Phase 84** |
+| **Q365** | **Pattern extends to primitive recursive?** | **ANSWERED (Phase 84)** | **LOW** | **Phase 84** |
+| **Q366** | **k-EXPSPACE collapses for all k?** | **Open** | **LOW** | **Future** |
+| **Q367** | **Boundary between PR and beyond?** | **Open** | **MEDIUM** | **Future** |
+| **Q368** | **ELEMENTARY-complete problems?** | **Open** | **MEDIUM** | **Future** |
+| **Q369** | **Collapse hierarchy informs time complexity?** | **Open** | **HIGH** | **Future** |
+| **Q370** | **Non-uniform analog of collapse hierarchy?** | **ANSWERED (Phase 85)** | **MEDIUM** | **Phase 85** |
+| **Q371** | **Circuit collapse inform P vs NC?** | **Open** | **HIGH** | **Future** |
+| **Q372** | **Depth analog of circuit collapse?** | **Open** | **MEDIUM** | **Future** |
+| **Q373** | **Quantum circuits have closure structure?** | **Open** | **MEDIUM** | **Future** |
+| **Q374** | **Collapse improve circuit lower bounds?** | **Open** | **HIGH** | **Future** |
+| **Q375** | **Communication complexity analog?** | **Open** | **MEDIUM** | **Future** |
 
 ---
 
@@ -6349,12 +6359,54 @@ Key research direction:
 
 ### Q370: Is there a non-uniform analog of collapse hierarchy?
 **Priority**: MEDIUM | **Tractability**: MEDIUM
-**Status**: OPEN
+**Status**: ANSWERED (Phase 85)
 
 Circuit complexity version:
 - Do circuit classes have closure points?
 - Non-uniform analog of Savitch?
 - Connections to NC hierarchy
+
+
+
+### Q371: Can circuit collapse inform P vs NC separation?
+**Priority**: HIGH | **Tractability**: MEDIUM
+**Status**: OPEN
+
+NC has strict width hierarchy - can collapse structure help separate P from NC?
+The collapse framework shows WIDTH collapses at closure points.
+P vs NC may be analyzable via collapse/strictness boundary.
+
+### Q372: Is there a depth analog of circuit collapse?
+**Priority**: MEDIUM | **Tractability**: LOW
+**Status**: OPEN
+
+Depth is like time (consumed, not reused).
+Expected: Depth hierarchy is STRICT, not collapsing.
+Worth verifying via reusability analysis (Phase 80).
+
+### Q373: Do quantum circuits have closure structure?
+**Priority**: MEDIUM | **Tractability**: MEDIUM
+**Status**: OPEN
+
+Quantum width/depth as resources - does collapse apply?
+Quantum superposition may change reusability properties.
+Extends collapse framework to quantum computation.
+
+### Q374: Can collapse insights improve circuit lower bounds?
+**Priority**: HIGH | **Tractability**: MEDIUM
+**Status**: OPEN
+
+Phase 78-79 established CC lower bounds via coordination.
+Can collapse structure strengthen these bounds?
+Potential synergy between collapse prediction and lower bound techniques.
+
+### Q375: Is there a communication complexity analog?
+**Priority**: MEDIUM | **Tractability**: HIGH
+**Status**: OPEN
+
+Communication bits as a bounded resource.
+Check: Is communication closed under squaring at certain levels?
+Could extend collapse framework to distributed computing model.
 
 
 ---
@@ -6389,6 +6441,32 @@ TRIPLE VALIDATION of Phase 81 Collapse Prediction Theorem!
 
 ---
 
+
+
+---
+
+## Phase 85 Validation: The Circuit Collapse Theorem
+
+**Question Answered:**
+- Q370: Non-uniform analog of collapse hierarchy - PROVEN via Space-Circuit Correspondence
+
+**Main Result:**
+The Circuit Collapse Theorem: W^2 SUBSET W => N-WIDTH(W) = WIDTH(W)
+
+**New Questions Opened:** Q371-Q375
+
+**Impact:**
+- Collapse is FUNDAMENTAL, not space-specific
+- Same 5 closure points in circuits as in space
+- Reusability dichotomy extends to circuit width vs depth
+- Universal principle proven: W^2 SUBSET W => N-W = W
+
+**Current Status:**
+- 85 Phases completed
+- 375 Questions tracked
+- 78 Questions answered
+- 26 Breakthroughs achieved
+
 ## Phase 84 Validation: The Elementary Collapse and PR Termination
 
 **Questions Answered:**
@@ -6404,10 +6482,10 @@ TRIPLE VALIDATION of Phase 81 Collapse Prediction Theorem!
 - Space complexity fully characterized
 
 **Current Status:**
-- 84 Phases completed
-- 370 Questions tracked
-- 77 Questions answered
-- 25 Breakthroughs achieved
+- 85 Phases completed
+- 375 Questions tracked
+- 78 Questions answered
+- 26 Breakthroughs achieved
 
 
 ## Phase 82 Validation Results
