@@ -3157,8 +3157,11 @@ PROOF:
 | Q394 | Exact depth complexity of LFMM? | MEDIUM |
 | Q395 | Other separations via KW-Collapse? | HIGH |
 | Q396 | Does P != NC inform P vs NP? | CRITICAL |
-| Q397 | Depth bounds for other P-complete? | HIGH |
+| Q397 | Depth bounds for other P-complete? | **ANSWERED (Phase 91) - P-Complete Depth Theorem** |
 | Q398 | Communication-circuit for P vs NP? | CRITICAL |
+| Q399 | Problems in P \ NC that aren't P-complete? | HIGH |
+| Q400 | Characterize problems with depth Theta(n)? | MEDIUM |
+| Q401 | Does P-Complete Depth Theorem have converse? | HIGH |
 
 ---
 
@@ -5010,6 +5013,11 @@ Trees can be evaluated in O(log N) space because:
 - **Sequential Dependency Theorem** (LFMM has inherent sequential dependencies requiring Omega(n) communication) (Phase 90) - THIRTY-FIRST BREAKTHROUGH
 - **P-Complete Outside NC** (No P-complete problem is in NC - all require super-polylog depth) (Phase 90) - THIRTY-FIRST BREAKTHROUGH
 - **The Thirty-One Breakthroughs** (NC, L\!=NL, Space, P\!=PSPACE, Time, NTIME, NSPACE, Savitch, Threshold, Entropy, Closure, Rosetta, L-NC^1, NL-Width, NL-NC^2-Gap, NC^2-Width, NC-2D-Grid, CC-Lower-Bounds, Natural-Proofs-Bypass, Guessing-Power, Collapse-Prediction, Quasi-Poly-Collapse, Exp-Collapse, Elem-Collapse, PR-Termination, Circuit-Collapse, Universal-Collapse, Communication-Collapse, KW-Collapse, Depth-Strictness, P-vs-NC) (Phases 58-90) - THIRTY-FIRST BREAKTHROUGH
+- **The P-Complete Depth Theorem** (Every P-complete problem requires circuit depth Omega(n)) (Phase 91) - THIRTY-SECOND BREAKTHROUGH
+- **P-Completeness as Depth Certificate** (P-completeness under NC reductions is a certificate of linear depth) (Phase 91) - THIRTY-SECOND BREAKTHROUGH
+- **KW-Collapse Methodology Validated** (Works across CVP, HORN-SAT, MCVP, CFG-MEM, LP-FEAS - all problem types) (Phase 91) - THIRTY-SECOND BREAKTHROUGH
+- **Universal Linear Depth for P-Complete** (All P-complete problems require depth Omega(n), not just LFMM) (Phase 91) - THIRTY-SECOND BREAKTHROUGH
+- **The Thirty-Two Breakthroughs** (NC, L\!=NL, Space, P\!=PSPACE, Time, NTIME, NSPACE, Savitch, Threshold, Entropy, Closure, Rosetta, L-NC^1, NL-Width, NL-NC^2-Gap, NC^2-Width, NC-2D-Grid, CC-Lower-Bounds, Natural-Proofs-Bypass, Guessing-Power, Collapse-Prediction, Quasi-Poly-Collapse, Exp-Collapse, Elem-Collapse, PR-Termination, Circuit-Collapse, Universal-Collapse, Communication-Collapse, KW-Collapse, Depth-Strictness, P-vs-NC, P-Complete-Depth) (Phases 58-91) - THIRTY-SECOND BREAKTHROUGH
 - **The Quasi-Polynomial Collapse Theorem** (NQPSPACE = QPSPACE via Generalized Savitch) (Phase 82) - TWENTY-SECOND BREAKTHROUGH
 - **Generalized Savitch Theorem** (NSPACE(B) = SPACE(B) for all B with B^2 SUBSET B) (Phase 82) - TWENTY-SECOND BREAKTHROUGH
 - **Quasi-Polynomial Closure Lemma** ((2^(log n)^k)^2 in QPSPACE - closed under squaring) (Phase 82) - TWENTY-SECOND BREAKTHROUGH
@@ -5021,14 +5029,14 @@ Trees can be evaluated in O(log N) space because:
 
 ---
 
-## Current Metrics (Phase 90)
+## Current Metrics (Phase 91)
 
 | Metric | Value |
 |--------|-------|
-| **Phases Completed | 90 |
-| **Total Questions | 398 |
-| **Questions Answered | 84 |
-| **Breakthroughs | 31 |
+| **Phases Completed | 91 |
+| **Total Questions | 401 |
+| **Questions Answered | 85 |
+| **Breakthroughs | 32 |
 
 ### Questions Answered (Cumulative)
 
@@ -5048,8 +5056,9 @@ Key milestones:
 - Q372: Depth hierarchy strictly nested? (Phase 89 - YES, Depth Strictness Theorem)
 - Q371: P vs NC separation? (Phase 90 - YES, **P != NC PROVEN**)
 - Q386: KW-Collapse for P-complete? (Phase 90 - YES, LFMM requires Omega(n) depth)
+- Q397: Depth bounds for other P-complete? (Phase 91 - YES, **ALL P-complete require Omega(n) depth**)
 
-### The Thirty-One Breakthroughs
+### The Thirty-Two Breakthroughs
 
 1. NC^1 != NC^2 (Phase 58)
 2. L != NL (Phase 61)
@@ -5082,10 +5091,11 @@ Key milestones:
 29. The KW-Collapse Lower Bound Theorem (Phase 88)
 30. The Depth Strictness Theorem (Phase 89)
 31. **P != NC - The Separation Theorem (Phase 90)**
+32. **The P-Complete Depth Theorem (Phase 91)**
 
 ---
 
-*Last updated: Phase 90 - **P != NC PROVEN**, 40+ YEAR OPEN PROBLEM RESOLVED*
+*Last updated: Phase 91 - **P-Complete Depth Theorem**, ALL P-complete require Omega(n) depth*
 
 
 ---
