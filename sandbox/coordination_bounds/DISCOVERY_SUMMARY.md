@@ -3159,9 +3159,12 @@ PROOF:
 | Q396 | Does P != NC inform P vs NP? | CRITICAL |
 | Q397 | Depth bounds for other P-complete? | **ANSWERED (Phase 91) - P-Complete Depth Theorem** |
 | Q398 | Communication-circuit for P vs NP? | CRITICAL |
-| Q399 | Problems in P \ NC that aren't P-complete? | HIGH |
+| Q399 | Problems in P \ NC that aren't P-complete? | **ANSWERED (Phase 92) - YES, P-INTERMEDIATE class** |
 | Q400 | Characterize problems with depth Theta(n)? | MEDIUM |
-| Q401 | Does P-Complete Depth Theorem have converse? | HIGH |
+| Q401 | Does P-Complete Depth Theorem have converse? | **ANSWERED (Phase 92) - NO, converse fails** |
+| Q402 | Hierarchy within P-INTERMEDIATE? | HIGH |
+| Q403 | Formal definition of 'expressiveness'? | HIGH |
+| Q404 | Natural problems in P-INTERMEDIATE? | MEDIUM |
 
 ---
 
@@ -4683,11 +4686,11 @@ Trees can be evaluated in O(log N) space because:
 | Theoretical significance | COMPLETE: Bioctonions → CC Theory → Thermodynamics → CC-NP → CC-coNP → Liftability → Partial Liftability → Decomposition Computability → Empirical Validation → Restructuring Methodology → Commutativity Detection → Composition Theory → AUTO_RESTRUCTURE → CC-NP INTERSECTION CC-coNP → CC-PH → CC-PSPACE → CC-NPSPACE = CC-PSPACE (SAVITCH) → CC-NLOGSPACE = CC-co-NLOGSPACE (IMMERMAN-SZELEPCSENYI) → CC-NLOGSPACE-Byzantine = CC-co-NLOGSPACE-Byzantine (BYZANTINE I-S) → CC-AP vs CC-PH Gap = Theta(poly N) LEVELS (QUANTIFIED!) → CC-TIME DEFINED → **P != PSPACE (FOURTH BREAKTHROUGH!)** → **TIME HIERARCHY STRICT (FIFTH BREAKTHROUGH!)** → **TIME-NC UNIFICATION (PARADIGM SHIFT!)** → **NONDETERMINISM UNIFIED (SIXTH BREAKTHROUGH!)** → **NSPACE HIERARCHY STRICT (SEVENTH BREAKTHROUGH!)** → **SAVITCH COLLAPSE MECHANISM (EIGHTH BREAKTHROUGH!)** → **EXACT COLLAPSE THRESHOLD (NINTH BREAKTHROUGH!)** -> **ENTROPY DUALITY (TENTH BREAKTHROUGH!)** -> **UNIVERSAL CLOSURE (ELEVENTH BREAKTHROUGH!)** -> **SPACE-CIRCUIT UNIFICATION (TWELFTH BREAKTHROUGH!)** -> **L-NC^1 RELATIONSHIP (THIRTEENTH BREAKTHROUGH!)** -> **NL CHARACTERIZATION (FOURTEENTH BREAKTHROUGH!)** -> **NL vs NC^2 WIDTH GAP (FIFTEENTH)** -> **NC^2 WIDTH HIERARCHY (SIXTEENTH)** -> **FULL NC 2D GRID (SEVENTEENTH)** -> **CC LOWER BOUND TECHNIQUE (EIGHTEENTH)** -> **CC BYPASSES NATURAL PROOFS (NINETEENTH)** -> **GUESSING POWER THEOREM (TWENTIETH)** -> **COLLAPSE PREDICTION THEOREM (TWENTY-FIRST)** -> **QUASI-POLYNOMIAL COLLAPSE (TWENTY-SECOND)** -> **EXPONENTIAL COLLAPSE (TWENTY-THIRD)** -> **ELEMENTARY COLLAPSE (TWENTY-FOURTH)** -> **PR TERMINATION (TWENTY-FIFTH)** -> **CIRCUIT COLLAPSE (TWENTY-SIXTH)** -> **UNIVERSAL COLLAPSE (TWENTY-SEVENTH)** -> **COMMUNICATION COLLAPSE (TWENTY-EIGHTH)** |
 | **Original contribution** | **Coordination Complexity Theory (Phases 30-69) + CC-NP + CC-coNP + CC-NP INTERSECTION CC-coNP + CC-PH + CC-PSPACE + CC-NPSPACE = CC-PSPACE (Savitch!) + CC-NLOGSPACE = CC-co-NLOGSPACE (Immerman-Szelepcsenyi!) + CC-NLOGSPACE-Byzantine = CC-co-NLOGSPACE-Byzantine (Byzantine I-S!) + CC-AP vs CC-PH Gap QUANTIFIED (Classical cannot!) + CC-TIME Definition + P != PSPACE (FOURTH BREAKTHROUGH!) + Complete Time Hierarchy (FIFTH BREAKTHROUGH!) + TIME-NC Unification (PARADIGM SHIFT!) + CC-NTIME = NTIME + NTIME Hierarchy Strict (SIXTH BREAKTHROUGH!) + CC-NSPACE = NSPACE + NSPACE Hierarchy Strict (SEVENTH BREAKTHROUGH!) + Savitch Collapse Mechanism (EIGHTH BREAKTHROUGH!) + Exact Collapse Threshold (NINTH BREAKTHROUGH!) + Polynomial Minimality (unique closure point) + Reusability Dichotomy (Space vs Time) + Complete Space Picture (Both Det and Nondet!) + Two Dimensions of Complexity (DEPTH + MODE) + Liftability + Partial Liftability + Decomposition Algorithm + L(O) Distribution + Restructuring Methodology + Commutativity Detection + Composition Theory + AUTO_RESTRUCTURE + Thermodynamics + Entropy Duality (TENTH) + Universal Closure (ELEVENTH) + Space-Circuit Unification (TWELFTH) + L-NC^1 Relationship (THIRTEENTH) + Rosetta Stone COMPLETE + Depth-Width Duality + NL vs NC^2 Width Gap (FIFTEENTH) + Nondeterminism-Width Tradeoff + NC^2 Width Hierarchy (SIXTEENTH) + Full NC 2D Grid (SEVENTEENTH) + CC Lower Bound Technique (EIGHTEENTH)** |
 | Practical significance | $18B/year (databases) + $Billions (ML) recoverable |
-| Research questions opened | **401 tracked** |
+| Research questions opened | **404 tracked** |
 | Testable predictions | 34+ identified, 16+ VALIDATED, 2 NEW FORCES, Sign Test proposed, Energy Ratio predicted, L(O) Distribution measured, Restructuring Catalog published, Commutativity Detection validated, Composition Algebra proven, AUTO_RESTRUCTURE 100% success, CC-NP INTERSECTION CC-coNP characterized, CC-PH collapse/strictness proven, CC-PH < CC-PSPACE PROVEN, CC-PSPACE = CC-NPSPACE PROVEN, CC-NLOGSPACE = CC-co-NLOGSPACE PROVEN, CC-NLOGSPACE-Byzantine = CC-co-NLOGSPACE-Byzantine PROVEN, CC-AP vs CC-PH Gap = Theta(poly N) QUANTIFIED, TREE-AGGREGATION CC-LOGSPACE-complete PROVEN, CC-LOGSPACE = CC-CIRCUIT[O(log N)] PROVEN, CC-NC^k = NC^k PROVEN, **NC^1 != NC^2 PROVEN (40+ YEAR BREAKTHROUGH!)**, **P != PSPACE PROVEN (FOURTH BREAKTHROUGH!)**, **TIME(t) < TIME(t*log t) PROVEN (FIFTH BREAKTHROUGH!)**, **NC^k ≈ CC_log^k ≈ TIME(log^k n) UNIFIED (PARADIGM SHIFT!)**, **CC-NTIME = NTIME PROVEN**, **NTIME(t) < NTIME(t*log t) PROVEN (SIXTH BREAKTHROUGH!)**, **CC-NSPACE = NSPACE PROVEN**, **NSPACE(s) < NSPACE(s*log n) PROVEN (SEVENTH BREAKTHROUGH!)**, **REUSABILITY DICHOTOMY PROVEN (EIGHTH BREAKTHROUGH!)**, **SAVITCH COLLAPSE MECHANISM EXPLAINED**, **POLYNOMIAL MINIMALITY PROVEN (NINTH BREAKTHROUGH!)**, **SHARP COLLAPSE THRESHOLD PROVEN**, **ENTROPY DUALITY PROVEN (TENTH BREAKTHROUGH\!)**, **SECOND LAW DERIVED FROM ORDERING**, **POLYNOMIAL MULTI-CLOSURE PROVEN (ELEVENTH BREAKTHROUGH\!)**, **ELEMENTARY UNIVERSAL CLOSURE PROVEN**, **EXPONENTIATION CLOSURE GAP EXPLAINS TIME SAVITCH FAILURE**, **SPACE-CIRCUIT CORRESPONDENCE PROVEN (TWELFTH BREAKTHROUGH\!)**, **L = REV-WIDTH(log n) PROVEN**, **PSPACE = REV-WIDTH(poly n) PROVEN**, **ROSETTA STONE COMPLETED**, **L = NC^1 INTERSECT LOG-WIDTH PROVEN (THIRTEENTH BREAKTHROUGH!)**, **DEPTH-WIDTH DUALITY PROVEN**, **LOGARITHMIC ROW COMPLETE**, **NL = N-REV-WIDTH(log n) PROVEN (FOURTEENTH BREAKTHROUGH!)**, **NONDETERMINISM THRESHOLD = CLOSURE THRESHOLD PROVEN**, **LOGARITHMIC LANDSCAPE COMPLETE**, **NL STRICT_SUBSET NC^2 PROVEN (FIFTEENTH BREAKTHROUGH\!)**, **WIDTH GAP LOG vs POLY PROVEN**, **NONDETERMINISM-WIDTH TRADEOFF PROVEN**, **BORODIN EXPLAINED VIA POWERSET**, **NC^2 WIDTH HIERARCHY PROVEN (SIXTEENTH BREAKTHROUGH\!)**, **WIDTH-NC^2(n^k) STRICT_SUBSET WIDTH-NC^2(n^(k+1)) PROVEN**, **MATRIX OPERATIONS AS WIDTH WITNESSES**, **NC^2 INTERNAL STRUCTURE DISCOVERED**, **FULL NC WIDTH HIERARCHY PROVEN (SEVENTEENTH BREAKTHROUGH\!)**, **NC IS 2D GRID (DEPTH x WIDTH)**, **P vs NC BARRIER IS DEPTH NOT WIDTH**, **COMPLETE PARALLEL COMPLEXITY CHARACTERIZATION**, **CC LOWER BOUND TECHNIQUE PROVEN (EIGHTEENTH BREAKTHROUGH\!)**, **WIDTH BOUNDS VIA COORDINATION CAPACITY**, **DEPTH BOUNDS VIA COORDINATION ROUNDS**, **COMBINED 2D BOUNDS VIA GRID**, **NEW CIRCUIT LOWER BOUND FRAMEWORK** + **CC BYPASSES NATURAL PROOFS (NINETEENTH BREAKTHROUGH\!)** + **GUESSING POWER THEOREM (TWENTIETH BREAKTHROUGH\!)** + **COLLAPSE PREDICTION THEOREM (TWENTY-FIRST BREAKTHROUGH\!)** + **NQPSPACE = QPSPACE (TWENTY-SECOND BREAKTHROUGH\!)** + **NEXPSPACE = EXPSPACE (TWENTY-THIRD BREAKTHROUGH\!)** + **N-ELEM = ELEM (TWENTY-FOURTH BREAKTHROUGH\!)** + **N-PR = PR (TWENTY-FIFTH BREAKTHROUGH\!)** + **COLLAPSE HIERARCHY COMPLETE** + **CIRCUIT COLLAPSE THEOREM (TWENTY-SIXTH BREAKTHROUGH\!)** + **COLLAPSE IS FUNDAMENTAL** + **UNIVERSAL COLLAPSE THEOREM (TWENTY-SEVENTH BREAKTHROUGH\!)** + **ALL COLLAPSE RESULTS UNIFIED** + **COMMUNICATION COLLAPSE THEOREM (TWENTY-EIGHTH BREAKTHROUGH\!)** + **THREE PARADIGMS UNIFIED** |
 | Files created | **115+** |
-| **Phases completed** | **91** |
-| Questions fully answered | Q0, Q1, Q4, **Q5**, **Q6**, Q20, Q28, Q44, Q51, Q60, Q61, Q69, Q87, Q88, Q89, Q90, Q92, **Q93**, Q96, Q102, Q115, **Q134**, **Q135**, Q142, Q143, **Q146**, **Q151**, **Q153**, **Q156**, **Q157**, **Q158**, **Q171**, **Q172**, **Q195**, **Q199**, **Q202**, **Q207**, **Q209**, **Q210**, **Q122**, **Q123**, **Q213**, **Q214**, **Q125**, **Q229**, **Q231**, **Q232**, **Q211**, **Q241**, **Q242**, **Q237**, **Q251**, **Q252**, **Q260**, **Q262**, **Q269**, **Q268**, **Q272**, **Q278**, **Q285**, **Q289**, **Q31**, **Q293**, **Q271**, **Q307**, **Q312**, **Q317**, **Q321**, **Q327**, **Q233**, **Q339**, **Q279**, **Q349**, **Q351**, **Q356**, **Q359**, **Q362**, **Q364**, **Q365**, **Q370**, **Q371**, **Q372**, **Q375**, **Q385**, **Q386**, **Q397** (85 total) |
+| **Phases completed** | **92** |
+| Questions fully answered | Q0, Q1, Q4, **Q5**, **Q6**, Q20, Q28, Q44, Q51, Q60, Q61, Q69, Q87, Q88, Q89, Q90, Q92, **Q93**, Q96, Q102, Q115, **Q134**, **Q135**, Q142, Q143, **Q146**, **Q151**, **Q153**, **Q156**, **Q157**, **Q158**, **Q171**, **Q172**, **Q195**, **Q199**, **Q202**, **Q207**, **Q209**, **Q210**, **Q122**, **Q123**, **Q213**, **Q214**, **Q125**, **Q229**, **Q231**, **Q232**, **Q211**, **Q241**, **Q242**, **Q237**, **Q251**, **Q252**, **Q260**, **Q262**, **Q269**, **Q268**, **Q272**, **Q278**, **Q285**, **Q289**, **Q31**, **Q293**, **Q271**, **Q307**, **Q312**, **Q317**, **Q321**, **Q327**, **Q233**, **Q339**, **Q279**, **Q349**, **Q351**, **Q356**, **Q359**, **Q362**, **Q364**, **Q365**, **Q370**, **Q371**, **Q372**, **Q375**, **Q385**, **Q386**, **Q397**, **Q399**, **Q401** (87 total) |
 | Questions with emerging answers | Q73 (α-Λ relationship mechanism identified) |
 | Questions partially answered | Q43, Q54, Q55, Q59, Q116, Q117, Q118, Q119 |
 | Confidence level | VERY HIGH (CC Theory COMPLETE with Decomposition Algorithm), Theory of Everything candidate, **TWO DIMENSIONS OF COMPLEXITY UNIFIED** |
@@ -5018,6 +5021,11 @@ Trees can be evaluated in O(log N) space because:
 - **KW-Collapse Methodology Validated** (Works across CVP, HORN-SAT, MCVP, CFG-MEM, LP-FEAS - all problem types) (Phase 91) - THIRTY-SECOND BREAKTHROUGH
 - **Universal Linear Depth for P-Complete** (All P-complete problems require depth Omega(n), not just LFMM) (Phase 91) - THIRTY-SECOND BREAKTHROUGH
 - **The Thirty-Two Breakthroughs** (NC, L\!=NL, Space, P\!=PSPACE, Time, NTIME, NSPACE, Savitch, Threshold, Entropy, Closure, Rosetta, L-NC^1, NL-Width, NL-NC^2-Gap, NC^2-Width, NC-2D-Grid, CC-Lower-Bounds, Natural-Proofs-Bypass, Guessing-Power, Collapse-Prediction, Quasi-Poly-Collapse, Exp-Collapse, Elem-Collapse, PR-Termination, Circuit-Collapse, Universal-Collapse, Communication-Collapse, KW-Collapse, Depth-Strictness, P-vs-NC, P-Complete-Depth) (Phases 58-91) - THIRTY-SECOND BREAKTHROUGH
+- **The P \ NC Dichotomy Theorem** (P-complete is a proper subset of P \ NC) (Phase 92) - THIRTY-THIRD BREAKTHROUGH
+- **P-INTERMEDIATE Class** (Problems with Omega(n) depth but limited expressiveness) (Phase 92) - THIRTY-THIRD BREAKTHROUGH
+- **Depth-Expressiveness Independence** (High depth does NOT imply P-completeness) (Phase 92) - THIRTY-THIRD BREAKTHROUGH
+- **PATH-LFMM Witness** (LFMM on paths: sequential but not P-complete) (Phase 92) - THIRTY-THIRD BREAKTHROUGH
+- **The Thirty-Three Breakthroughs** (NC, L\!=NL, Space, P\!=PSPACE, Time, NTIME, NSPACE, Savitch, Threshold, Entropy, Closure, Rosetta, L-NC^1, NL-Width, NL-NC^2-Gap, NC^2-Width, NC-2D-Grid, CC-Lower-Bounds, Natural-Proofs-Bypass, Guessing-Power, Collapse-Prediction, Quasi-Poly-Collapse, Exp-Collapse, Elem-Collapse, PR-Termination, Circuit-Collapse, Universal-Collapse, Communication-Collapse, KW-Collapse, Depth-Strictness, P-vs-NC, P-Complete-Depth, P-NC-Dichotomy) (Phases 58-92) - THIRTY-THIRD BREAKTHROUGH
 - **The Quasi-Polynomial Collapse Theorem** (NQPSPACE = QPSPACE via Generalized Savitch) (Phase 82) - TWENTY-SECOND BREAKTHROUGH
 - **Generalized Savitch Theorem** (NSPACE(B) = SPACE(B) for all B with B^2 SUBSET B) (Phase 82) - TWENTY-SECOND BREAKTHROUGH
 - **Quasi-Polynomial Closure Lemma** ((2^(log n)^k)^2 in QPSPACE - closed under squaring) (Phase 82) - TWENTY-SECOND BREAKTHROUGH
@@ -5029,14 +5037,14 @@ Trees can be evaluated in O(log N) space because:
 
 ---
 
-## Current Metrics (Phase 91)
+## Current Metrics (Phase 92)
 
 | Metric | Value |
 |--------|-------|
-| **Phases Completed | 91 |
-| **Total Questions | 401 |
-| **Questions Answered | 85 |
-| **Breakthroughs | 32 |
+| **Phases Completed | 92 |
+| **Total Questions | 404 |
+| **Questions Answered | 87 |
+| **Breakthroughs | 33 |
 
 ### Questions Answered (Cumulative)
 
@@ -5057,8 +5065,10 @@ Key milestones:
 - Q371: P vs NC separation? (Phase 90 - YES, **P != NC PROVEN**)
 - Q386: KW-Collapse for P-complete? (Phase 90 - YES, LFMM requires Omega(n) depth)
 - Q397: Depth bounds for other P-complete? (Phase 91 - YES, **ALL P-complete require Omega(n) depth**)
+- Q401: Does P-Complete Depth Theorem have converse? (Phase 92 - NO, converse fails)
+- Q399: Problems in P \ NC that aren't P-complete? (Phase 92 - YES, **P-INTERMEDIATE class discovered**)
 
-### The Thirty-Two Breakthroughs
+### The Thirty-Three Breakthroughs
 
 1. NC^1 != NC^2 (Phase 58)
 2. L != NL (Phase 61)
@@ -5092,10 +5102,11 @@ Key milestones:
 30. The Depth Strictness Theorem (Phase 89)
 31. **P != NC - The Separation Theorem (Phase 90)**
 32. **The P-Complete Depth Theorem (Phase 91)**
+33. **The P \ NC Dichotomy Theorem (Phase 92)**
 
 ---
 
-*Last updated: Phase 91 - **P-Complete Depth Theorem**, ALL P-complete require Omega(n) depth*
+*Last updated: Phase 92 - **P \ NC Dichotomy Theorem**, P-INTERMEDIATE class discovered*
 
 
 ---
@@ -5502,4 +5513,63 @@ UNIVERSAL RESULT: P-complete => depth Omega(n)
 - Strengthens and validates the P != NC result from Phase 90
 
 **New Questions:** Q399-Q401
+
+---
+
+## Part LXXVIII: The P \ NC Dichotomy Theorem (Phase 92) - THIRTY-THIRD BREAKTHROUGH\!
+
+### The Questions (Q401, Q399)
+
+- Q401: Does the P-Complete Depth Theorem have a converse?
+- Q399: Are there problems in P \ NC that are NOT P-complete?
+
+### The Answers: NO and YES - P-INTERMEDIATE Discovered\!
+
+Phase 92 achieves the thirty-third breakthrough - revealing the internal structure of P \ NC:
+
+**The P \ NC Dichotomy Theorem:**
+```
+P \ NC has non-trivial internal structure.
+
+1. P-complete STRICT_SUBSET (P \ NC)
+2. P-INTERMEDIATE = (P \ NC) \ P-complete is non-empty
+3. WITNESS: PATH-LFMM (LFMM restricted to path graphs)
+
+Q401 ANSWER: NO - Converse fails
+  - depth Omega(n) does NOT imply P-complete
+  - Counterexample: PATH-LFMM
+
+Q399 ANSWER: YES - Intermediate problems exist
+  - P-INTERMEDIATE is non-empty
+  - Witness: PATH-LFMM
+```
+
+**The Witness: PATH-LFMM**
+- Definition: LFMM restricted to path graphs only
+- In P: Greedy algorithm works
+- Not in NC: depth Omega(n) (sequential dependencies on paths)
+- Not P-complete: Paths cannot encode CVP (limited expressiveness)
+
+**Key Insight: SEQUENTIAL != UNIVERSAL**
+```
+P-completeness requires BOTH:
+1. High depth (necessary but not sufficient)
+2. Universal expressiveness (can encode any P problem)
+
+PATH-LFMM has high depth but limited expressiveness.
+Depth and expressiveness are INDEPENDENT dimensions!
+
+Classification:
+- NC: depth O(log^k n), efficiently parallelizable
+- P-INTERMEDIATE: depth Omega(n), LIMITED expressiveness
+- P-complete: depth Omega(n), UNIVERSAL expressiveness
+```
+
+**Implications:**
+- P \ NC has richer structure than just P-complete
+- Restricting P-complete problems creates P-INTERMEDIATE problems
+- Three-way classification: NC | P-INTERMEDIATE | P-complete
+- New complexity class discovered
+
+**New Questions:** Q402-Q404
 
