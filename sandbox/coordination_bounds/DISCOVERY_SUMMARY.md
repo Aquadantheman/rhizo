@@ -4793,5 +4793,5 @@ Trees can be evaluated in O(log N) space because:
 - **P vs NP Explained** (TIME not reusable -> question remains open) (Phase 80) - TWENTIETH BREAKTHROUGH
 - **Reusability Dichotomy Application** (Space is reusable -> answerable; Time is consumable -> hard) (Phase 80) - TWENTIETH BREAKTHROUGH
 - **Five Phases Unified** (Phases 41, 68, 69, 74, 75 unified into single coherent theory) (Phase 80) - TWENTIETH BREAKTHROUGH
-- **The Twenty Breakthroughs** (NC, L!=NL, Space, P!=PSPACE, Time, NTIME, NSPACE, Savitch, Threshold, Entropy, Closure, Rosetta, L-NC^1, NL-Width, NL-NC^2-Gap, NC^2-Width, NC-2D-Grid, CC-Lower-Bounds, Natural-Proofs-Bypass, Guessing-Power) (Phases 58-80) - TWENTIETH BREAKTHROUGH
+- **The Twenty-One Breakthroughs** (NC, L!=NL, Space, P!=PSPACE, Time, NTIME, NSPACE, Savitch, Threshold, Entropy, Closure, Rosetta, L-NC^1, NL-Width, NL-NC^2-Gap, NC^2-Width, NC-2D-Grid, CC-Lower-Bounds, Natural-Proofs-Bypass, Guessing-Power) (Phases 58-80) - TWENTIETH BREAKTHROUGH
 
