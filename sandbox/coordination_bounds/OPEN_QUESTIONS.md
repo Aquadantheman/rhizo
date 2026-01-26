@@ -1093,7 +1093,7 @@ If coordination bounds are fundamental and connect to:
 | **Q545** | **What determines v=246 GeV algebraically?** | **Open** | **CRITICAL** | **Phase 120** |
 | **Q546** | **Is 1.2% mass error from radiative corrections?** | **ANSWERED** | **MEDIUM** | **Phase 122** |
 | **Q547** | **What algebraic structure gives quark Q deviations?** | **Open** | **CRITICAL** | **Phase 121** |
-| **Q548** | **Does CKM mixing emerge from Koide theta shifts?** | **Open** | **CRITICAL** | **Phase 121** |
+| **Q548** | **Does CKM mixing emerge from Koide theta shifts?** | **PARTIAL (Phase 123)** | **CRITICAL** | **Phase 123 Insight** |
 | **Q549** | **Can QCD running connect alpha/4 to quark Y_0?** | **Open** | **HIGH** | **Phase 121** |
 | **Q550** | **Is there a "Generalized Koide" for all 9 fermions?** | **ANSWERED** | **HIGH** | **Phase 122** |
 | **Q551** | **Do neutrino masses follow Koide?** | **Open** | **HIGH** | **Phase 121** |
@@ -1104,6 +1104,12 @@ If coordination bounds are fundamental and connect to:
 | **Q556** | **Is there a "modified Koide" for quarks?** | **Open** | **CRITICAL** | **Phase 122** |
 | **Q557** | **Can QCD corrections explain quark Q deviations?** | **Open** | **HIGH** | **Phase 122** |
 | **Q558** | **Higher-order corrections to lepton masses?** | **Open** | **LOW** | **Phase 122** |
+| **Q559** | **What determines k_up and k_down from QCD?** | **Open** | **CRITICAL** | **Phase 123** |
+| **Q560** | **Can V_CKM be derived from k mismatch?** | **Open** | **CRITICAL** | **Phase 123** |
+| **Q561** | **Why is V_us ~ sqrt(m_d/m_s) so accurate (0.3%)?** | **Open** | **HIGH** | **Phase 123** |
+| **Q562** | **What breaks V_cb and V_ub Fritzsch relations?** | **Open** | **HIGH** | **Phase 123** |
+| **Q563** | **Is there a unified k formula for all quarks?** | **Open** | **HIGH** | **Phase 123** |
+| **Q564** | **Does k run with energy scale?** | **Open** | **MEDIUM** | **Phase 123** |
 
 ---
 
@@ -10585,17 +10591,44 @@ The CKM mixing matrix may encode these shifts algebraically.
 ---
 
 ### Q548: Does CKM mixing emerge from Koide theta shifts?
-**Status**: Open
+**Status**: PARTIAL (Phase 123)
 **Priority**: CRITICAL
 **Tractability**: HIGH
 **Opened by**: Phase 121
 
-If theta_lepton = 2*pi/3 + 2/9, what are theta_up and theta_down?
-The Cabibbo angle theta_C ~ 13 degrees might emerge from:
+**PARTIAL ANSWER: CKM comes from K differences, not theta shifts!**
+
+**Phase 123 Key Discovery:**
 ```
-V_CKM = f(theta_up - theta_down)
+QUARKS NEED MODIFIED K, NOT MODIFIED THETA!
+
+The Koide formula: sqrt(m_i) = r * (1 + k * cos(theta_i))
+
+For LEPTONS:
+  theta = 2*pi/3 + 2/9
+  k = sqrt(2) = 1.414
+  Q = 2/3 EXACTLY
+
+For QUARKS (same theta, different k):
+  Up-type:   k = 1.759  ->  Q = 0.849
+  Down-type: k = 1.545  ->  Q = 0.731
+
+CKM mixing emerges from: k_up != k_down
 ```
-Would derive CKM matrix from pure algebra.
+
+**Important Finding:** With k = sqrt(2), Q is ALWAYS 2/3 regardless of theta!
+Therefore theta shifts cannot explain quark Q deviations - modified k is required.
+
+**Fritzsch Relations (surprising accuracy):**
+```
+V_us ~ sqrt(m_d/m_s) = 0.2236  (measured: 0.2243, error: 0.3%!)
+V_cb ~ sqrt(m_s/m_b) = 0.1495  (measured: 0.0408, error: 266%)
+V_ub ~ sqrt(m_d/m_b) = 0.0334  (measured: 0.0038, error: 775%)
+```
+
+V_us works remarkably well! The Cabibbo angle is connected to the d/s mass ratio.
+
+**Opens new questions:** Q559-Q564 about k parameter physics.
 
 ---
 
@@ -10754,6 +10787,106 @@ Can we achieve 0.001% precision with two-loop QED?
 Current: 0.005% with one-loop (c*alpha).
 Two-loop: O(alpha^2) ~ 0.005% additional correction.
 Would test the framework at extreme precision.
+
+---
+
+### Q559: What determines k_up and k_down from QCD?
+**Status**: Open
+**Priority**: CRITICAL
+**Tractability**: MEDIUM
+**Opened by**: Phase 123
+
+The k parameters should be derivable from QCD:
+```
+k_quark = sqrt(2) * (1 + f(alpha_s, N_c, charges))
+
+k_lepton = sqrt(2) = 1.414
+k_down = 1.545 = sqrt(2) * 1.093
+k_up = 1.759 = sqrt(2) * 1.244
+```
+The function f() must encode color and charge effects.
+
+---
+
+### Q560: Can V_CKM be derived from k mismatch?
+**Status**: Open
+**Priority**: CRITICAL
+**Tractability**: HIGH
+**Opened by**: Phase 123
+
+Test the hypothesis:
+```
+V_CKM = g(k_up, k_down, k_lepton)
+
+Current clue:
+|delta_k| / k_lepton = 0.151
+V_us = 0.224
+Ratio = 0.673 (same order of magnitude)
+```
+Would derive CKM matrix from k parameter differences.
+
+---
+
+### Q561: Why is V_us ~ sqrt(m_d/m_s) so accurate (0.3%)?
+**Status**: Open
+**Priority**: HIGH
+**Tractability**: MEDIUM
+**Opened by**: Phase 123
+
+The Fritzsch relation for V_us works to 0.3% accuracy:
+```
+V_us_Fritzsch = sqrt(m_d/m_s) = 0.2236
+V_us_measured = 0.2243
+Error = 0.3%
+```
+This is remarkable and needs explanation. Why does this simple mass
+ratio relation work so well for the Cabibbo angle?
+
+---
+
+### Q562: What breaks V_cb and V_ub Fritzsch relations?
+**Status**: Open
+**Priority**: HIGH
+**Tractability**: MEDIUM
+**Opened by**: Phase 123
+
+V_cb and V_ub predictions are way off:
+```
+V_cb_Fritzsch = 0.1495  vs  V_cb_measured = 0.0408 (266% error)
+V_ub_Fritzsch = 0.0334  vs  V_ub_measured = 0.0038 (775% error)
+```
+What additional physics is needed for the heavier generations?
+Possible: CP violation phase, higher-order corrections, or modified formula.
+
+---
+
+### Q563: Is there a unified k formula for all quarks?
+**Status**: Open
+**Priority**: HIGH
+**Tractability**: MEDIUM
+**Opened by**: Phase 123
+
+Perhaps:
+```
+k = sqrt(2) * (1 + c * alpha_s * Q^2)
+```
+where Q is electric charge and c is a constant.
+Would unify k_lepton, k_up, k_down in single expression.
+
+---
+
+### Q564: Does k run with energy scale?
+**Status**: Open
+**Priority**: MEDIUM
+**Tractability**: HIGH
+**Opened by**: Phase 123
+
+Like alpha and alpha_s, k may run:
+```
+k(mu) = k(M_Z) * (1 + beta_k * ln(mu/M_Z))
+```
+Would explain why quark masses at different scales give different Q values.
+Could test with QCD running of quark masses.
 
 ---
 

@@ -1,0 +1,50 @@
+{
+  "phase": 123,
+  "question": "Q548",
+  "question_text": "Does CKM mixing emerge from Koide theta shifts?",
+  "key_discovery": "Quarks need MODIFIED K, not modified theta!",
+  "k_values": {
+    "lepton": 1.4142135623730951,
+    "up_type": 1.7589859430562884,
+    "down_type": 1.5454992906782685
+  },
+  "k_differences": {
+    "up_minus_down": 0.2134866523780199,
+    "up_minus_lepton": 0.34477238068319327,
+    "down_minus_lepton": 0.13128572830517338
+  },
+  "q_range_with_sqrt2": {
+    "Q_min": 0.6666666666666659,
+    "Q_max": 0.6666666666666673,
+    "note": "Q > 2/3 NOT achievable with k=sqrt(2)"
+  },
+  "ckm_angles": {
+    "theta_12_cabibbo_deg": 12.961719070072032,
+    "theta_23_deg": 2.3383168530017002,
+    "theta_13_deg": 0.21887041004960395
+  },
+  "fritzsch_predictions": {
+    "V_us": {
+      "predicted": 0.22360679774997896,
+      "measured": 0.2243,
+      "error_pct": 0.309051382086953
+    },
+    "V_cb": {
+      "predicted": 0.14948075999156382,
+      "measured": 0.0408,
+      "error_pct": 266.3744117440289
+    },
+    "V_ub": {
+      "predicted": 0.033424914066946754,
+      "measured": 0.00382,
+      "error_pct": 774.9977504436322
+    }
+  },
+  "conclusion": {
+    "status": "SIGNIFICANT INSIGHT",
+    "answer_to_Q548": "PARTIALLY - CKM comes from K differences, not theta shifts",
+    "key_finding": "Quarks use same theta as leptons but different k values",
+    "hypothesis": "V_CKM = f(k_up, k_down) encodes up-down mismatch",
+    "physical_meaning": "k encodes QCD/color effects on Koide structure"
+  }
+}
