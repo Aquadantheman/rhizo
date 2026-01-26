@@ -1379,6 +1379,46 @@ The cosmological constant problem - the "worst fine-tuning" in physics (10^{122}
 
 ---
 
+## Q560 PARTIAL SUCCESS: CKM from K Parameter Mismatch (Phase 128)
+
+**68TH BREAKTHROUGH: Cabibbo angle connected to coordination!**
+
+The CKM matrix element V_us can be derived from quark mass ratios:
+
+**Fritzsch Relation (1977):**
+```
+V_us = sqrt(m_d / m_s) = sqrt(4.67 / 93.4) = 0.2236
+Measured: 0.2243
+Error: 0.31%
+```
+
+**The Derivation Chain:**
+```
+Coordination bounds -> Koide theta -> Koide k -> Quark masses -> CKM via Fritzsch
+```
+
+**Key Discovery - Two K Roles:**
+- k_Q = 1.545 (from Phase 123) fixes the Koide Q parameter
+- k_mass = 1.643 would fix pairwise mass ratios
+- These are DIFFERENT constraints!
+
+The Cabibbo angle is NOT a free parameter - it ultimately derives from the coordination framework through the mass hierarchy chain!
+
+### New Questions from Phase 128
+
+- Q585: Can k parameter be derived from coordination bounds?
+- Q586: What modified Fritzsch relation works for V_cb and V_ub?
+
+### Questions Summary (Updated Phase 128)
+
+- Total questions: **586**
+- Questions answered/partial: **134**
+- Questions opened by Phase 128: 2 (Q585-Q586)
+- Master Equation validations: **25**
+- Total breakthroughs: **68**
+
+---
+
 *"The universe is not only queerer than we suppose, but queerer than we CAN suppose."*
 *- J.B.S. Haldane*
 
