@@ -1143,9 +1143,13 @@ If coordination bounds are fundamental and connect to:
 | **Q595** | **Can we derive the number of generations (3) from dim(SU(2))=N_c?** | **ANSWERED** | **HIGH** | **Phase 133** |
 | **Q596** | **Does the 3/2 power appear in other mixing formulas?** | **Open** | **MEDIUM** | **Phase 132** |
 | **Q597** | **Is there a generalized power formula for heavier generations?** | **Open** | **MEDIUM** | **Phase 132** |
-| **Q598** | **Can generation mass ratios be derived from J_3(O)?** | **Open** | **HIGH** | **Phase 133** |
+| **Q598** | **Can generation mass ratios be derived from J_3(O)?** | **ANSWERED** | **HIGH** | **Phase 134** |
 | **Q599** | **Does each generation occupy a distinct Peirce subspace?** | **Open** | **MEDIUM** | **Phase 133** |
 | **Q600** | **Why is the third generation so much heavier?** | **Open** | **HIGH** | **Phase 133** |
+| **Q601** | **Can the scale r be derived from first principles?** | **Open** | **HIGH** | **Phase 134** |
+| **Q602** | **Is there a universal delta formula for all fermion sectors?** | **Open** | **HIGH** | **Phase 134** |
+| **Q603** | **Can neutrino mass ratios be predicted using this framework?** | **Open** | **HIGH** | **Phase 134** |
+| **Q604** | **Does CKM/PMNS mixing arise from delta differences?** | **Open** | **CRITICAL** | **Phase 134** |
 
 ---
 
