@@ -5260,7 +5260,7 @@ Key milestones:
 
 ---
 
-*Last updated: Phase 138 - **CKM Up-Type Boundary** - Q613 BOUNDARY: No universal up-type formula! Tradeoff discovered: improving V_ub (2.4% with alpha=0.38) worsens V_us (70%). Phase 137 remains best for V_us/V_cb. CP phase likely key for V_ub. Questions: 620 total (4 new), 143 answered. 78 Results (77 breakthroughs + 1 boundary)! 29 Independent Validations!**Hierarchical CKM Theorem** - Q607 PARTIAL: CKM mixing MULTIPLIES across generations! V_cb = V_us * sqrt(m_s/m_b). Errors: V_cb 266%->18%, V_ub 775%->96%. Wolfenstein A = m_s/sqrt(m_d*m_b) is algebraic. Questions: 616 total (4 new), 142 answered. 77 Breakthroughs! 29 Independent Validations!**Neutrino Mass Ratios from Koide** - Q603 ANSWERED: delta_nu = dim(C)/dim(O) = 1/4. The "+1" in charged lepton delta = EM coupling contribution! Neutrinos lack EM charge -> simpler delta. Delta difference delta_l - delta_nu = -1/36 explains PMNS large angles. Milder neutrino hierarchy (m3/m1 ~ 5-50 vs 3477). Normal ordering preferred. Testable: m1 ~ 0.01-0.02 eV. Questions: 612 total (4 new), 142 answered/partial. 76 Breakthroughs! 29 Independent Validations!*
+*Last updated: Phase 138 - **CKM Up-Type Boundary** - Q613 BOUNDARY: No universal up-type formula! Tradeoff discovered: improving V_ub (2.4% with alpha=0.38) worsens V_us (70%). Phase 137 remains best for V_us/V_cb. CP phase likely key for V_ub. Questions: 620 total (4 new), 143 answered. 78 Results (77 breakthroughs + 1 boundary)! 29 Independent Validations!*
 
 
 ---
