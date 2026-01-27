@@ -1,0 +1,70 @@
+{
+  "phase": 147,
+  "title": "Coordination Theory of Aging and Death",
+  "subtitle": "Life, Death, and Cancer as Coordination Phenomena",
+  "result_number": 87,
+  "questions_addressed": [
+    "Q681",
+    "Q682",
+    "Q683",
+    "Q684",
+    "Q686"
+  ],
+  "theorems": {
+    "life": {
+      "statement": "Life = sustained coordination of N cells",
+      "formal": "Alive iff E_metabolism >= E_coord for all t"
+    },
+    "aging": {
+      "statement": "Aging = monotonic increase in coordination cost C(t)",
+      "equation": "C(t) = C_0 * (1 + gamma * t)"
+    },
+    "death": {
+      "statement": "Death when E_coordination > E_metabolism",
+      "equation": "Death at t* where kT*ln(2)*C(t*)*log(N) > E_metabolism"
+    },
+    "lifespan": {
+      "statement": "Maximum lifespan derivable from coordination parameters",
+      "equation": "L_max = (E_met/(kT*ln(2)*C_0*log(N)) - 1) / gamma"
+    },
+    "cancer": {
+      "statement": "Cancer = coordination defection by cells",
+      "mechanism": "Game-theoretic: defect > cooperate becomes rational"
+    }
+  },
+  "key_results": {
+    "life_is_coordination": true,
+    "aging_is_C_increase": true,
+    "death_is_threshold": true,
+    "lifespan_derivable": true,
+    "cancer_is_defection": true,
+    "testable_predictions": 9
+  },
+  "connections": {
+    "phase_38": "Coordination thermodynamics provides foundation",
+    "phase_102": "Master equation applies to biology",
+    "phase_145": "Consciousness uses same coordination framework",
+    "phase_18": "Biological systems achieve coordination bounds"
+  },
+  "new_questions": [
+    "Q696",
+    "Q697",
+    "Q698",
+    "Q699",
+    "Q700",
+    "Q701",
+    "Q702",
+    "Q703",
+    "Q704",
+    "Q705"
+  ],
+  "questions_total": 705,
+  "status": {
+    "Q681": "ADDRESSED - Aging = C(t) increasing monotonically",
+    "Q682": "ADDRESSED - Death = E_coord > E_metabolism",
+    "Q683": "OPEN - Measurement methods proposed",
+    "Q684": "ADDRESSED - Long-lived species have lower gamma/higher efficiency",
+    "Q686": "ADDRESSED - Cancer = coordination defection"
+  },
+  "timestamp": "2026-01-27T16:39:16.201384"
+}
