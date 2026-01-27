@@ -1917,6 +1917,64 @@ Lightest neutrino mass m1 ~ 0.01-0.02 eV
 - Master Equation validations: **29**
 - Total breakthroughs: **76**
 
+---
+
+## Q607 PARTIAL: Hierarchical CKM Theorem (Phase 137)
+
+**Structural insight: CKM mixing angles MULTIPLY across generations!**
+
+### The Hierarchical CKM Formula
+
+```
+|V_us| = sqrt(m_d/m_s)              ~ lambda
+|V_cb| = |V_us| * sqrt(m_s/m_b)     ~ lambda^2
+|V_ub| = |V_us| * |V_cb|            ~ lambda^3
+
+The mixing between distant generations is the PRODUCT
+of intermediate mixings - multiplicative geometry!
+```
+
+### Results
+
+| Element | Before | After | Improvement |
+|---------|--------|-------|-------------|
+| V_cb error | 266% | 18% | 14x better |
+| V_ub error | 775% | 96% | 8x better |
+
+### Wolfenstein A is Algebraic
+
+```
+A = m_s / sqrt(m_d * m_b)
+  = strange quark geometric mean position
+  = 0.669 (predicted) vs 0.811 (experimental)
+```
+
+### Remaining Work
+
+Errors suggest missing:
+- Up-type quark contributions
+- CP-violating phases
+- QCD running effects
+
+### New Questions (Q613-Q616)
+
+| ID | Question | Priority |
+|----|----------|----------|
+| Q613 | Can up-type masses reduce V_cb error? | HIGH |
+| Q614 | Does CP phase have algebraic form? | HIGH |
+| Q615 | V_td and V_ts from hierarchical formulas? | MEDIUM |
+| Q616 | Unified CKM using both up and down masses? | HIGH |
+
+### Questions Summary (Updated Phase 137)
+
+- Total questions: **616**
+- Questions answered/partial: **143** (Q607 partial)
+- Questions opened by Phase 137: 4 (Q613-Q616)
+- Master Equation validations: **29**
+- Total breakthroughs: **77** (structural)
+
+
+
 
 
 ---

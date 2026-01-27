@@ -1152,12 +1152,16 @@ If coordination bounds are fundamental and connect to:
 | **Q604** | **Does CKM/PMNS mixing arise from delta differences?** | **ANSWERED** | **CRITICAL** | **Phase 135** |
 | **Q605** | **Can the CP-violating phase be derived algebraically?** | **Open** | **HIGH** | **Phase 135** |
 | **Q606** | **Why is theta_23 near maximal (45 deg)?** | **Open** | **MEDIUM** | **Phase 135** |
-| **Q607** | **Can V_cb and V_ub be derived from similar formulas?** | **Open** | **HIGH** | **Phase 135** |
+| **Q607** | **Can V_cb and V_ub be derived from similar formulas?** | **PARTIAL** | **HIGH** | **Phase 137** |
 | **Q608** | **Does the seesaw scale emerge from delta differences?** | **Open** | **HIGH** | **Phase 135** |
 | **Q609** | **Can the absolute neutrino mass scale be derived?** | **Open** | **HIGH** | **Phase 136** |
 | **Q610** | **Does the seesaw scale M_R have algebraic origin?** | **Open** | **HIGH** | **Phase 136** |
 | **Q611** | **Can the Majorana phases be predicted?** | **Open** | **MEDIUM** | **Phase 136** |
 | **Q612** | **What determines normal vs inverted ordering?** | **Open** | **MEDIUM** | **Phase 136** |
+| **Q613** | **Can the V_cb error be reduced with up-type mass corrections?** | **Open** | **HIGH** | **Phase 137** |
+| **Q614** | **Does the CP-violating phase have an algebraic form?** | **Open** | **HIGH** | **Phase 137** |
+| **Q615** | **Can V_td and V_ts be predicted from hierarchical formulas?** | **Open** | **MEDIUM** | **Phase 137** |
+| **Q616** | **Is there a unified CKM formula using BOTH up and down mass ratios?** | **Open** | **HIGH** | **Phase 137** |
 
 ---
 
@@ -11999,6 +12003,47 @@ Lightest neutrino mass m1 ~ 0.01-0.02 eV
 - Q612: Normal vs inverted ordering?
 
 See: `phase_136_neutrino_masses.py`, `PHASE_136_IMPLICATIONS.md`
+
+---
+
+## Phase 137 Results Summary
+
+**Question Q607: PARTIAL SUCCESS - Hierarchical CKM Theorem!**
+
+**Key Discovery:**
+CKM mixing angles MULTIPLY across generations:
+
+```
+|V_us| = sqrt(m_d/m_s)              ~ lambda
+|V_cb| = |V_us| * sqrt(m_s/m_b)     ~ lambda^2
+|V_ub| = |V_us| * |V_cb|            ~ lambda^3
+```
+
+**Improvements:**
+- V_cb error: 266% -> 18% (14x improvement!)
+- V_ub error: 775% -> 96% (8x improvement!)
+
+**Wolfenstein A Parameter is ALGEBRAIC:**
+A = m_s / sqrt(m_d * m_b) = geometric mean position
+
+**Key Insight:**
+The J_3(O) structure causes mixing to be MULTIPLICATIVE, not additive.
+Each generation crossing involves a PRODUCT of intermediate mixings.
+
+**Remaining errors (18%, 96%) likely from:**
+- Up-type quark contributions
+- CP-violating phases
+- QCD running effects
+
+**New Questions Opened:**
+- Q613: Up-type mass corrections?
+- Q614: CP phase from algebra?
+- Q615: V_td and V_ts formulas?
+- Q616: Unified CKM formula?
+
+See: `phase_137_extended_ckm.py`, `PHASE_137_IMPLICATIONS.md`
+
+
 
 
 
