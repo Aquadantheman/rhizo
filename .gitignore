@@ -48,3 +48,6 @@ htmlcov/
 # Benchmark results (machine-specific)
 /benchmarks/results/
 /benchmarks/archive/
+
+# Sandbox (work in progress, not for public)
+/sandbox/
