@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use super::types::*;
 use super::epoch::*;
@@ -33,6 +33,10 @@ pub struct TransactionManager {
 
     /// Recently committed transactions in current epoch (for conflict checking)
     recent_committed: RwLock<Vec<TransactionRecord>>,
+
+    /// Serializes the commit critical section (conflict check → catalog write → recent_committed update).
+    /// Prevents TOCTOU race where two concurrent commits both pass conflict checks before either applies writes.
+    commit_lock: Mutex<()>,
 
     /// Conflict detector (pluggable strategy)
     conflict_detector: Arc<dyn ConflictDetector + Send + Sync>,
@@ -76,6 +80,7 @@ impl TransactionManager {
             config: storage_config.epoch_config,
             active_transactions: RwLock::new(HashMap::new()),
             recent_committed: RwLock::new(Vec::new()),
+            commit_lock: Mutex::new(()),
             conflict_detector: Arc::new(TableLevelConflictDetector::new()),
             catalog,
             branch_manager,
@@ -173,8 +178,13 @@ impl TransactionManager {
     }
 
     /// Commit a transaction
+    ///
+    /// The commit path is serialized via `commit_lock` to prevent a TOCTOU race
+    /// where two concurrent commits both pass conflict checks before either applies
+    /// writes to the catalog. The lock is held from conflict detection through
+    /// catalog write and recent_committed update, ensuring linearizable commits.
     pub fn commit(&self, tx_id: TxId) -> Result<(), TransactionError> {
-        // Get transaction from active set
+        // Get transaction from active set (outside commit lock — read-only)
         let tx = {
             let active = self.active_transactions.read()
                 .map_err(|_| TransactionError::LockError("active_transactions".to_string()))?;
@@ -186,6 +196,12 @@ impl TransactionManager {
         if !tx.is_active() {
             return Err(TransactionError::TransactionNotActive(tx_id));
         }
+
+        // === BEGIN SERIALIZED COMMIT CRITICAL SECTION ===
+        // Hold commit_lock from conflict check through catalog write to prevent
+        // two transactions from both passing conflict checks concurrently.
+        let _commit_guard = self.commit_lock.lock()
+            .map_err(|_| TransactionError::LockError("commit_lock".to_string()))?;
 
         // Check for conflicts with recently committed transactions
         self.check_conflicts(&tx)?;
@@ -218,7 +234,10 @@ impl TransactionManager {
             recent.push(committed_tx.clone());
         }
 
-        // Remove from active set
+        // === END SERIALIZED COMMIT CRITICAL SECTION ===
+        // commit_lock released here (drop of _commit_guard)
+
+        // Remove from active set (safe outside lock — tx_id is unique)
         {
             let mut active = self.active_transactions.write()
                 .map_err(|_| TransactionError::LockError("active_transactions".to_string()))?;
