@@ -85,8 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Backwards compatible**: New exceptions inherit from standard exception types
 
 ### Testing
-- 370 Rust tests passing
-- 348 Python tests passing
+- 443 Rust tests passing
+- 454 Python tests passing
 - All linting clean (clippy, ruff)
 
 ---

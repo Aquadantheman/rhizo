@@ -9,6 +9,8 @@ These custom exceptions provide:
 
 from __future__ import annotations
 
+import re
+
 
 class RhizoError(Exception):
     """Base class for all Rhizo-specific errors."""
@@ -67,3 +69,48 @@ class SizeLimitExceededError(RhizoError, ValueError):
         super().__init__(
             f"Size limit exceeded: {actual:,} {unit} > {maximum:,} {unit} maximum"
         )
+
+
+# Pre-compiled regex for table name validation
+_TABLE_NAME_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+
+
+def validate_table_name(table_name: str) -> str:
+    """
+    Validate and normalize a table name to prevent path traversal attacks.
+
+    This should be called at every public entry point that accepts a table name.
+
+    Args:
+        table_name: Name of the table to validate
+
+    Returns:
+        Normalized (lowercase) table name
+
+    Raises:
+        ValueError: If table name is invalid
+    """
+    if not table_name:
+        raise ValueError("Table name cannot be empty")
+
+    # Normalize to lowercase
+    normalized = table_name.lower()
+
+    # Check length (reasonable limit to prevent issues)
+    if len(normalized) > 128:
+        raise ValueError(f"Table name too long (max 128 chars): {len(normalized)} chars")
+
+    # Must be a valid identifier: start with letter/underscore, alphanumeric + underscore only
+    if not _TABLE_NAME_PATTERN.match(normalized):
+        raise ValueError(
+            f"Invalid table name '{table_name}': must start with a letter or underscore "
+            "and contain only letters, numbers, and underscores"
+        )
+
+    # Explicitly check for path traversal patterns (defense in depth)
+    dangerous_patterns = ['..', '/', '\\', '\x00']
+    for pattern in dangerous_patterns:
+        if pattern in table_name:
+            raise ValueError(f"Invalid table name '{table_name}': contains forbidden character sequence")
+
+    return normalized

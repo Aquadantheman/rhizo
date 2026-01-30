@@ -26,7 +26,7 @@ from .reader import TableReader
 from .writer import TableWriter, WriteResult
 from .olap_engine import OLAPEngine, is_datafusion_available
 from .logging import get_logger
-from .exceptions import TableNotFoundError
+from .exceptions import TableNotFoundError, validate_table_name
 
 _logger = get_logger(__name__)
 
@@ -40,43 +40,8 @@ if TYPE_CHECKING:
     from .subscriber import Subscriber
 
 
-def _validate_table_name(table_name: str) -> str:
-    """
-    Validate and normalize a table name to prevent path traversal attacks.
-
-    Args:
-        table_name: Name of the table to validate
-
-    Returns:
-        Normalized (lowercase) table name
-
-    Raises:
-        ValueError: If table name is invalid
-    """
-    if not table_name:
-        raise ValueError("Table name cannot be empty")
-
-    # Normalize to lowercase
-    normalized = table_name.lower()
-
-    # Check length (reasonable limit to prevent issues)
-    if len(normalized) > 128:
-        raise ValueError(f"Table name too long (max 128 chars): {len(normalized)} chars")
-
-    # Must be a valid identifier: start with letter/underscore, alphanumeric + underscore only
-    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', normalized):
-        raise ValueError(
-            f"Invalid table name '{table_name}': must start with a letter or underscore "
-            "and contain only letters, numbers, and underscores"
-        )
-
-    # Explicitly check for path traversal patterns (defense in depth)
-    dangerous_patterns = ['..', '/', '\\', '\x00']
-    for pattern in dangerous_patterns:
-        if pattern in table_name:
-            raise ValueError(f"Invalid table name '{table_name}': contains forbidden character sequence")
-
-    return normalized
+# Backwards-compatible alias for the shared validation function
+_validate_table_name = validate_table_name
 
 
 @dataclass
@@ -525,7 +490,8 @@ class QueryEngine:
         if self._olap is None:
             raise RuntimeError("OLAP engine not available")
 
-        self._olap.clear_cache(table_name)
+        validated = validate_table_name(table_name) if table_name else None
+        self._olap.clear_cache(validated)
 
     def olap_preload(
         self,
@@ -547,8 +513,9 @@ class QueryEngine:
         if self._olap is None:
             raise RuntimeError("OLAP engine not available")
 
+        validated_name = validate_table_name(table_name)
         effective_branch = branch or self._current_branch
-        self._olap.preload(table_name, version, effective_branch)
+        self._olap.preload(validated_name, version, effective_branch)
 
     def query_changelog(
         self,
@@ -673,20 +640,20 @@ class QueryEngine:
             ValueError: If table_name is invalid
         """
         # Validate table name to prevent path traversal
-        validated_name = _validate_table_name(table_name)
+        validated_name = validate_table_name(table_name)
         result = self.writer.write(validated_name, data, metadata)
 
         # Update branch head if branch_manager is configured
         if self.branch_manager is not None:
             effective_branch = branch or self._current_branch
-            self.branch_manager.update_head(effective_branch, table_name, result.version)
+            self.branch_manager.update_head(effective_branch, validated_name, result.version)
 
         # Invalidate cache for this table (force reload on next query)
-        self._invalidate_cache(table_name)
+        self._invalidate_cache(validated_name)
 
         # Also invalidate OLAP cache
         if self._olap is not None:
-            self._olap.clear_cache(table_name)
+            self._olap.clear_cache(validated_name)
 
         return result
 
@@ -696,7 +663,8 @@ class QueryEngine:
 
     def list_versions(self, table_name: str) -> List[int]:
         """List all versions of a table."""
-        return self.reader.list_versions(table_name)
+        validated_name = validate_table_name(table_name)
+        return self.reader.list_versions(validated_name)
 
     # =========================================================================
     # Transaction Operations
@@ -935,6 +903,8 @@ class QueryEngine:
             "added_in_source": diff.added_in_source,
             "added_in_target": diff.added_in_target,
             "has_conflicts": diff.has_conflicts,
+            "source_only_changes": diff.source_only_changes,
+            "target_only_changes": diff.target_only_changes,
         }
 
     def merge_branch(self, source: str, into: Optional[str] = None) -> None:
@@ -970,10 +940,11 @@ class QueryEngine:
         Returns:
             Dict with table metadata and schema info
         """
-        metadata = self.reader.get_metadata(table_name, version)
+        validated_name = validate_table_name(table_name)
+        metadata = self.reader.get_metadata(validated_name, version)
 
         # Load schema from first chunk
-        arrow_table = self.reader.read_arrow(table_name, version)
+        arrow_table = self.reader.read_arrow(validated_name, version)
 
         return {
             "table_name": metadata.table_name,
@@ -1012,11 +983,12 @@ class QueryEngine:
         Raises:
             ValueError: If key_columns contain invalid characters
         """
-        table_a = self.reader.read_arrow(table_name, version_a)
-        table_b = self.reader.read_arrow(table_name, version_b)
+        validated_name = validate_table_name(table_name)
+        table_a = self.reader.read_arrow(validated_name, version_a)
+        table_b = self.reader.read_arrow(validated_name, version_b)
 
         result = {
-            "table_name": table_name,
+            "table_name": validated_name,
             "version_a": version_a,
             "version_b": version_b,
             "rows_a": table_a.num_rows,

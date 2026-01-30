@@ -223,7 +223,7 @@ Rhizo rearchitects data infrastructure around content-addressable storage. This 
 - **Unified batch/stream semantics**
 - **Coordination-free distributed transactions**
 
-All core phases complete. 935 tests passing (443 Rust + 492 Python).
+All core phases complete. 897 tests passing (443 Rust + 454 Python).
 
 **Measured results:** 33,000x faster than consensus, 97,943x less energy, 32x faster OLAP than DuckDB, 450,000x smaller branches than Delta Lake.
 

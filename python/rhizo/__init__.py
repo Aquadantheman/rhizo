@@ -91,14 +91,20 @@ from _rhizo import (
     PyAlgebraicTransaction,
     PyVersionedUpdate,
     PyLocalCommitProtocol,
-    # Simulation types (multi-node convergence testing)
-    PyNetworkCondition,
-    PySimulationConfig,
-    PySimulationStats,
-    PySimulatedNode,
-    PySimulatedCluster,
-    PySimulationBuilder,
 )
+
+# Simulation types (optional — only available when compiled with simulation support)
+try:
+    from _rhizo import (
+        PyNetworkCondition,
+        PySimulationConfig,
+        PySimulationStats,
+        PySimulatedNode,
+        PySimulatedCluster,
+        PySimulationBuilder,
+    )
+except ImportError:
+    pass
 
 try:
     from ._version import version as __version__

@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Optional, Union, List, Dict, Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from rhizo.exceptions import validate_table_name
+
 if TYPE_CHECKING:
     import pandas as pd
 
@@ -144,6 +146,8 @@ class TableWriter:
         Raises:
             ValueError: If data is empty, invalid, or exceeds size limits
         """
+        table_name = validate_table_name(table_name)
+
         # Convert to Arrow Table if needed
         table = self._to_arrow(data)
 
@@ -215,6 +219,8 @@ class TableWriter:
         Raises:
             ValueError: If data is empty, invalid, or exceeds size limits
         """
+        table_name = validate_table_name(table_name)
+
         # Convert to Arrow Table if needed
         table = self._to_arrow(data)
 

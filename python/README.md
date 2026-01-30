@@ -252,7 +252,7 @@ Application Layer
 | Phase A: Merkle Storage | O(change) deduplication via Merkle trees | Complete |
 | **Phase P: Performance** | Native Rust Parquet, parallel I/O | **Complete** |
 
-**All phases complete. 632 tests passing (370 Rust + 262 Python).**
+**All phases complete. 897 tests passing (443 Rust + 454 Python).**
 
 ### Performance Optimization Journey
 

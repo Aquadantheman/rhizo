@@ -188,9 +188,10 @@ class TestQueryEngineBranchIntegration:
         # Compare branches
         diff = engine.diff_branches("feature/test", "main")
 
-        assert diff["has_conflicts"] is True
-        assert len(diff["modified"]) == 1
-        assert diff["modified"][0][0] == "users"
+        # With three-way merge, source-only changes are not conflicts
+        assert diff["has_conflicts"] is False
+        assert len(diff["source_only_changes"]) == 1
+        assert diff["source_only_changes"][0][0] == "users"
 
     def test_merge_branch_via_engine(self, temp_storage):
         """Test merging branches through engine."""

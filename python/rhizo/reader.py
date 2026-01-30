@@ -20,7 +20,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from rhizo.cache import ArrowChunkCache, ChunkCacheStats
-from rhizo.exceptions import EmptyResultError
+from rhizo.exceptions import EmptyResultError, validate_table_name
 
 # Default integrity verification: True for safety, override with RHIZO_VERIFY_INTEGRITY=false
 _DEFAULT_VERIFY_INTEGRITY = os.environ.get("RHIZO_VERIFY_INTEGRITY", "true").lower() != "false"
@@ -274,6 +274,7 @@ class TableReader:
         Raises:
             IOError: If table or version not found
         """
+        table_name = validate_table_name(table_name)
         table_version = self.catalog.get_version(table_name, version)
 
         return TableMetadata(
@@ -681,6 +682,7 @@ class TableReader:
         Returns:
             List of version numbers in ascending order
         """
+        table_name = validate_table_name(table_name)
         return self.catalog.list_versions(table_name)
 
     def list_tables(self) -> List[str]:

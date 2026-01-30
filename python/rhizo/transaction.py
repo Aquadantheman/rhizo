@@ -36,6 +36,8 @@ from typing import TYPE_CHECKING, Optional, Dict, List, Any, Union
 
 import pyarrow as pa
 
+from rhizo.exceptions import validate_table_name
+
 if TYPE_CHECKING:
     import pandas as pd
     from .engine import QueryEngine, QueryResult
@@ -207,6 +209,7 @@ class TransactionContext:
             RuntimeError: If transaction is no longer active
         """
         self._check_active("write")
+        table_name = validate_table_name(table_name)
 
         # Import pandas for type checking
         try:

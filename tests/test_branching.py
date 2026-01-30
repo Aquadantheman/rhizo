@@ -193,9 +193,10 @@ class TestBranchDiff:
 
         diff = manager.diff("feature", "main")
 
+        # With three-way merge, source-only changes are not conflicts
         assert diff.unchanged == []
-        assert ("users", 2, 1) in diff.modified
-        assert diff.has_conflicts is True
+        assert ("users", 2, 1) in diff.source_only_changes
+        assert diff.has_conflicts is False
 
     def test_diff_added_tables(self, temp_storage):
         """Test diff with tables added on one branch."""
