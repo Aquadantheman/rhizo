@@ -350,9 +350,19 @@ impl TransactionLog {
         Ok(entries)
     }
 
-    /// Read transaction record
+    /// Read transaction record.
+    ///
+    /// Uses the committed index for O(1) epoch lookup when available,
+    /// falling back to linear epoch scan for uncommitted or pre-index transactions.
     pub fn read_transaction(&self, tx_id: TxId) -> Result<TransactionRecord, TransactionError> {
-        // Search through epochs (most recent first)
+        // Fast path: look up epoch from committed index
+        if let Ok(Some(entries)) = self.read_committed_index() {
+            if let Some(&(epoch_id, _)) = entries.iter().find(|(_, tid)| *tid == tx_id) {
+                return self.read_transaction_from_epoch(tx_id, epoch_id);
+            }
+        }
+
+        // Fallback: linear scan across epochs (handles uncommitted or pre-index txns)
         let epochs = self.list_epochs()?;
 
         for epoch_id in epochs.into_iter().rev() {
