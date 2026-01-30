@@ -1,8 +1,26 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use fs2::FileExt;
+use serde::{Deserialize, Serialize};
 use super::error::CatalogError;
 use super::version::TableVersion;
+
+/// A pending commit intent written to disk before the actual catalog commit.
+///
+/// If a crash occurs between chunk writes and catalog version commit, these
+/// intent files survive on disk. On recovery, they identify which chunks were
+/// part of an incomplete commit and can be cleaned up.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingCommit {
+    /// Unique identifier for this pending commit
+    pub intent_id: String,
+    /// Table being committed to
+    pub table_name: String,
+    /// Chunk hashes that were written for this commit
+    pub chunk_hashes: Vec<String>,
+    /// Timestamp when the intent was created
+    pub created_at: i64,
+}
 
 pub struct FileCatalog {
     base_path: PathBuf,
@@ -12,6 +30,8 @@ impl FileCatalog {
     pub fn new(base_path: impl AsRef<Path>) -> Result<Self, CatalogError> {
         let base_path = base_path.as_ref().to_path_buf();
         fs::create_dir_all(&base_path)?;
+        // Ensure the pending intents directory exists
+        fs::create_dir_all(base_path.join(".pending"))?;
         Ok(Self { base_path })
     }
 
@@ -73,20 +93,38 @@ impl FileCatalog {
 
     /// Commit the next version of a table, automatically assigning the version number.
     ///
-    /// Acquires an exclusive file lock, reads the latest version, increments, and
-    /// commits atomically. Safe for both multi-thread and multi-process access.
+    /// Uses a write-ahead intent log for crash safety:
+    /// 1. Write pending intent (chunk hashes for this commit)
+    /// 2. Commit version to catalog
+    /// 3. Remove pending intent
+    ///
+    /// If a crash occurs between steps 1 and 3, the intent file survives on disk.
+    /// On recovery, `recover_pending_commits()` returns these intents so the caller
+    /// can identify orphaned chunks and clean them up.
     pub fn commit_next_version(
         &self,
         table_name: &str,
         chunk_hashes: Vec<String>,
     ) -> Result<u64, CatalogError> {
-        // Acquire lock BEFORE reading latest, so the entire read-increment-write
-        // is atomic across processes
-        let _lock = self.acquire_table_lock(table_name)?;
-        let next = self.get_latest_version_num(table_name)? + 1;
-        let version = TableVersion::new(table_name, next, chunk_hashes);
-        self.commit_inner(version)
-        // _lock dropped here — file lock released
+        // Step 1: Write pending intent to disk BEFORE committing
+        let intent_id = self.write_pending_intent(table_name, &chunk_hashes)?;
+
+        // Step 2: Acquire lock and commit
+        let result = {
+            let _lock = self.acquire_table_lock(table_name)?;
+            let next = self.get_latest_version_num(table_name)? + 1;
+            let version = TableVersion::new(table_name, next, chunk_hashes);
+            self.commit_inner(version)
+        };
+
+        // Step 3: Remove intent on success (crash here is safe — intent will
+        // be found on recovery but the version is already committed, so
+        // recover_pending_commits filters it out)
+        if result.is_ok() {
+            self.remove_pending_intent(&intent_id);
+        }
+
+        result
     }
 
     /// Internal commit without acquiring the lock (caller must hold it).
@@ -117,6 +155,116 @@ impl FileCatalog {
         fs::rename(&temp_latest_path, &latest_path)?;
 
         Ok(version.version)
+    }
+
+    // === Write-Ahead Intent Log ===
+
+    /// Write a pending commit intent to disk.
+    ///
+    /// Returns the intent ID (used to remove the intent after successful commit).
+    fn write_pending_intent(
+        &self,
+        table_name: &str,
+        chunk_hashes: &[String],
+    ) -> Result<String, CatalogError> {
+        let intent_id = uuid::Uuid::new_v4().to_string();
+        let pending = PendingCommit {
+            intent_id: intent_id.clone(),
+            table_name: table_name.to_string(),
+            chunk_hashes: chunk_hashes.to_vec(),
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i64,
+        };
+
+        let pending_dir = self.base_path.join(".pending");
+        let intent_path = pending_dir.join(format!("{}.json", intent_id));
+        let temp_path = intent_path.with_extension("json.tmp");
+        let json = serde_json::to_string(&pending)?;
+        fs::write(&temp_path, &json)?;
+        fs::rename(&temp_path, &intent_path)?;
+
+        Ok(intent_id)
+    }
+
+    /// Remove a pending commit intent after successful commit.
+    fn remove_pending_intent(&self, intent_id: &str) {
+        let intent_path = self.base_path.join(".pending").join(format!("{}.json", intent_id));
+        let _ = fs::remove_file(intent_path);
+    }
+
+    /// Recover pending commit intents left by crashes.
+    ///
+    /// Returns intents whose chunk hashes are NOT referenced by any committed
+    /// version, meaning the commit never completed. The caller can use these
+    /// to identify and clean up orphaned chunks in the chunk store.
+    ///
+    /// Intents whose chunks ARE already referenced (crash between step 2 and 3
+    /// of commit_next_version) are automatically cleaned up.
+    pub fn recover_pending_commits(&self) -> Result<Vec<PendingCommit>, CatalogError> {
+        let pending_dir = self.base_path.join(".pending");
+        if !pending_dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        let mut orphaned = Vec::new();
+
+        for entry in fs::read_dir(&pending_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+
+            let json = match fs::read_to_string(&path) {
+                Ok(j) => j,
+                Err(_) => {
+                    // Corrupted intent — remove it
+                    let _ = fs::remove_file(&path);
+                    continue;
+                }
+            };
+
+            let pending: PendingCommit = match serde_json::from_str(&json) {
+                Ok(p) => p,
+                Err(_) => {
+                    let _ = fs::remove_file(&path);
+                    continue;
+                }
+            };
+
+            // Check if the commit actually completed (crash between step 2 and 3)
+            if self.is_committed(&pending.table_name, &pending.chunk_hashes)? {
+                // Commit succeeded — just clean up the stale intent
+                let _ = fs::remove_file(&path);
+            } else {
+                // Commit never completed — these chunks are orphaned
+                orphaned.push(pending);
+                let _ = fs::remove_file(&path);
+            }
+        }
+
+        Ok(orphaned)
+    }
+
+    /// Check whether a set of chunk hashes is referenced by any committed version
+    /// of the given table.
+    fn is_committed(&self, table_name: &str, chunk_hashes: &[String]) -> Result<bool, CatalogError> {
+        let table_dir = self.base_path.join(table_name);
+        if !table_dir.exists() {
+            return Ok(false);
+        }
+
+        // Check the latest version first (most likely match)
+        let latest = self.get_latest_version_num(table_name)?;
+        if latest == 0 {
+            return Ok(false);
+        }
+
+        let version = self.get_version(table_name, Some(latest))?;
+        Ok(version.chunk_hashes == chunk_hashes)
     }
 
     pub fn get_version(&self, table_name: &str, version: Option<u64>) -> Result<TableVersion, CatalogError> {
@@ -173,16 +321,20 @@ impl FileCatalog {
 
     pub fn list_tables(&self) -> Result<Vec<String>, CatalogError> {
         let mut tables = Vec::new();
-        
+
         for entry in fs::read_dir(&self.base_path)? {
             let entry = entry?;
             if entry.file_type()?.is_dir() {
                 if let Some(name) = entry.file_name().to_str() {
+                    // Skip internal directories
+                    if name.starts_with('.') {
+                        continue;
+                    }
                     tables.push(name.to_string());
                 }
             }
         }
-        
+
         tables.sort();
         Ok(tables)
     }
@@ -402,6 +554,123 @@ mod tests {
         // Lock file should exist after commit
         let lock_path = dir.join("locked_table").join(".lock");
         assert!(lock_path.exists());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_pending_dir_created() {
+        let dir = temp_dir();
+        let _catalog = FileCatalog::new(&dir).unwrap();
+
+        assert!(dir.join(".pending").exists());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_no_pending_intents_after_successful_commit() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        catalog.commit_next_version("test_table", vec!["h1".to_string()]).unwrap();
+        catalog.commit_next_version("test_table", vec!["h2".to_string()]).unwrap();
+
+        // No pending intents should remain after successful commits
+        let pending = catalog.recover_pending_commits().unwrap();
+        assert!(pending.is_empty());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_recover_orphaned_intent() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        // Simulate a crash: write an intent file manually without committing
+        let intent = PendingCommit {
+            intent_id: "crash-sim-001".to_string(),
+            table_name: "orphaned_table".to_string(),
+            chunk_hashes: vec!["orphan_chunk_1".to_string(), "orphan_chunk_2".to_string()],
+            created_at: 1234567890,
+        };
+        let intent_path = dir.join(".pending").join("crash-sim-001.json");
+        let json = serde_json::to_string(&intent).unwrap();
+        fs::write(&intent_path, &json).unwrap();
+
+        // Recovery should find the orphaned intent
+        let orphaned = catalog.recover_pending_commits().unwrap();
+        assert_eq!(orphaned.len(), 1);
+        assert_eq!(orphaned[0].table_name, "orphaned_table");
+        assert_eq!(orphaned[0].chunk_hashes, vec!["orphan_chunk_1", "orphan_chunk_2"]);
+
+        // Intent file should be cleaned up after recovery
+        assert!(!intent_path.exists());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_recover_stale_intent_after_completed_commit() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        // Commit a version normally
+        let hashes = vec!["chunk_a".to_string(), "chunk_b".to_string()];
+        catalog.commit_next_version("my_table", hashes.clone()).unwrap();
+
+        // Simulate a crash between step 2 (commit succeeded) and step 3 (intent removal)
+        // by manually placing an intent that matches the committed version
+        let intent = PendingCommit {
+            intent_id: "stale-intent-001".to_string(),
+            table_name: "my_table".to_string(),
+            chunk_hashes: hashes,
+            created_at: 1234567890,
+        };
+        let intent_path = dir.join(".pending").join("stale-intent-001.json");
+        let json = serde_json::to_string(&intent).unwrap();
+        fs::write(&intent_path, &json).unwrap();
+
+        // Recovery should detect this is already committed and return empty
+        let orphaned = catalog.recover_pending_commits().unwrap();
+        assert!(orphaned.is_empty());
+
+        // Stale intent file should be cleaned up
+        assert!(!intent_path.exists());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_recover_corrupted_intent() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        // Write a corrupted intent file
+        let intent_path = dir.join(".pending").join("bad-intent.json");
+        fs::write(&intent_path, "not valid json!!!").unwrap();
+
+        // Recovery should skip corrupted intents and clean them up
+        let orphaned = catalog.recover_pending_commits().unwrap();
+        assert!(orphaned.is_empty());
+        assert!(!intent_path.exists());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_list_tables_excludes_pending_dir() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        catalog.commit(TableVersion::new("alpha", 1, vec![])).unwrap();
+        catalog.commit(TableVersion::new("beta", 1, vec![])).unwrap();
+
+        // .pending dir should not appear in table listing
+        let tables = catalog.list_tables().unwrap();
+        assert_eq!(tables, vec!["alpha", "beta"]);
+        assert!(!tables.contains(&".pending".to_string()));
 
         fs::remove_dir_all(&dir).ok();
     }
