@@ -996,6 +996,10 @@ struct PyBranchDiff {
     added_in_target: Vec<(String, u64)>,
     #[pyo3(get)]
     has_conflicts: bool,
+    #[pyo3(get)]
+    source_only_changes: Vec<(String, u64, u64)>,
+    #[pyo3(get)]
+    target_only_changes: Vec<(String, u64, u64)>,
 }
 
 impl From<BranchDiff> for PyBranchDiff {
@@ -1008,6 +1012,8 @@ impl From<BranchDiff> for PyBranchDiff {
             added_in_source: d.added_in_source,
             added_in_target: d.added_in_target,
             has_conflicts: d.has_conflicts,
+            source_only_changes: d.source_only_changes,
+            target_only_changes: d.target_only_changes,
         }
     }
 }
@@ -3249,6 +3255,8 @@ fn analyze_merge(diff: &PyBranchDiff, registry: &PyAlgebraicSchemaRegistry) -> P
         added_in_source: diff.added_in_source.clone(),
         added_in_target: diff.added_in_target.clone(),
         has_conflicts: diff.has_conflicts,
+        source_only_changes: Vec::new(),
+        target_only_changes: Vec::new(),
     };
     let analyzer = MergeAnalyzer::new(&registry.inner);
     PyMergeAnalysis::from(analyzer.analyze(&rust_diff))

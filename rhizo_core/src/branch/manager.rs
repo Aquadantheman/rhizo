@@ -164,28 +164,29 @@ impl BranchManager {
         Ok(branch.get_table_version(table_name))
     }
 
-    /// Compare two branches.
+    /// Compare two branches using three-way merge when fork point is available.
     pub fn diff(&self, source: &str, target: &str) -> Result<BranchDiff, BranchError> {
         let source_branch = self.get(source)?;
         let target_branch = self.get(target)?;
         Ok(BranchDiff::compute(&source_branch, &target_branch))
     }
 
-    /// Check if a fast-forward merge is possible.
-    ///
-    /// Fast-forward is possible when target branch has not diverged from source,
-    /// meaning all tables in target either don't exist in source or have the
-    /// same version.
+    /// Check if a merge is possible (no true conflicts after three-way analysis).
     pub fn can_fast_forward(&self, source: &str, target: &str) -> Result<bool, BranchError> {
         let diff = self.diff(source, target)?;
-        // Can fast-forward if no modifications (divergence)
         Ok(!diff.has_conflicts)
     }
 
-    /// Merge source branch into target branch (fast-forward only).
+    /// Merge source branch into target branch.
     ///
-    /// This updates target to have the same head pointers as source.
-    /// Fails if branches have diverged (both modified same table).
+    /// Uses three-way merge when a fork point is available:
+    /// - Source-only changes are applied to target automatically
+    /// - Target-only changes are preserved automatically
+    /// - Added tables from source are included
+    /// - True conflicts (both changed same table) cause an error
+    ///
+    /// Without a fork point, falls back to fast-forward (all source heads
+    /// overwrite target).
     pub fn merge_fast_forward(&self, source: &str, into: &str) -> Result<(), BranchError> {
         let diff = self.diff(source, into)?;
 
@@ -194,16 +195,28 @@ impl BranchManager {
             return Err(BranchError::MergeConflict(conflicting));
         }
 
-        // Get both branches
         let source_branch = self.get(source)?;
         let mut target_branch = self.get(into)?;
 
-        // Update target with all source head pointers
-        for (table, version) in &source_branch.head {
+        // Apply source-only changes (source diverged from base, target didn't)
+        for (table, src_version, _) in &diff.source_only_changes {
+            target_branch.set_table_version(table, *src_version);
+        }
+
+        // Target-only changes: target already has the right version, nothing to do
+
+        // Apply tables added only in source
+        for (table, version) in &diff.added_in_source {
             target_branch.set_table_version(table, *version);
         }
 
-        // Save updated target
+        // If no fork point was available, fall back to overwriting all source heads
+        if source_branch.fork_point.is_none() {
+            for (table, version) in &source_branch.head {
+                target_branch.set_table_version(table, *version);
+            }
+        }
+
         self.save_branch(&target_branch)?;
 
         Ok(())
@@ -448,9 +461,10 @@ mod tests {
 
         let diff = manager.diff("feature", "main").unwrap();
 
-        assert!(diff.modified.contains(&("users".to_string(), 2, 1)));
+        // With three-way merge: only feature changed users (source-only), not a conflict
+        assert!(diff.source_only_changes.contains(&("users".to_string(), 2, 1)));
         assert!(diff.added_in_source.contains(&("orders".to_string(), 1)));
-        assert!(diff.has_conflicts); // users was modified
+        assert!(!diff.has_conflicts); // source-only change, not a true conflict
 
         fs::remove_dir_all(&dir).ok();
     }
@@ -495,9 +509,64 @@ mod tests {
         // Also update users on main to v3 (divergence!)
         manager.update_head("main", "users", 3).unwrap();
 
-        // Should NOT be able to fast-forward
+        // Should NOT be able to fast-forward (true conflict — both changed users)
         assert!(!manager.can_fast_forward("feature", "main").unwrap());
 
+        let result = manager.merge_fast_forward("feature", "main");
+        assert!(matches!(result, Err(BranchError::MergeConflict(_))));
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_three_way_auto_merge() {
+        // Three-way merge: source changes users, target changes orders
+        // Both should be auto-resolved without conflict
+        let dir = temp_dir();
+        let manager = BranchManager::new(&dir).unwrap();
+
+        // Setup main with users=1 and orders=1
+        manager.update_head("main", "users", 1).unwrap();
+        manager.update_head("main", "orders", 1).unwrap();
+
+        // Create feature branch (fork point: users=1, orders=1)
+        manager.create("feature", Some("main"), None).unwrap();
+
+        // Feature changes users to v2
+        manager.update_head("feature", "users", 2).unwrap();
+
+        // Main changes orders to v2 (no conflict with feature's changes)
+        manager.update_head("main", "orders", 2).unwrap();
+
+        // Three-way merge should succeed
+        assert!(manager.can_fast_forward("feature", "main").unwrap());
+        manager.merge_fast_forward("feature", "main").unwrap();
+
+        // After merge: main should have users=2 (from feature) and orders=2 (kept)
+        let main = manager.get("main").unwrap();
+        assert_eq!(main.get_table_version("users"), Some(2));
+        assert_eq!(main.get_table_version("orders"), Some(2));
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_three_way_true_conflict_in_manager() {
+        // Both branches change the same table — true conflict
+        let dir = temp_dir();
+        let manager = BranchManager::new(&dir).unwrap();
+
+        manager.update_head("main", "users", 1).unwrap();
+
+        // Create feature (fork point: users=1)
+        manager.create("feature", Some("main"), None).unwrap();
+
+        // Both change users
+        manager.update_head("feature", "users", 2).unwrap();
+        manager.update_head("main", "users", 3).unwrap();
+
+        // Should fail — true conflict
+        assert!(!manager.can_fast_forward("feature", "main").unwrap());
         let result = manager.merge_fast_forward("feature", "main");
         assert!(matches!(result, Err(BranchError::MergeConflict(_))));
 
