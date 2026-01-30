@@ -7,6 +7,7 @@ with automatic eviction when memory limits are reached.
 
 from __future__ import annotations
 
+import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -97,8 +98,8 @@ class CacheManager:
         >>> cache.invalidate("users")  # Invalidate all versions
 
     Thread Safety:
-        This implementation is NOT thread-safe. For concurrent access,
-        wrap operations in appropriate locks.
+        All public methods are protected by an internal lock and safe
+        for concurrent access from multiple threads.
     """
 
     def __init__(self, max_size_bytes: int = 1_000_000_000):
@@ -113,6 +114,7 @@ class CacheManager:
 
         self._max_size = max_size_bytes
         self._current_size = 0
+        self._lock = threading.Lock()
 
         # OrderedDict maintains insertion order, used for LRU
         self._cache: OrderedDict[CacheKey, CacheEntry] = OrderedDict()
@@ -134,20 +136,21 @@ class CacheManager:
         Returns:
             Arrow table if found, None if not in cache
         """
-        if key not in self._cache:
-            self._misses += 1
-            return None
+        with self._lock:
+            if key not in self._cache:
+                self._misses += 1
+                return None
 
-        # Move to end (most recently used)
-        self._cache.move_to_end(key)
+            # Move to end (most recently used)
+            self._cache.move_to_end(key)
 
-        # Update access metadata
-        entry = self._cache[key]
-        entry.last_accessed = time.time()
-        entry.access_count += 1
+            # Update access metadata
+            entry = self._cache[key]
+            entry.last_accessed = time.time()
+            entry.access_count += 1
 
-        self._hits += 1
-        return entry.table
+            self._hits += 1
+            return entry.table
 
     def put(self, key: CacheKey, table: pa.Table) -> None:
         """
@@ -159,32 +162,33 @@ class CacheManager:
             key: Cache key identifying the table
             table: Arrow table to cache
         """
-        # Calculate size of new entry
+        # Calculate size outside the lock (read-only on table)
         size_bytes = _estimate_arrow_size(table)
 
         # If single entry is larger than max cache, don't cache it
         if size_bytes > self._max_size:
             return
 
-        # Remove existing entry if present (will be re-added with new data)
-        if key in self._cache:
-            self._remove_entry(key)
+        with self._lock:
+            # Remove existing entry if present (will be re-added with new data)
+            if key in self._cache:
+                self._remove_entry(key)
 
-        # Evict entries until we have room
-        while self._current_size + size_bytes > self._max_size and self._cache:
-            self._evict_lru()
+            # Evict entries until we have room
+            while self._current_size + size_bytes > self._max_size and self._cache:
+                self._evict_lru()
 
-        # Add new entry
-        now = time.time()
-        entry = CacheEntry(
-            table=table,
-            size_bytes=size_bytes,
-            created_at=now,
-            last_accessed=now,
-            access_count=0,
-        )
-        self._cache[key] = entry
-        self._current_size += size_bytes
+            # Add new entry
+            now = time.time()
+            entry = CacheEntry(
+                table=table,
+                size_bytes=size_bytes,
+                created_at=now,
+                last_accessed=now,
+                access_count=0,
+            )
+            self._cache[key] = entry
+            self._current_size += size_bytes
 
     def invalidate(self, table_name: str) -> int:
         """
@@ -196,18 +200,19 @@ class CacheManager:
         Returns:
             Number of entries invalidated
         """
-        table_lower = table_name.lower()
+        with self._lock:
+            table_lower = table_name.lower()
 
-        # Find all keys for this table
-        keys_to_remove = [
-            k for k in self._cache if k.table_name.lower() == table_lower
-        ]
+            # Find all keys for this table
+            keys_to_remove = [
+                k for k in self._cache if k.table_name.lower() == table_lower
+            ]
 
-        # Remove them
-        for key in keys_to_remove:
-            self._remove_entry(key)
+            # Remove them
+            for key in keys_to_remove:
+                self._remove_entry(key)
 
-        return len(keys_to_remove)
+            return len(keys_to_remove)
 
     def invalidate_version(self, table_name: str, version: int) -> bool:
         """
@@ -220,38 +225,42 @@ class CacheManager:
         Returns:
             True if entry was found and removed, False otherwise
         """
-        # Find keys matching table and version (any branch)
-        table_lower = table_name.lower()
-        keys_to_remove = [
-            k
-            for k in self._cache
-            if k.table_name.lower() == table_lower and k.version == version
-        ]
+        with self._lock:
+            # Find keys matching table and version (any branch)
+            table_lower = table_name.lower()
+            keys_to_remove = [
+                k
+                for k in self._cache
+                if k.table_name.lower() == table_lower and k.version == version
+            ]
 
-        for key in keys_to_remove:
-            self._remove_entry(key)
+            for key in keys_to_remove:
+                self._remove_entry(key)
 
-        return len(keys_to_remove) > 0
+            return len(keys_to_remove) > 0
 
     def clear(self) -> None:
         """Clear all entries from the cache."""
-        self._cache.clear()
-        self._current_size = 0
+        with self._lock:
+            self._cache.clear()
+            self._current_size = 0
 
     def contains(self, key: CacheKey) -> bool:
         """Check if a key is in the cache (without updating LRU order)."""
-        return key in self._cache
+        with self._lock:
+            return key in self._cache
 
     def stats(self) -> CacheStats:
         """Get cache statistics."""
-        return CacheStats(
-            hits=self._hits,
-            misses=self._misses,
-            evictions=self._evictions,
-            current_size_bytes=self._current_size,
-            max_size_bytes=self._max_size,
-            entry_count=len(self._cache),
-        )
+        with self._lock:
+            return CacheStats(
+                hits=self._hits,
+                misses=self._misses,
+                evictions=self._evictions,
+                current_size_bytes=self._current_size,
+                max_size_bytes=self._max_size,
+                entry_count=len(self._cache),
+            )
 
     def _remove_entry(self, key: CacheKey) -> None:
         """Remove an entry from the cache."""
@@ -355,8 +364,8 @@ class ArrowChunkCache:
         >>> batch = cache.get("abc123...")  # Returns batch (hit)
 
     Thread Safety:
-        This implementation is NOT thread-safe. For concurrent access,
-        wrap operations in appropriate locks or use per-thread caches.
+        All public methods are protected by an internal lock and safe
+        for concurrent access from multiple threads.
     """
 
     def __init__(self, max_size_bytes: int = 100_000_000):
@@ -371,6 +380,7 @@ class ArrowChunkCache:
 
         self._max_size = max_size_bytes
         self._current_size = 0
+        self._lock = threading.Lock()
 
         # OrderedDict maintains insertion order for LRU eviction
         # Key: chunk_hash (str), Value: (RecordBatch, size_bytes)
@@ -393,16 +403,17 @@ class ArrowChunkCache:
         Returns:
             RecordBatch if found, None if not in cache
         """
-        if chunk_hash not in self._cache:
-            self._misses += 1
-            return None
+        with self._lock:
+            if chunk_hash not in self._cache:
+                self._misses += 1
+                return None
 
-        # Move to end (most recently used)
-        self._cache.move_to_end(chunk_hash)
-        self._hits += 1
+            # Move to end (most recently used)
+            self._cache.move_to_end(chunk_hash)
+            self._hits += 1
 
-        batch, _ = self._cache[chunk_hash]
-        return batch
+            batch, _ = self._cache[chunk_hash]
+            return batch
 
     def put(self, chunk_hash: str, batch: pa.RecordBatch) -> bool:
         """
@@ -417,44 +428,49 @@ class ArrowChunkCache:
         Returns:
             True if cached successfully, False if too large for cache
         """
+        # Calculate size outside the lock (read-only on batch)
         size_bytes = batch.nbytes
 
         # If single entry is larger than max cache, don't cache
         if size_bytes > self._max_size:
             return False
 
-        # Remove existing entry if present (shouldn't happen with content-addressing)
-        if chunk_hash in self._cache:
-            self._remove_entry(chunk_hash)
+        with self._lock:
+            # Remove existing entry if present (shouldn't happen with content-addressing)
+            if chunk_hash in self._cache:
+                self._remove_entry(chunk_hash)
 
-        # Evict LRU entries until we have room
-        while self._current_size + size_bytes > self._max_size and self._cache:
-            self._evict_lru()
+            # Evict LRU entries until we have room
+            while self._current_size + size_bytes > self._max_size and self._cache:
+                self._evict_lru()
 
-        # Add new entry
-        self._cache[chunk_hash] = (batch, size_bytes)
-        self._current_size += size_bytes
-        return True
+            # Add new entry
+            self._cache[chunk_hash] = (batch, size_bytes)
+            self._current_size += size_bytes
+            return True
 
     def contains(self, chunk_hash: str) -> bool:
         """Check if a chunk is in cache (without updating LRU order)."""
-        return chunk_hash in self._cache
+        with self._lock:
+            return chunk_hash in self._cache
 
     def clear(self) -> None:
         """Clear all entries from the cache."""
-        self._cache.clear()
-        self._current_size = 0
+        with self._lock:
+            self._cache.clear()
+            self._current_size = 0
 
     def stats(self) -> ChunkCacheStats:
         """Get cache statistics."""
-        return ChunkCacheStats(
-            hits=self._hits,
-            misses=self._misses,
-            evictions=self._evictions,
-            current_size_bytes=self._current_size,
-            max_size_bytes=self._max_size,
-            entry_count=len(self._cache),
-        )
+        with self._lock:
+            return ChunkCacheStats(
+                hits=self._hits,
+                misses=self._misses,
+                evictions=self._evictions,
+                current_size_bytes=self._current_size,
+                max_size_bytes=self._max_size,
+                entry_count=len(self._cache),
+            )
 
     def _remove_entry(self, chunk_hash: str) -> None:
         """Remove an entry from the cache."""
