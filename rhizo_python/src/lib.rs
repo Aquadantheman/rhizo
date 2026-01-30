@@ -177,6 +177,7 @@ fn catalog_err_to_py(e: CatalogError) -> PyErr {
         }
         CatalogError::Io(e) => PyIOError::new_err(sanitize_io_error(&e)),
         CatalogError::Json(e) => PyValueError::new_err(format!("JSON error: {}", sanitize_error_message(&e.to_string()))),
+        CatalogError::LockError(msg) => PyIOError::new_err(format!("Lock error: {}", sanitize_error_message(&msg))),
     }
 }
 

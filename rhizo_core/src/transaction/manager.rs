@@ -3,7 +3,7 @@
 //! The TransactionManager coordinates transactions across multiple tables,
 //! providing snapshot isolation with conflict detection.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -31,8 +31,13 @@ pub struct TransactionManager {
     /// Active transactions (in-memory for fast access)
     active_transactions: RwLock<HashMap<TxId, TransactionRecord>>,
 
-    /// Recently committed transactions in current epoch (for conflict checking)
-    recent_committed: RwLock<Vec<TransactionRecord>>,
+    /// Recently committed transactions for conflict checking (bounded size).
+    /// Capped at max_recent_committed to prevent unbounded memory growth.
+    /// validate_snapshot provides a safety net if entries are evicted.
+    recent_committed: RwLock<VecDeque<TransactionRecord>>,
+
+    /// Maximum entries in recent_committed before oldest are evicted
+    max_recent_committed: usize,
 
     /// Serializes the commit critical section (conflict check → catalog write → recent_committed update).
     /// Prevents TOCTOU race where two concurrent commits both pass conflict checks before either applies writes.
@@ -74,12 +79,15 @@ impl TransactionManager {
         // Initialize config if needed
         let storage_config = log.initialize_if_needed()?;
 
+        let max_recent = storage_config.epoch_config.max_transactions as usize;
+
         Ok(Self {
             base_path: tx_path,
             log,
             config: storage_config.epoch_config,
             active_transactions: RwLock::new(HashMap::new()),
-            recent_committed: RwLock::new(Vec::new()),
+            recent_committed: RwLock::new(VecDeque::new()),
+            max_recent_committed: max_recent,
             commit_lock: Mutex::new(()),
             conflict_detector: Arc::new(TableLevelConflictDetector::new()),
             catalog,
@@ -227,11 +235,14 @@ impl TransactionManager {
         epoch_meta.record_commit();
         self.log.write_epoch_metadata(&epoch_meta)?;
 
-        // Add to recently committed for conflict detection
+        // Add to recently committed for conflict detection (bounded)
         {
             let mut recent = self.recent_committed.write()
                 .map_err(|_| TransactionError::LockError("recent_committed".to_string()))?;
-            recent.push(committed_tx.clone());
+            recent.push_back(committed_tx.clone());
+            while recent.len() > self.max_recent_committed {
+                recent.pop_front();
+            }
         }
 
         // === END SERIALIZED COMMIT CRITICAL SECTION ===

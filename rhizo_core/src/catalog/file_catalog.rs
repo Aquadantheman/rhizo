@@ -27,6 +27,7 @@ impl FileCatalog {
         let lock_file = fs::OpenOptions::new()
             .create(true)
             .write(true)
+            .truncate(false)
             .open(&lock_path)
             .map_err(|e| CatalogError::LockError(
                 format!("{}: {}", table_name, e)
