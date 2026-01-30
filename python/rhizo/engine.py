@@ -294,11 +294,17 @@ class QueryEngine:
             version = versions.get(table_name)  # None means resolve via branch/latest
             self._ensure_registered(table_name, version, branch)
 
-        # Execute query
-        if params:
-            result = self._conn.execute(sql, params)
-        else:
-            result = self._conn.execute(sql)
+        # Execute with retry: if regex missed a table, DuckDB's error tells us
+        # which table is missing so we can register it and retry once.
+        try:
+            result = self._conn.execute(sql, params or [])
+        except Exception as e:
+            missing = self._extract_missing_table(e)
+            if missing:
+                self._ensure_registered(missing, versions.get(missing), branch)
+                result = self._conn.execute(sql, params or [])
+            else:
+                raise
 
         arrow_table = result.fetch_arrow_table()
 
@@ -307,6 +313,16 @@ class QueryEngine:
             row_count=arrow_table.num_rows,
             column_names=arrow_table.column_names,
         )
+
+    @staticmethod
+    def _extract_missing_table(exc: Exception) -> Optional[str]:
+        """Extract a missing table name from a DuckDB CatalogError."""
+        msg = str(exc)
+        # DuckDB format: 'Catalog Error: Table with name X does not exist!'
+        m = re.search(r"Table with name (\w+) does not exist", msg, re.IGNORECASE)
+        if m:
+            return m.group(1).lower()
+        return None
 
     def query_pandas(
         self,
@@ -1130,43 +1146,25 @@ class QueryEngine:
         This is a regex-based approach that handles:
         - Quoted identifiers: "table_name" and `table_name`
         - Schema-qualified names: schema.table (extracts just table)
+        - Comma-separated FROM lists: FROM a, b, c
         - Avoids extracting from string literals
-        - Excludes SQL keywords and common functions
+        - Excludes SQL keywords, functions, and subquery aliases
 
-        Note: For complex queries with nested subqueries or CTEs,
-        this may extract more tables than strictly necessary, but
-        over-extraction is safe (just registers tables that may not be used).
+        Over-extraction is safe (just registers tables that may not be used).
+        Under-extraction is caught by _query_duckdb's retry mechanism.
         """
         # Step 1: Remove string literals to avoid extracting table names from them
-        # Replace single-quoted strings with a placeholder
         sql_no_strings = re.sub(r"'(?:[^'\\]|\\.)*'", "''", sql)
-        # Replace double-quoted strings that are string literals (not identifiers)
-        # In standard SQL, double quotes are for identifiers, but some dialects use them for strings
-        # We'll be conservative and keep double-quoted items as potential identifiers
 
         # Normalize whitespace
         sql_normalized = " ".join(sql_no_strings.split())
 
-        # Patterns to match table names after FROM/JOIN keywords:
-        # 1. Unquoted identifier: FROM table_name or FROM schema.table_name
-        # 2. Double-quoted identifier: FROM "table_name" or FROM schema."table_name"
-        # 3. Backtick-quoted identifier: FROM `table_name` or FROM schema.`table_name`
-        # 4. Mixed: FROM "schema".table_name or FROM schema."table_name"
-        #
-        # We capture the full table reference and then extract the table name part
-
-        # Pattern components:
-        # - Unquoted identifier: [a-zA-Z_][a-zA-Z0-9_]*
-        # - Double-quoted identifier: "[^"]+"|""[^"]*""
-        # - Backtick-quoted identifier: `[^`]+`
+        # Identifier patterns
         identifier = r'(?:[a-zA-Z_][a-zA-Z0-9_]*|"[^"]+"|`[^`]+`)'
-        # Schema-qualified: schema.table or just table
         table_ref = rf'(?:{identifier}\.)?({identifier})'
 
-        # Keywords that introduce table references
-        # Include various JOIN types
+        # Keywords that introduce table references (single-table patterns)
         patterns = [
-            rf'\bFROM\s+{table_ref}',
             rf'\bJOIN\s+{table_ref}',
             rf'\bINNER\s+JOIN\s+{table_ref}',
             rf'\bLEFT\s+(?:OUTER\s+)?JOIN\s+{table_ref}',
@@ -1174,7 +1172,6 @@ class QueryEngine:
             rf'\bFULL\s+(?:OUTER\s+)?JOIN\s+{table_ref}',
             rf'\bCROSS\s+JOIN\s+{table_ref}',
             rf'\bNATURAL\s+(?:LEFT\s+|RIGHT\s+|FULL\s+)?(?:OUTER\s+)?JOIN\s+{table_ref}',
-            # UPDATE and INSERT for completeness (though less common in read queries)
             rf'\bUPDATE\s+{table_ref}',
             rf'\bINTO\s+{table_ref}',
         ]
@@ -1183,15 +1180,38 @@ class QueryEngine:
         for pattern in patterns:
             matches = re.findall(pattern, sql_normalized, re.IGNORECASE)
             for match in matches:
-                # match is the captured group (table name part)
-                # Strip quotes if present
                 table_name = match.strip('"').strip('`')
                 table_names.add(table_name.lower())
 
-        # Comprehensive list of SQL keywords and built-in functions to exclude
-        # These might be mistakenly captured in edge cases
+        # Handle comma-separated FROM lists: FROM a, b AS x, schema.c
+        # Match everything after FROM until a keyword boundary
+        from_clauses = re.finditer(
+            r'\bFROM\s+((?:(?!\bWHERE\b|\bGROUP\b|\bORDER\b|\bLIMIT\b|\bHAVING\b'
+            r'|\bUNION\b|\bEXCEPT\b|\bINTERSECT\b|\bJOIN\b|\bINNER\b|\bLEFT\b'
+            r'|\bRIGHT\b|\bFULL\b|\bCROSS\b|\bNATURAL\b|\bON\b|\bUSING\b'
+            r'|\bINTO\b|\bSET\b|\bVALUES\b|\bRETURNING\b|\bFOR\b'
+            r'|\bSELECT\b).)+)',
+            sql_normalized,
+            re.IGNORECASE,
+        )
+        for m in from_clauses:
+            from_body = m.group(1)
+            # Split on commas, then extract the table identifier from each item
+            # Each item may be: table, schema.table, table AS alias, (subquery)
+            for item in from_body.split(','):
+                item = item.strip()
+                if not item or item.startswith('('):
+                    continue
+                # Take the first token (possibly schema.table), ignore alias
+                ref_match = re.match(
+                    rf'(?:{identifier}\.)?({identifier})', item
+                )
+                if ref_match:
+                    table_name = ref_match.group(1).strip('"').strip('`')
+                    table_names.add(table_name.lower())
+
+        # SQL keywords and built-in functions to exclude
         keywords = {
-            # SQL keywords
             'select', 'from', 'where', 'group', 'order', 'limit', 'offset',
             'union', 'except', 'intersect', 'all', 'distinct', 'as',
             'and', 'or', 'not', 'in', 'is', 'null', 'true', 'false',
@@ -1205,12 +1225,9 @@ class QueryEngine:
             'exists', 'any', 'some', 'over', 'partition', 'window', 'rows', 'range',
             'unbounded', 'preceding', 'following', 'current', 'row',
             'lateral', 'unnest', 'ordinality',
-            # Common aggregate/window functions that might appear in odd contexts
             'count', 'sum', 'avg', 'min', 'max', 'first_value', 'last_value',
             'row_number', 'rank', 'dense_rank', 'ntile', 'lag', 'lead',
-            # DuckDB-specific
             'sample', 'tablesample', 'returning', 'conflict', 'nothing',
-            # Data types that might appear
             'integer', 'bigint', 'smallint', 'real', 'double', 'precision',
             'varchar', 'char', 'text', 'boolean', 'date', 'time', 'timestamp',
             'interval', 'blob', 'json', 'array',

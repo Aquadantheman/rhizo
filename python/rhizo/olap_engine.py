@@ -493,28 +493,76 @@ class OLAPEngine:
         """
         Extract table names from a SQL query.
 
-        Uses simple regex matching. For production, consider
-        using DataFusion's query plan analysis.
-        """
-        # Normalize whitespace
-        sql_normalized = " ".join(sql.split())
+        Handles comma-separated FROM lists, various JOIN types,
+        quoted identifiers, and filters SQL keywords.
 
-        # Patterns: FROM table, JOIN table
-        # Also matches: table VERSION N, table@branch
+        Over-extraction is safe (just registers tables that may not be used).
+        """
+        # Remove string literals
+        sql_no_strings = re.sub(r"'(?:[^'\\]|\\.)*'", "''", sql)
+
+        # Normalize whitespace
+        sql_normalized = " ".join(sql_no_strings.split())
+
+        identifier = r'(?:[a-zA-Z_][a-zA-Z0-9_]*|"[^"]+"|`[^`]+`)'
+        table_ref = rf'(?:{identifier}\.)?({identifier})'
+
+        # Single-table patterns (JOINs, UPDATE, INTO)
         patterns = [
-            r'\bFROM\s+(\w+)',
-            r'\bJOIN\s+(\w+)',
+            rf'\bJOIN\s+{table_ref}',
+            rf'\bINNER\s+JOIN\s+{table_ref}',
+            rf'\bLEFT\s+(?:OUTER\s+)?JOIN\s+{table_ref}',
+            rf'\bRIGHT\s+(?:OUTER\s+)?JOIN\s+{table_ref}',
+            rf'\bFULL\s+(?:OUTER\s+)?JOIN\s+{table_ref}',
+            rf'\bCROSS\s+JOIN\s+{table_ref}',
+            rf'\bUPDATE\s+{table_ref}',
+            rf'\bINTO\s+{table_ref}',
         ]
 
         table_names = set()
         for pattern in patterns:
             matches = re.findall(pattern, sql_normalized, re.IGNORECASE)
-            table_names.update(m.lower() for m in matches)
+            for match in matches:
+                table_names.add(match.strip('"').strip('`').lower())
 
-        # Filter out SQL keywords
+        # Comma-separated FROM lists: FROM a, b AS x, schema.c
+        from_clauses = re.finditer(
+            r'\bFROM\s+((?:(?!\bWHERE\b|\bGROUP\b|\bORDER\b|\bLIMIT\b|\bHAVING\b'
+            r'|\bUNION\b|\bEXCEPT\b|\bINTERSECT\b|\bJOIN\b|\bINNER\b|\bLEFT\b'
+            r'|\bRIGHT\b|\bFULL\b|\bCROSS\b|\bNATURAL\b|\bON\b|\bUSING\b'
+            r'|\bINTO\b|\bSET\b|\bVALUES\b|\bRETURNING\b|\bFOR\b'
+            r'|\bSELECT\b).)+)',
+            sql_normalized,
+            re.IGNORECASE,
+        )
+        for m in from_clauses:
+            for item in m.group(1).split(','):
+                item = item.strip()
+                if not item or item.startswith('('):
+                    continue
+                ref_match = re.match(
+                    rf'(?:{identifier}\.)?({identifier})', item
+                )
+                if ref_match:
+                    table_names.add(
+                        ref_match.group(1).strip('"').strip('`').lower()
+                    )
+
+        # Filter SQL keywords
         keywords = {
-            'select', 'where', 'group', 'order', 'limit', 'offset',
-            'union', 'except', 'intersect', 'having', 'as', 'version'
+            'select', 'from', 'where', 'group', 'order', 'limit', 'offset',
+            'union', 'except', 'intersect', 'all', 'distinct', 'as',
+            'and', 'or', 'not', 'in', 'is', 'null', 'true', 'false',
+            'case', 'when', 'then', 'else', 'end',
+            'join', 'inner', 'outer', 'left', 'right', 'full', 'cross', 'natural',
+            'on', 'using', 'having', 'by', 'asc', 'desc', 'version',
+            'with', 'recursive', 'values', 'set', 'update', 'delete', 'insert', 'into',
+            'create', 'drop', 'alter', 'table', 'view', 'index',
+            'exists', 'any', 'some', 'over', 'partition', 'window',
+            'lateral', 'unnest',
+            'count', 'sum', 'avg', 'min', 'max',
+            'integer', 'bigint', 'varchar', 'text', 'boolean', 'double', 'float',
+            'date', 'time', 'timestamp', 'interval',
         }
         table_names -= keywords
 
