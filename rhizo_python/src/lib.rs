@@ -922,6 +922,14 @@ impl PyCatalog {
         self.inner.commit(version.into()).map_err(catalog_err_to_py)
     }
 
+    /// Commit the next version of a table with auto-assigned version number.
+    ///
+    /// Atomically reads the latest version and increments, preventing race
+    /// conditions where concurrent writers compute the same version number.
+    fn commit_next(&self, table_name: &str, chunk_hashes: Vec<String>) -> PyResult<u64> {
+        self.inner.commit_next_version(table_name, chunk_hashes).map_err(catalog_err_to_py)
+    }
+
     #[pyo3(signature = (table_name, version=None))]
     fn get_version(&self, table_name: &str, version: Option<u64>) -> PyResult<PyTableVersion> {
         self.inner

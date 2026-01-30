@@ -13,7 +13,7 @@ use super::error::TransactionError;
 use super::log::TransactionLog;
 use super::conflict::{ConflictDetector, TableLevelConflictDetector};
 use super::recovery::RecoveryReport;
-use crate::catalog::{FileCatalog, TableVersion};
+use crate::catalog::FileCatalog;
 use crate::branch::BranchManager;
 
 /// Manages cross-table ACID transactions
@@ -213,11 +213,11 @@ impl TransactionManager {
         let mut committed_tx = tx.clone();
         committed_tx.mark_committed();
 
-        // Apply writes to catalog
-        self.apply_writes(&committed_tx)?;
-
-        // Update branch heads (if branch manager configured)
-        self.update_branch_heads(&committed_tx)?;
+        // Apply writes to catalog and update branch heads.
+        // apply_writes returns actual committed versions (which may differ from
+        // pre-computed versions if another writer committed between planning and execution).
+        let committed_versions = self.apply_writes(&committed_tx)?;
+        self.update_branch_heads(&committed_tx, &committed_versions)?;
 
         // Persist committed status
         self.log.write_transaction(&committed_tx)?;
@@ -443,26 +443,38 @@ impl TransactionManager {
         Ok(())
     }
 
-    fn apply_writes(&self, tx: &TransactionRecord) -> Result<(), TransactionError> {
-        for write in &tx.writes {
-            let table_version = TableVersion::new(
-                &write.table_name,
-                write.new_version,
-                write.chunk_hashes.clone(),
-            );
+    fn apply_writes(&self, tx: &TransactionRecord) -> Result<HashMap<String, u64>, TransactionError> {
+        let mut committed_versions = HashMap::new();
 
-            self.catalog.commit(table_version)
-                .map_err(|e| TransactionError::CatalogError(e.to_string()))?;
+        for write in &tx.writes {
+            // Use catalog-assigned versioning to prevent race conditions where
+            // two transactions pre-computed the same next version number.
+            let actual_version = self.catalog.commit_next_version(
+                &write.table_name,
+                write.chunk_hashes.clone(),
+            ).map_err(|e| TransactionError::CatalogError(e.to_string()))?;
+
+            committed_versions.insert(write.table_name.clone(), actual_version);
         }
 
-        Ok(())
+        Ok(committed_versions)
     }
 
-    fn update_branch_heads(&self, tx: &TransactionRecord) -> Result<(), TransactionError> {
+    fn update_branch_heads(
+        &self,
+        tx: &TransactionRecord,
+        committed_versions: &HashMap<String, u64>,
+    ) -> Result<(), TransactionError> {
         if let Some(ref bm) = self.branch_manager {
             for write in &tx.writes {
                 let branch = write.branch.as_ref().unwrap_or(&tx.branch);
-                bm.update_head(branch, &write.table_name, write.new_version)
+                // Use the actual committed version (from catalog), not the
+                // pre-computed version, in case they differ.
+                let version = committed_versions
+                    .get(&write.table_name)
+                    .copied()
+                    .unwrap_or(write.new_version);
+                bm.update_head(branch, &write.table_name, version)
                     .map_err(|e| TransactionError::BranchError(e.to_string()))?;
             }
         }
@@ -834,9 +846,8 @@ mod tests {
     fn test_conflict_detection_after_epoch_boundary_clear() {
         // This test verifies that conflict detection works even when
         // recent_committed is cleared (simulating an epoch boundary).
-        // The system should still detect conflicts via:
-        // 1. validate_snapshot (checks if tables changed since tx start)
-        // 2. catalog version enforcement (rejects duplicate versions)
+        // The system catches conflicts via validate_snapshot: transactions
+        // that read a table before writing detect when that table changed.
 
         let (manager, _temp) = create_test_manager();
 
@@ -844,7 +855,10 @@ mod tests {
         let tx1 = manager.begin(None).unwrap();
         let tx2 = manager.begin(None).unwrap();
 
-        // Both want to write to same table, version 1
+        // Both read users at version 0 (initial state) then write
+        manager.record_read(tx1, "users", 0).unwrap();
+        manager.record_read(tx2, "users", 0).unwrap();
+
         let write1 = TableWrite::new("users", 1, vec!["chunk1".to_string()]);
         let write2 = TableWrite::new("users", 1, vec!["chunk2".to_string()]);
 
@@ -857,16 +871,14 @@ mod tests {
         // Clear recent_committed (simulating epoch boundary)
         manager.clear_recent_committed().unwrap();
 
-        // Second commit should STILL fail due to either:
-        // - validate_snapshot detecting users changed from v0 to v1
-        // - catalog version enforcement rejecting duplicate v1
+        // Second commit should fail: validate_snapshot detects that
+        // users changed from v0 (when TX2 read it) to v1 (after TX1 committed)
         let result = manager.commit(tx2);
 
-        // Should fail with either SnapshotConflict or CatalogError
         assert!(result.is_err(),
             "TX2 should fail after epoch boundary clear, but got: {:?}", result);
 
-        // Verify it's a conflict-related error, not some other error
+        // Verify it's a snapshot conflict
         let err = result.unwrap_err();
         let is_conflict = matches!(
             err,

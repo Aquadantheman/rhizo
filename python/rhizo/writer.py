@@ -180,17 +180,9 @@ class TableWriter:
         # Store all chunks in parallel using batch operation
         chunk_hashes = self.store.put_batch(parquet_chunks)
 
-        # Determine the next version number
-        version = self._get_next_version(table_name)
-
-        # Import here to avoid circular dependency
-        import _rhizo
-
-        # Create and commit the version
-        table_version = _rhizo.PyTableVersion(table_name, version, chunk_hashes)
-        # Note: metadata handling would require extending PyTableVersion
-
-        committed_version = self.catalog.commit(table_version)
+        # Commit with catalog-assigned version (atomic read-increment-write
+        # prevents race where concurrent writers compute the same version)
+        committed_version = self.catalog.commit_next(table_name, chunk_hashes)
 
         return WriteResult(
             table_name=table_name,

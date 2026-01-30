@@ -43,6 +43,20 @@ impl FileCatalog {
         Ok(version.version)
     }
 
+    /// Commit the next version of a table, automatically assigning the version number.
+    ///
+    /// Reads the latest version and increments atomically, eliminating the race
+    /// condition where two callers both compute the same "next version" independently.
+    pub fn commit_next_version(
+        &self,
+        table_name: &str,
+        chunk_hashes: Vec<String>,
+    ) -> Result<u64, CatalogError> {
+        let next = self.get_latest_version_num(table_name)? + 1;
+        let version = TableVersion::new(table_name, next, chunk_hashes);
+        self.commit(version)
+    }
+
     pub fn get_version(&self, table_name: &str, version: Option<u64>) -> Result<TableVersion, CatalogError> {
         let table_dir = self.base_path.join(table_name);
         
