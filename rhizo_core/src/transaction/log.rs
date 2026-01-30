@@ -28,6 +28,7 @@ const EPOCHS_DIR: &str = "epochs";
 const CONFIG_FILE: &str = "_config.json";
 const SEQUENCE_FILE: &str = "_sequence";
 const EPOCH_SEQUENCE_FILE: &str = "_epoch_sequence";
+const LATEST_COMMITTED_FILE: &str = "_latest_committed";
 const EPOCH_META_FILE: &str = "_meta.json";
 const EPOCH_COMMITTED_MARKER: &str = "_committed";
 
@@ -234,7 +235,10 @@ impl TransactionLog {
 
     // === Transaction Management ===
 
-    /// Write transaction record to current epoch
+    /// Write transaction record to current epoch.
+    ///
+    /// If the transaction is committed, also updates the `_latest_committed`
+    /// pointer file so that `latest_committed_tx_id()` is O(1).
     pub fn write_transaction(&self, tx: &TransactionRecord) -> Result<(), TransactionError> {
         let epoch_dir = self.epoch_dir(tx.epoch_id);
         fs::create_dir_all(&epoch_dir)?;
@@ -246,6 +250,22 @@ impl TransactionLog {
         fs::write(&temp_path, &json)?;
         fs::rename(&temp_path, &tx_path)?;
 
+        // Update the latest-committed pointer when persisting a committed transaction
+        if tx.is_committed() {
+            self.update_latest_committed(tx.tx_id)?;
+        }
+
+        Ok(())
+    }
+
+    /// Update the latest committed transaction pointer file.
+    ///
+    /// Uses atomic write (temp + rename) to avoid partial reads.
+    fn update_latest_committed(&self, tx_id: TxId) -> Result<(), TransactionError> {
+        let path = self.base_path.join(LATEST_COMMITTED_FILE);
+        let temp_path = path.with_extension("tmp");
+        fs::write(&temp_path, tx_id.to_string())?;
+        fs::rename(&temp_path, &path)?;
         Ok(())
     }
 
@@ -381,9 +401,33 @@ impl TransactionLog {
     }
 
     /// Get the latest committed transaction ID, if any.
+    ///
+    /// Reads from the `_latest_committed` pointer file for O(1) performance.
+    /// Falls back to a full scan if the pointer file doesn't exist (backward
+    /// compatibility with data created before the pointer was introduced).
     pub fn latest_committed_tx_id(&self) -> Result<Option<TxId>, TransactionError> {
+        let path = self.base_path.join(LATEST_COMMITTED_FILE);
+
+        if path.exists() {
+            let content = fs::read_to_string(&path)?;
+            match content.trim().parse::<u64>() {
+                Ok(tx_id) => return Ok(Some(tx_id)),
+                Err(_) => {
+                    // Corrupted pointer — fall through to full scan
+                }
+            }
+        }
+
+        // Fallback: full scan (only needed for pre-pointer data or corrupted pointer)
         let committed = self.list_committed_transactions()?;
-        Ok(committed.last().map(|tx| tx.tx_id))
+        let latest = committed.last().map(|tx| tx.tx_id);
+
+        // Backfill the pointer so future calls are O(1)
+        if let Some(tx_id) = latest {
+            let _ = self.update_latest_committed(tx_id);
+        }
+
+        Ok(latest)
     }
 
     /// List committed transactions since a specific tx_id (exclusive).
