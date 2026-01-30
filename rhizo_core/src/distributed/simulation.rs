@@ -200,8 +200,23 @@ impl SimulatedNode {
     }
 
     /// Generate a unique ID for an update (for deduplication).
+    ///
+    /// Uses the full vector clock state (sorted for determinism) instead of
+    /// just the clock sum, which is not unique across different updates.
     fn generate_update_id(&self, update: &VersionedUpdate) -> String {
-        format!("{}:{}", update.origin_node(), update.clock().sum())
+        // Use explicit update_id if set
+        if let Some(id) = update.update_id() {
+            return id.to_string();
+        }
+        // Build deterministic clock representation: sorted node:time pairs
+        let mut entries: Vec<_> = update.clock().entries().collect();
+        entries.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
+        let clock_str: String = entries
+            .iter()
+            .map(|(node, time)| format!("{}={}", node.as_str(), time))
+            .collect::<Vec<_>>()
+            .join(",");
+        format!("{}@{}", update.origin_node(), clock_str)
     }
 
     /// Get the current value for a key.

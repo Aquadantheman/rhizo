@@ -252,6 +252,11 @@ impl VectorClock {
         self.clocks.keys()
     }
 
+    /// Get all (node_id, time) entries in this clock.
+    pub fn entries(&self) -> impl Iterator<Item = (&NodeId, &u64)> {
+        self.clocks.iter()
+    }
+
     /// Get the number of nodes with entries in this clock.
     pub fn node_count(&self) -> usize {
         self.clocks.len()
