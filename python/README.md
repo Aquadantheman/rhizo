@@ -17,7 +17,7 @@ In 1980, Deleuze and Guattari contrasted the rhizome with the tree: hierarchies 
 
 [![CI](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml/badge.svg)](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-433%20tests-blue)](https://github.com/rhizodata/rhizo)
+[![Rust](https://img.shields.io/badge/rust-436%20tests-blue)](https://github.com/rhizodata/rhizo)
 [![Python](https://img.shields.io/badge/python-492%20tests-blue)](https://github.com/rhizodata/rhizo)
 
 ---

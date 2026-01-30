@@ -88,6 +88,10 @@ pub enum TransactionError {
     /// Lock acquisition failed
     #[error("Failed to acquire lock: {0}")]
     LockError(String),
+
+    /// Data integrity check failed (checksum mismatch)
+    #[error("Integrity error: {0}")]
+    IntegrityError(String),
 }
 
 impl TransactionError {

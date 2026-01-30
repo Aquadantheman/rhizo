@@ -170,7 +170,12 @@ impl TransactionLog {
         Ok(meta)
     }
 
-    /// Get epoch metadata
+    /// Get epoch metadata with integrity verification.
+    ///
+    /// The file format is `blake3_checksum\njson_data`. If the checksum doesn't
+    /// match the JSON payload, returns `IntegrityError`. Files without a checksum
+    /// line (pre-integrity format) are read without verification for backward
+    /// compatibility.
     pub fn get_epoch(&self, epoch_id: EpochId) -> Result<EpochMetadata, TransactionError> {
         let meta_path = self.epoch_dir(epoch_id).join(EPOCH_META_FILE);
 
@@ -178,12 +183,32 @@ impl TransactionLog {
             return Err(TransactionError::EpochNotFound(epoch_id));
         }
 
-        let json = fs::read_to_string(&meta_path)?;
-        let meta: EpochMetadata = serde_json::from_str(&json)?;
+        let content = fs::read_to_string(&meta_path)?;
+
+        // New format: first line is BLAKE3 checksum, rest is JSON
+        if let Some((checksum_line, json)) = content.split_once('\n') {
+            if checksum_line.len() == 64 && checksum_line.chars().all(|c| c.is_ascii_hexdigit()) {
+                let actual = blake3::hash(json.as_bytes()).to_hex().to_string();
+                if actual != checksum_line {
+                    return Err(TransactionError::IntegrityError(format!(
+                        "epoch {} metadata checksum mismatch: expected {}, got {}",
+                        epoch_id, checksum_line, actual
+                    )));
+                }
+                let meta: EpochMetadata = serde_json::from_str(json)?;
+                return Ok(meta);
+            }
+        }
+
+        // Backward compatibility: old format without checksum
+        let meta: EpochMetadata = serde_json::from_str(&content)?;
         Ok(meta)
     }
 
-    /// Write epoch metadata
+    /// Write epoch metadata with integrity protection.
+    ///
+    /// Writes a BLAKE3 checksum on the first line followed by the JSON payload.
+    /// This allows `get_epoch` to detect corruption on read.
     pub fn write_epoch_metadata(&self, meta: &EpochMetadata) -> Result<(), TransactionError> {
         let epoch_dir = self.epoch_dir(meta.epoch_id);
         fs::create_dir_all(&epoch_dir)?;
@@ -192,7 +217,9 @@ impl TransactionLog {
         let temp_path = meta_path.with_extension("json.tmp");
 
         let json = serde_json::to_string_pretty(meta)?;
-        fs::write(&temp_path, &json)?;
+        let checksum = blake3::hash(json.as_bytes()).to_hex().to_string();
+        let content = format!("{}\n{}", checksum, json);
+        fs::write(&temp_path, &content)?;
         fs::rename(&temp_path, &meta_path)?;
 
         Ok(())
@@ -729,5 +756,59 @@ mod tests {
         let loaded = log.get_epoch(1).unwrap();
         assert_eq!(loaded.transactions, vec![1, 2]);
         assert_eq!(loaded.committed_count, 1);
+    }
+
+    #[test]
+    fn test_epoch_metadata_integrity_roundtrip() {
+        let (log, _temp) = create_test_log();
+
+        let mut meta = log.create_epoch(1).unwrap();
+        meta.add_transaction(1);
+        meta.record_commit();
+
+        log.write_epoch_metadata(&meta).unwrap();
+
+        // Read back should succeed with intact checksum
+        let loaded = log.get_epoch(1).unwrap();
+        assert_eq!(loaded.epoch_id, 1);
+        assert_eq!(loaded.transactions, vec![1]);
+        assert_eq!(loaded.committed_count, 1);
+    }
+
+    #[test]
+    fn test_epoch_metadata_detects_corruption() {
+        let (log, _temp) = create_test_log();
+
+        let meta = log.create_epoch(1).unwrap();
+        log.write_epoch_metadata(&meta).unwrap();
+
+        // Corrupt the JSON payload while keeping the checksum line intact
+        let meta_path = log.epoch_dir(1).join(EPOCH_META_FILE);
+        let content = fs::read_to_string(&meta_path).unwrap();
+        let (checksum, _json) = content.split_once('\n').unwrap();
+        let corrupted = format!("{}\n{{\"corrupt\": true}}", checksum);
+        fs::write(&meta_path, &corrupted).unwrap();
+
+        // Read should fail with IntegrityError
+        let result = log.get_epoch(1);
+        assert!(matches!(result, Err(TransactionError::IntegrityError(_))));
+    }
+
+    #[test]
+    fn test_epoch_metadata_backward_compat_no_checksum() {
+        let (log, _temp) = create_test_log();
+
+        let meta = EpochMetadata::new(1);
+
+        // Write old format (JSON only, no checksum line)
+        let epoch_dir = log.epoch_dir(1);
+        fs::create_dir_all(&epoch_dir).unwrap();
+        let meta_path = epoch_dir.join(EPOCH_META_FILE);
+        let json = serde_json::to_string_pretty(&meta).unwrap();
+        fs::write(&meta_path, &json).unwrap();
+
+        // Read should succeed without integrity check
+        let loaded = log.get_epoch(1).unwrap();
+        assert_eq!(loaded.epoch_id, 1);
     }
 }
