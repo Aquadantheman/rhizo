@@ -292,6 +292,15 @@ impl BranchManager {
             ));
         }
 
+        // Don't allow double underscores — they collide with the filesystem
+        // encoding of slashes (e.g., "feature/test" → "feature__test.json",
+        // so "feature__test" would map to the same file).
+        if name.contains("__") {
+            return Err(BranchError::InvalidBranchName(
+                "Branch name cannot contain double underscores (reserved for path encoding)".to_string(),
+            ));
+        }
+
         Ok(())
     }
 }
@@ -515,6 +524,12 @@ mod tests {
         // Double slashes
         assert!(matches!(
             manager.create("feature//test", None, None),
+            Err(BranchError::InvalidBranchName(_))
+        ));
+
+        // Double underscores (would collide with slash encoding on filesystem)
+        assert!(matches!(
+            manager.create("feature__test", None, None),
             Err(BranchError::InvalidBranchName(_))
         ));
 
