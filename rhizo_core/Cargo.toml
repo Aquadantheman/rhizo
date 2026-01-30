@@ -14,6 +14,7 @@ uuid = { workspace = true }
 rayon = { workspace = true }
 memmap2 = { workspace = true }
 tracing = { workspace = true }
+fs2 = { workspace = true }
 
 # Phase 4: Native Arrow/Parquet
 arrow = { workspace = true }

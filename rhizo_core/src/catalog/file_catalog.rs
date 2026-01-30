@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use fs2::FileExt;
 use super::error::CatalogError;
 use super::version::TableVersion;
 
@@ -14,7 +15,81 @@ impl FileCatalog {
         Ok(Self { base_path })
     }
 
+    /// Acquire an exclusive file lock for a table directory.
+    ///
+    /// Returns the lock file handle — the lock is held until the handle is dropped.
+    /// This provides cross-process mutual exclusion for the read-modify-write
+    /// sequence in commit (read latest → check version → write → update latest).
+    fn acquire_table_lock(&self, table_name: &str) -> Result<fs::File, CatalogError> {
+        let table_dir = self.base_path.join(table_name);
+        fs::create_dir_all(&table_dir)?;
+        let lock_path = table_dir.join(".lock");
+        let lock_file = fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&lock_path)
+            .map_err(|e| CatalogError::LockError(
+                format!("{}: {}", table_name, e)
+            ))?;
+        lock_file.lock_exclusive().map_err(|e| CatalogError::LockError(
+            format!("{}: {}", table_name, e)
+        ))?;
+        Ok(lock_file)
+    }
+
     pub fn commit(&self, version: TableVersion) -> Result<u64, CatalogError> {
+        let table_dir = self.base_path.join(&version.table_name);
+        fs::create_dir_all(&table_dir)?;
+
+        // Acquire cross-process file lock for this table
+        let _lock = self.acquire_table_lock(&version.table_name)?;
+
+        // Check version sequence (safe under lock)
+        let expected_version = self.get_latest_version_num(&version.table_name)? + 1;
+        if version.version != expected_version {
+            return Err(CatalogError::InvalidVersion {
+                expected: expected_version,
+                got: version.version,
+            });
+        }
+
+        // Write version file atomically (write to temp, then rename)
+        let version_path = table_dir.join(format!("{}.json", version.version));
+        let temp_version_path = version_path.with_extension("json.tmp");
+        let json = serde_json::to_string_pretty(&version)?;
+        fs::write(&temp_version_path, &json)?;
+        fs::rename(&temp_version_path, &version_path)?;
+
+        // Update latest pointer atomically
+        let latest_path = table_dir.join("latest");
+        let temp_latest_path = table_dir.join("latest.tmp");
+        fs::write(&temp_latest_path, version.version.to_string())?;
+        fs::rename(&temp_latest_path, &latest_path)?;
+
+        Ok(version.version)
+        // _lock dropped here — file lock released
+    }
+
+    /// Commit the next version of a table, automatically assigning the version number.
+    ///
+    /// Acquires an exclusive file lock, reads the latest version, increments, and
+    /// commits atomically. Safe for both multi-thread and multi-process access.
+    pub fn commit_next_version(
+        &self,
+        table_name: &str,
+        chunk_hashes: Vec<String>,
+    ) -> Result<u64, CatalogError> {
+        // Acquire lock BEFORE reading latest, so the entire read-increment-write
+        // is atomic across processes
+        let _lock = self.acquire_table_lock(table_name)?;
+        let next = self.get_latest_version_num(table_name)? + 1;
+        let version = TableVersion::new(table_name, next, chunk_hashes);
+        self.commit_inner(version)
+        // _lock dropped here — file lock released
+    }
+
+    /// Internal commit without acquiring the lock (caller must hold it).
+    fn commit_inner(&self, version: TableVersion) -> Result<u64, CatalogError> {
         let table_dir = self.base_path.join(&version.table_name);
         fs::create_dir_all(&table_dir)?;
 
@@ -41,20 +116,6 @@ impl FileCatalog {
         fs::rename(&temp_latest_path, &latest_path)?;
 
         Ok(version.version)
-    }
-
-    /// Commit the next version of a table, automatically assigning the version number.
-    ///
-    /// Reads the latest version and increments atomically, eliminating the race
-    /// condition where two callers both compute the same "next version" independently.
-    pub fn commit_next_version(
-        &self,
-        table_name: &str,
-        chunk_hashes: Vec<String>,
-    ) -> Result<u64, CatalogError> {
-        let next = self.get_latest_version_num(table_name)? + 1;
-        let version = TableVersion::new(table_name, next, chunk_hashes);
-        self.commit(version)
     }
 
     pub fn get_version(&self, table_name: &str, version: Option<u64>) -> Result<TableVersion, CatalogError> {
@@ -289,6 +350,57 @@ mod tests {
 
         let result = catalog.get_version("test_table", Some(999));
         assert!(matches!(result, Err(CatalogError::VersionNotFound(_, _))));
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_concurrent_commit_next_version() {
+        use std::sync::Arc;
+
+        let dir = temp_dir();
+        let catalog = Arc::new(FileCatalog::new(&dir).unwrap());
+        let num_threads = 10;
+
+        // Spawn threads that all try to commit_next_version concurrently
+        let handles: Vec<_> = (0..num_threads)
+            .map(|i| {
+                let catalog = Arc::clone(&catalog);
+                std::thread::spawn(move || {
+                    catalog.commit_next_version(
+                        "concurrent_table",
+                        vec![format!("hash_{}", i)],
+                    )
+                })
+            })
+            .collect();
+
+        let mut versions: Vec<u64> = handles
+            .into_iter()
+            .map(|h| h.join().unwrap().unwrap())
+            .collect();
+        versions.sort();
+
+        // All versions should be unique and sequential 1..=N
+        assert_eq!(versions, (1..=num_threads).collect::<Vec<u64>>());
+
+        // Latest should be num_threads
+        let latest = catalog.get_version("concurrent_table", None).unwrap();
+        assert_eq!(latest.version, num_threads);
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_lock_file_created() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        catalog.commit(TableVersion::new("locked_table", 1, vec![])).unwrap();
+
+        // Lock file should exist after commit
+        let lock_path = dir.join("locked_table").join(".lock");
+        assert!(lock_path.exists());
 
         fs::remove_dir_all(&dir).ok();
     }

@@ -19,4 +19,7 @@ pub enum CatalogError {
 
     #[error("Latest pointer corrupted for table: {0}")]
     LatestPointerCorrupted(String),
+
+    #[error("Failed to acquire file lock for table: {0}")]
+    LockError(String),
 }
