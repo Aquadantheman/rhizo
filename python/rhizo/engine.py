@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Dict, List, Any, Union, Generator
@@ -188,8 +189,10 @@ class QueryEngine:
         # Current branch (only used if branch_manager is provided)
         self._current_branch: str = "main"
 
-        # DuckDB connection (in-memory)
+        # DuckDB connection (in-memory) + reentrant lock for thread safety.
+        # RLock because _query_duckdb holds the lock while calling _ensure_registered.
         self._conn = duckdb.connect(":memory:")
+        self._conn_lock = threading.RLock()
 
         # Cache of registered tables: (table_name, version) -> RegisteredTable
         self._registered: Dict[tuple, RegisteredTable] = {}
@@ -286,27 +289,28 @@ class QueryEngine:
         branch: str,
     ) -> QueryResult:
         """Execute query using DuckDB backend."""
-        # Extract table names from query
+        # Extract table names from query (pure regex, no conn access)
         table_names = self._extract_table_names(sql)
 
-        # Register each table with the appropriate version
-        for table_name in table_names:
-            version = versions.get(table_name)  # None means resolve via branch/latest
-            self._ensure_registered(table_name, version, branch)
+        with self._conn_lock:
+            # Register each table with the appropriate version
+            for table_name in table_names:
+                version = versions.get(table_name)  # None means resolve via branch/latest
+                self._ensure_registered(table_name, version, branch)
 
-        # Execute with retry: if regex missed a table, DuckDB's error tells us
-        # which table is missing so we can register it and retry once.
-        try:
-            result = self._conn.execute(sql, params or [])
-        except Exception as e:
-            missing = self._extract_missing_table(e)
-            if missing:
-                self._ensure_registered(missing, versions.get(missing), branch)
+            # Execute with retry: if regex missed a table, DuckDB's error tells us
+            # which table is missing so we can register it and retry once.
+            try:
                 result = self._conn.execute(sql, params or [])
-            else:
-                raise
+            except Exception as e:
+                missing = self._extract_missing_table(e)
+                if missing:
+                    self._ensure_registered(missing, versions.get(missing), branch)
+                    result = self._conn.execute(sql, params or [])
+                else:
+                    raise
 
-        arrow_table = result.fetch_arrow_table()
+            arrow_table = result.fetch_arrow_table()
 
         return QueryResult(
             arrow_table=arrow_table,
@@ -1038,37 +1042,38 @@ class QueryEngine:
 
             # Detailed row-level diff using DuckDB
             # Register both versions temporarily
-            self._conn.register("__diff_a", table_a)
-            self._conn.register("__diff_b", table_b)
+            with self._conn_lock:
+                self._conn.register("__diff_a", table_a)
+                self._conn.register("__diff_b", table_b)
 
-            try:
-                # Use quoted identifiers for safety
-                join_conditions = " AND ".join(f'a."{c}" = b."{c}"' for c in key_columns)
+                try:
+                    # Use quoted identifiers for safety
+                    join_conditions = " AND ".join(f'a."{c}" = b."{c}"' for c in key_columns)
 
-                # Find added rows (in B but not in A)
-                added = self._conn.execute(f"""
-                    SELECT * FROM __diff_b b
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM __diff_a a
-                        WHERE {join_conditions}
-                    )
-                """).fetch_arrow_table()
+                    # Find added rows (in B but not in A)
+                    added = self._conn.execute(f"""
+                        SELECT * FROM __diff_b b
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM __diff_a a
+                            WHERE {join_conditions}
+                        )
+                    """).fetch_arrow_table()
 
-                # Find removed rows (in A but not in B)
-                removed = self._conn.execute(f"""
-                    SELECT * FROM __diff_a a
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM __diff_b b
-                        WHERE {join_conditions}
-                    )
-                """).fetch_arrow_table()
+                    # Find removed rows (in A but not in B)
+                    removed = self._conn.execute(f"""
+                        SELECT * FROM __diff_a a
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM __diff_b b
+                            WHERE {join_conditions}
+                        )
+                    """).fetch_arrow_table()
 
-                result["rows_added"] = added.num_rows
-                result["rows_removed"] = removed.num_rows
-            finally:
-                # Always unregister temp tables
-                self._conn.unregister("__diff_a")
-                self._conn.unregister("__diff_b")
+                    result["rows_added"] = added.num_rows
+                    result["rows_removed"] = removed.num_rows
+                finally:
+                    # Always unregister temp tables
+                    self._conn.unregister("__diff_a")
+                    self._conn.unregister("__diff_b")
 
         return result
 
@@ -1081,12 +1086,14 @@ class QueryEngine:
         """
         Ensure a table is registered with DuckDB at the specified version.
 
+        Thread-safe: acquires _conn_lock (reentrant) for conn + cache access.
+
         Version resolution order:
         1. Explicit version parameter (highest priority)
         2. Branch head pointer (if branch_manager configured)
         3. Catalog latest (fallback)
         """
-        # Resolve version
+        # Resolve version (no conn access, safe outside lock)
         if version is None:
             # Try to resolve via branch head
             if self.branch_manager is not None and branch is not None:
@@ -1099,41 +1106,44 @@ class QueryEngine:
 
         cache_key = (table_name.lower(), version)
 
-        # Check if already registered at this version
-        if cache_key in self._registered:
-            return
+        with self._conn_lock:
+            # Check if already registered at this version
+            if cache_key in self._registered:
+                return
 
-        # Load the table
-        arrow_table = self.reader.read_arrow(table_name, version)
+            # Load the table (I/O, but must be under lock to avoid
+            # races between check-and-register)
+            arrow_table = self.reader.read_arrow(table_name, version)
 
-        # Unregister any previous version of this table
-        self._unregister_table(table_name)
+            # Unregister any previous version of this table
+            self._unregister_table(table_name)
 
-        # Register with DuckDB
-        self._conn.register(table_name.lower(), arrow_table)
+            # Register with DuckDB
+            self._conn.register(table_name.lower(), arrow_table)
 
-        # Cache the registration
-        self._registered[cache_key] = RegisteredTable(
-            table_name=table_name.lower(),
-            version=version,
-            arrow_table=arrow_table,
-        )
+            # Cache the registration
+            self._registered[cache_key] = RegisteredTable(
+                table_name=table_name.lower(),
+                version=version,
+                arrow_table=arrow_table,
+            )
 
     def _unregister_table(self, table_name: str) -> None:
-        """Unregister all versions of a table from DuckDB."""
+        """Unregister all versions of a table from DuckDB. Thread-safe."""
         table_lower = table_name.lower()
 
-        # Find and remove all cached versions
-        to_remove = [k for k in self._registered if k[0] == table_lower]
+        with self._conn_lock:
+            # Find and remove all cached versions
+            to_remove = [k for k in self._registered if k[0] == table_lower]
 
-        for key in to_remove:
-            del self._registered[key]
+            for key in to_remove:
+                del self._registered[key]
 
-        # Try to unregister from DuckDB (may not exist)
-        try:
-            self._conn.unregister(table_lower)
-        except Exception as e:
-            _logger.debug("Table %s not registered in DuckDB: %s", table_lower, e)
+            # Try to unregister from DuckDB (may not exist)
+            try:
+                self._conn.unregister(table_lower)
+            except Exception as e:
+                _logger.debug("Table %s not registered in DuckDB: %s", table_lower, e)
 
     def _invalidate_cache(self, table_name: str) -> None:
         """Invalidate cache for a table (called after writes)."""
@@ -1498,8 +1508,9 @@ class QueryEngine:
         return self.transaction_manager.latest_tx_id()
 
     def close(self) -> None:
-        """Close the DuckDB connection."""
-        self._conn.close()
+        """Close the DuckDB connection. Thread-safe."""
+        with self._conn_lock:
+            self._conn.close()
 
     def __enter__(self) -> "QueryEngine":
         return self

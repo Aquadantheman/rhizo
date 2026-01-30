@@ -142,31 +142,32 @@ class TransactionContext:
         # Register any buffered writes as temporary tables for read-your-writes
         self._register_buffered_writes()
 
-        # Extract table names from query
+        # Extract table names from query (pure regex, no conn access)
         table_names = self._engine._extract_table_names(sql)
 
-        # For tables NOT in buffered writes, ensure they're registered from snapshot
-        for table_name in table_names:
-            if table_name.lower() not in self._buffered_writes:
-                # Get version from snapshot
-                version = self._snapshot.get(table_name.lower())
-                if version is not None:
-                    self._engine._ensure_registered(table_name, version, self._branch)
-                else:
-                    # Table doesn't exist in snapshot - try catalog
-                    try:
-                        self._engine._ensure_registered(table_name, None, self._branch)
-                    except IOError:
-                        # Table doesn't exist at all - will error on query
-                        pass
+        with self._engine._conn_lock:
+            # For tables NOT in buffered writes, ensure they're registered from snapshot
+            for table_name in table_names:
+                if table_name.lower() not in self._buffered_writes:
+                    # Get version from snapshot
+                    version = self._snapshot.get(table_name.lower())
+                    if version is not None:
+                        self._engine._ensure_registered(table_name, version, self._branch)
+                    else:
+                        # Table doesn't exist in snapshot - try catalog
+                        try:
+                            self._engine._ensure_registered(table_name, None, self._branch)
+                        except IOError:
+                            # Table doesn't exist at all - will error on query
+                            pass
 
-        # Execute query directly on DuckDB connection
-        if params:
-            result = self._engine._conn.execute(sql, params)
-        else:
-            result = self._engine._conn.execute(sql)
+            # Execute query directly on DuckDB connection
+            if params:
+                result = self._engine._conn.execute(sql, params)
+            else:
+                result = self._engine._conn.execute(sql)
 
-        arrow_table = result.fetch_arrow_table()
+            arrow_table = result.fetch_arrow_table()
 
         # Import QueryResult to avoid circular import issues
         from .engine import QueryResult
@@ -340,7 +341,8 @@ class TransactionContext:
             try:
                 # Register the buffered data, replacing any existing registration
                 # The engine's _ensure_registered will use this instead of disk
-                self._engine._conn.register(table_name, buffered.data)
+                with self._engine._conn_lock:
+                    self._engine._conn.register(table_name, buffered.data)
             except Exception:
                 # Registration failed - but table is already tracked for cleanup
                 # Re-raise to let caller handle the error
@@ -348,11 +350,12 @@ class TransactionContext:
 
     def _cleanup_temp_tables(self) -> None:
         """Unregister any temporary tables created for read-your-writes."""
-        for table_name in self._temp_tables:
-            try:
-                self._engine._conn.unregister(table_name)
-            except Exception:
-                pass  # Ignore cleanup errors
+        with self._engine._conn_lock:
+            for table_name in self._temp_tables:
+                try:
+                    self._engine._conn.unregister(table_name)
+                except Exception:
+                    pass  # Ignore cleanup errors
 
         # Invalidate engine's cache for tables we wrote to
         # (they may need to be reloaded with committed versions)
