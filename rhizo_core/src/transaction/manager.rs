@@ -192,8 +192,8 @@ impl TransactionManager {
     /// writes to the catalog. The lock is held from conflict detection through
     /// catalog write and recent_committed update, ensuring linearizable commits.
     pub fn commit(&self, tx_id: TxId) -> Result<(), TransactionError> {
-        // Get transaction from active set (outside commit lock — read-only)
-        let tx = {
+        // Get transaction from active set (clone required to release RwLock)
+        let mut tx = {
             let active = self.active_transactions.read()
                 .map_err(|_| TransactionError::LockError("active_transactions".to_string()))?;
             active.get(&tx_id)
@@ -217,29 +217,30 @@ impl TransactionManager {
         // Validate snapshot (tables we read haven't changed)
         self.validate_snapshot(&tx)?;
 
-        // Prepare commit (update status)
-        let mut committed_tx = tx.clone();
-        committed_tx.mark_committed();
+        // Mark committed in place (no clone needed — we own tx)
+        tx.mark_committed();
 
         // Apply writes to catalog and update branch heads.
         // apply_writes returns actual committed versions (which may differ from
         // pre-computed versions if another writer committed between planning and execution).
-        let committed_versions = self.apply_writes(&committed_tx)?;
-        self.update_branch_heads(&committed_tx, &committed_versions)?;
+        let committed_versions = self.apply_writes(&tx)?;
+        self.update_branch_heads(&tx, &committed_versions)?;
 
         // Persist committed status
-        self.log.write_transaction(&committed_tx)?;
+        self.log.write_transaction(&tx)?;
 
         // Update epoch metadata
-        let mut epoch_meta = self.log.get_epoch(committed_tx.epoch_id)?;
+        let epoch_id = tx.epoch_id;
+        let mut epoch_meta = self.log.get_epoch(epoch_id)?;
         epoch_meta.record_commit();
         self.log.write_epoch_metadata(&epoch_meta)?;
 
-        // Add to recently committed for conflict detection (bounded)
+        // Add to recently committed for conflict detection (bounded).
+        // Move tx instead of cloning — this is the last use.
         {
             let mut recent = self.recent_committed.write()
                 .map_err(|_| TransactionError::LockError("recent_committed".to_string()))?;
-            recent.push_back(committed_tx.clone());
+            recent.push_back(tx);
             while recent.len() > self.max_recent_committed {
                 recent.pop_front();
             }
