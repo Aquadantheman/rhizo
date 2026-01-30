@@ -283,6 +283,72 @@ impl ChunkStore {
     }
 
     // =========================================================================
+    // Garbage Collection
+    // =========================================================================
+
+    /// List all chunk hashes stored on disk.
+    ///
+    /// Walks the content-addressed directory tree and returns the hash of every
+    /// chunk file (excluding `.tmp` files). This is used by garbage collection
+    /// to identify unreferenced chunks.
+    pub fn list_chunk_hashes(&self) -> Result<Vec<String>, ChunkStoreError> {
+        let files = self.walk_directory(&self.base_path)?;
+        let mut hashes = Vec::new();
+
+        for path in files {
+            // Skip temp files
+            if let Some(ext) = path.extension() {
+                if ext == "tmp" {
+                    continue;
+                }
+            }
+
+            // The chunk file name IS the hash
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if name.len() == EXPECTED_HASH_LEN && name.chars().all(|c| c.is_ascii_hexdigit()) {
+                    hashes.push(name.to_string());
+                }
+            }
+        }
+
+        Ok(hashes)
+    }
+
+    /// Garbage collect unreferenced chunks.
+    ///
+    /// Compares all chunks on disk against the set of `referenced_hashes`
+    /// (typically collected from all catalog versions across all tables and
+    /// branches). Any chunk not in the referenced set is deleted.
+    ///
+    /// Returns the number of chunks deleted and the number of deletion failures.
+    ///
+    /// # Arguments
+    /// * `referenced_hashes` - Set of hashes that are still in use. Collect
+    ///   these from `FileCatalog::get_version()` across all tables/versions.
+    pub fn garbage_collect(
+        &self,
+        referenced_hashes: &std::collections::HashSet<String>,
+    ) -> Result<(usize, usize), ChunkStoreError> {
+        let all_hashes = self.list_chunk_hashes()?;
+        let mut deleted = 0;
+        let mut failed = 0;
+
+        for hash in all_hashes {
+            if !referenced_hashes.contains(&hash) {
+                match self.delete(&hash) {
+                    Ok(()) => deleted += 1,
+                    Err(e) => {
+                        warn!(hash = %hash, error = %e, "Failed to delete unreferenced chunk");
+                        failed += 1;
+                    }
+                }
+            }
+        }
+
+        Ok((deleted, failed))
+    }
+
+    // =========================================================================
     // Batch Operations (Parallel)
     // =========================================================================
 
@@ -984,6 +1050,140 @@ mod tests {
         // Verify chunks are still there
         assert!(store.exists(&hash1).unwrap());
         assert!(store.exists(&hash2).unwrap());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // =========================================================================
+    // Garbage Collection Tests
+    // =========================================================================
+
+    #[test]
+    fn test_list_chunk_hashes_empty() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        let hashes = store.list_chunk_hashes().unwrap();
+        assert!(hashes.is_empty());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_list_chunk_hashes() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        let h1 = store.put(b"data one").unwrap();
+        let h2 = store.put(b"data two").unwrap();
+        let h3 = store.put(b"data three").unwrap();
+
+        let mut hashes = store.list_chunk_hashes().unwrap();
+        hashes.sort();
+
+        let mut expected = vec![h1, h2, h3];
+        expected.sort();
+
+        assert_eq!(hashes, expected);
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_list_chunk_hashes_ignores_tmp() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        let hash = store.put(b"real data").unwrap();
+
+        // Create a tmp file in the same directory
+        let chunk_path = store.hash_to_path(&hash).unwrap();
+        let tmp_path = chunk_path.with_file_name("orphan.tmp");
+        fs::write(&tmp_path, b"temp").unwrap();
+
+        let hashes = store.list_chunk_hashes().unwrap();
+        assert_eq!(hashes.len(), 1);
+        assert_eq!(hashes[0], hash);
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_garbage_collect_deletes_unreferenced() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        let h1 = store.put(b"keep me").unwrap();
+        let h2 = store.put(b"delete me").unwrap();
+        let h3 = store.put(b"also keep me").unwrap();
+
+        // Only h1 and h3 are referenced
+        let mut referenced = std::collections::HashSet::new();
+        referenced.insert(h1.clone());
+        referenced.insert(h3.clone());
+
+        let (deleted, failed) = store.garbage_collect(&referenced).unwrap();
+        assert_eq!(deleted, 1);
+        assert_eq!(failed, 0);
+
+        // h1 and h3 should still exist, h2 should be gone
+        assert!(store.exists(&h1).unwrap());
+        assert!(!store.exists(&h2).unwrap());
+        assert!(store.exists(&h3).unwrap());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_garbage_collect_all_referenced() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        let h1 = store.put(b"one").unwrap();
+        let h2 = store.put(b"two").unwrap();
+
+        let mut referenced = std::collections::HashSet::new();
+        referenced.insert(h1.clone());
+        referenced.insert(h2.clone());
+
+        let (deleted, failed) = store.garbage_collect(&referenced).unwrap();
+        assert_eq!(deleted, 0);
+        assert_eq!(failed, 0);
+
+        assert!(store.exists(&h1).unwrap());
+        assert!(store.exists(&h2).unwrap());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_garbage_collect_none_referenced() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        let h1 = store.put(b"orphan 1").unwrap();
+        let h2 = store.put(b"orphan 2").unwrap();
+
+        let referenced = std::collections::HashSet::new();
+        let (deleted, failed) = store.garbage_collect(&referenced).unwrap();
+        assert_eq!(deleted, 2);
+        assert_eq!(failed, 0);
+
+        assert!(!store.exists(&h1).unwrap());
+        assert!(!store.exists(&h2).unwrap());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_garbage_collect_empty_store() {
+        let dir = temp_dir();
+        let store = ChunkStore::new(&dir).unwrap();
+
+        let referenced = std::collections::HashSet::new();
+        let (deleted, failed) = store.garbage_collect(&referenced).unwrap();
+        assert_eq!(deleted, 0);
+        assert_eq!(failed, 0);
 
         fs::remove_dir_all(&dir).ok();
     }

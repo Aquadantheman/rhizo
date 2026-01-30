@@ -54,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Testing
 - **492 Python tests** (was 348, +144 new)
-- **426 Rust tests** (was 370, +56 new)
+- **433 Rust tests** (was 370, +63 new)
 - All linting clean (clippy, ruff)
 
 ---
