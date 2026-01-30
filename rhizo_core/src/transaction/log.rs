@@ -29,6 +29,7 @@ const CONFIG_FILE: &str = "_config.json";
 const SEQUENCE_FILE: &str = "_sequence";
 const EPOCH_SEQUENCE_FILE: &str = "_epoch_sequence";
 const LATEST_COMMITTED_FILE: &str = "_latest_committed";
+const COMMITTED_INDEX_FILE: &str = "_committed_index";
 const EPOCH_META_FILE: &str = "_meta.json";
 const EPOCH_COMMITTED_MARKER: &str = "_committed";
 
@@ -250,9 +251,10 @@ impl TransactionLog {
         fs::write(&temp_path, &json)?;
         fs::rename(&temp_path, &tx_path)?;
 
-        // Update the latest-committed pointer when persisting a committed transaction
+        // Update committed tracking when persisting a committed transaction
         if tx.is_committed() {
             self.update_latest_committed(tx.tx_id)?;
+            self.append_committed_index(tx.epoch_id, tx.tx_id)?;
         }
 
         Ok(())
@@ -267,6 +269,85 @@ impl TransactionLog {
         fs::write(&temp_path, tx_id.to_string())?;
         fs::rename(&temp_path, &path)?;
         Ok(())
+    }
+
+    /// Append a committed transaction entry to the index file.
+    ///
+    /// The index is an append-only text file with one `epoch_id:tx_id` per line,
+    /// enabling O(entries) reads without scanning epoch directories.
+    fn append_committed_index(&self, epoch_id: EpochId, tx_id: TxId) -> Result<(), TransactionError> {
+        use std::io::Write;
+        let path = self.base_path.join(COMMITTED_INDEX_FILE);
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)?;
+        writeln!(file, "{}:{}", epoch_id, tx_id)?;
+        Ok(())
+    }
+
+    /// Read the committed index, returning (epoch_id, tx_id) pairs in order.
+    ///
+    /// Returns None if the index doesn't exist (pre-index data — caller
+    /// should fall back to full scan and rebuild the index).
+    fn read_committed_index(&self) -> Result<Option<Vec<(EpochId, TxId)>>, TransactionError> {
+        let path = self.base_path.join(COMMITTED_INDEX_FILE);
+        if !path.exists() {
+            return Ok(None);
+        }
+
+        let content = fs::read_to_string(&path)?;
+        let mut entries = Vec::new();
+
+        for line in content.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            if let Some((epoch_str, tx_str)) = line.split_once(':') {
+                if let (Ok(epoch_id), Ok(tx_id)) = (epoch_str.parse::<u64>(), tx_str.parse::<u64>()) {
+                    entries.push((epoch_id, tx_id));
+                }
+                // Skip malformed lines silently
+            }
+        }
+
+        Ok(Some(entries))
+    }
+
+    /// Rebuild the committed index from a full epoch scan.
+    ///
+    /// Used for backward compatibility when the index file doesn't exist.
+    fn rebuild_committed_index(&self) -> Result<Vec<(EpochId, TxId)>, TransactionError> {
+        let epochs = self.list_epochs()?;
+        let mut entries = Vec::new();
+
+        for epoch_id in epochs {
+            let tx_ids = self.list_transactions_in_epoch(epoch_id)?;
+            for tx_id in tx_ids {
+                match self.read_transaction_from_epoch(tx_id, epoch_id) {
+                    Ok(tx) if tx.is_committed() => {
+                        entries.push((epoch_id, tx_id));
+                    }
+                    _ => continue,
+                }
+            }
+        }
+
+        entries.sort_by_key(|&(_, tx_id)| tx_id);
+
+        // Write the index so future calls are fast
+        let path = self.base_path.join(COMMITTED_INDEX_FILE);
+        let content: String = entries
+            .iter()
+            .map(|(epoch_id, tx_id)| format!("{}:{}", epoch_id, tx_id))
+            .collect::<Vec<_>>()
+            .join("\n");
+        if !content.is_empty() {
+            fs::write(&path, format!("{}\n", content))?;
+        }
+
+        Ok(entries)
     }
 
     /// Read transaction record
@@ -373,29 +454,22 @@ impl TransactionLog {
 
     /// List all committed transactions in order.
     ///
-    /// Scans all epochs and returns committed transactions sorted by tx_id.
-    /// This is used by the changelog module to provide streaming access.
+    /// Uses the committed index for O(C) performance where C is committed
+    /// transaction count, rather than scanning all epoch directories.
+    /// Falls back to full scan + index rebuild for pre-index data.
     pub fn list_committed_transactions(&self) -> Result<Vec<TransactionRecord>, TransactionError> {
-        let epochs = self.list_epochs()?;
+        let index = match self.read_committed_index()? {
+            Some(entries) => entries,
+            None => self.rebuild_committed_index()?,
+        };
+
         let mut committed = Vec::new();
-
-        for epoch_id in epochs {
-            let tx_ids = self.list_transactions_in_epoch(epoch_id)?;
-
-            for tx_id in tx_ids {
-                match self.read_transaction_from_epoch(tx_id, epoch_id) {
-                    Ok(tx) => {
-                        if tx.is_committed() {
-                            committed.push(tx);
-                        }
-                    }
-                    Err(_) => continue, // Skip unreadable transactions
-                }
+        for (epoch_id, tx_id) in index {
+            match self.read_transaction_from_epoch(tx_id, epoch_id) {
+                Ok(tx) => committed.push(tx),
+                Err(_) => continue,
             }
         }
-
-        // Sort by tx_id for consistent ordering
-        committed.sort_by_key(|tx| tx.tx_id);
 
         Ok(committed)
     }
@@ -432,13 +506,29 @@ impl TransactionLog {
 
     /// List committed transactions since a specific tx_id (exclusive).
     ///
-    /// Returns transactions with tx_id > since_tx_id.
+    /// Uses the committed index to skip directly to entries after `since_tx_id`,
+    /// only deserializing the transactions that match.
     pub fn list_committed_since(
         &self,
         since_tx_id: TxId,
     ) -> Result<Vec<TransactionRecord>, TransactionError> {
-        let committed = self.list_committed_transactions()?;
-        Ok(committed.into_iter().filter(|tx| tx.tx_id > since_tx_id).collect())
+        let index = match self.read_committed_index()? {
+            Some(entries) => entries,
+            None => self.rebuild_committed_index()?,
+        };
+
+        let mut committed = Vec::new();
+        for (epoch_id, tx_id) in index {
+            if tx_id <= since_tx_id {
+                continue;
+            }
+            match self.read_transaction_from_epoch(tx_id, epoch_id) {
+                Ok(tx) => committed.push(tx),
+                Err(_) => continue,
+            }
+        }
+
+        Ok(committed)
     }
 
     // === Private Helpers ===
