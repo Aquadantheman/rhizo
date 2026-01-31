@@ -20,7 +20,7 @@ In 1980, Deleuze and Guattari contrasted the rhizome with the tree: hierarchies 
 [![CI](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml/badge.svg)](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-458%20tests-blue)](https://github.com/rhizodata/rhizo)
-[![Python](https://img.shields.io/badge/python-471%20tests-blue)](https://github.com/rhizodata/rhizo)
+[![Python](https://img.shields.io/badge/python-485%20tests-blue)](https://github.com/rhizodata/rhizo)
 
 ---
 
@@ -279,7 +279,7 @@ with db.engine.transaction() as tx:
 | Phase A: Merkle Storage | O(change) deduplication via Merkle trees | Complete |
 | **Phase P: Performance** | Native Rust Parquet, parallel I/O | **Complete** |
 
-**All phases complete. 929 tests passing (458 Rust + 471 Python).**
+**All phases complete. 943 tests passing (458 Rust + 485 Python).**
 
 ### Performance Optimization Journey
 

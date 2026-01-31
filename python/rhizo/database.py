@@ -16,6 +16,7 @@ For advanced features (branching, transactions, OLAP), use QueryEngine directly.
 from __future__ import annotations
 
 import os
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union, Dict, List, Any
 
@@ -390,6 +391,19 @@ class Database:
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.close()
+
+    def __del__(self) -> None:
+        if not getattr(self, "_closed", True):
+            warnings.warn(
+                f"Database('{self._path}') was not closed explicitly. "
+                "Use db.close() or 'with rhizo.open(...)' to avoid resource leaks.",
+                ResourceWarning,
+                stacklevel=1,
+            )
+            try:
+                self.close()
+            except Exception:
+                pass
 
     def __repr__(self) -> str:
         status = "closed" if self._closed else "open"
