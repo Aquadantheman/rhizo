@@ -117,7 +117,9 @@ pub struct SimulatedNode {
     pub state: HashMap<String, (OpType, AlgebraicValue)>,
     /// Updates this node has produced
     pub local_updates: Vec<VersionedUpdate>,
-    /// Updates this node has received and applied
+    /// All updates this node has applied (local + received), for partition healing
+    pub all_updates: Vec<VersionedUpdate>,
+    /// Updates this node has received and applied (deduplication IDs)
     pub applied_updates: HashSet<String>,
     /// Pending updates to send to other nodes
     pub outbox: VecDeque<VersionedUpdate>,
@@ -133,6 +135,7 @@ impl SimulatedNode {
             clock: VectorClock::new(),
             state: HashMap::new(),
             local_updates: Vec::new(),
+            all_updates: Vec::new(),
             applied_updates: HashSet::new(),
             outbox: VecDeque::new(),
         }
@@ -149,6 +152,7 @@ impl SimulatedNode {
         let update_id = self.generate_update_id(&update);
         self.applied_updates.insert(update_id);
         self.local_updates.push(update.clone());
+        self.all_updates.push(update.clone());
 
         // Queue for propagation
         self.outbox.push_back(update.clone());
@@ -192,6 +196,7 @@ impl SimulatedNode {
         // Apply the update
         self.apply_update(update);
         self.applied_updates.insert(update_id);
+        self.all_updates.push(update.clone());
 
         // Queue for further propagation (gossip)
         self.outbox.push_back(update.clone());
@@ -375,11 +380,13 @@ impl SimulatedCluster {
         self.config.partitions.clear();
     }
 
-    /// Re-queue all local updates for propagation.
+    /// Re-queue all known updates for propagation.
     /// Call this after healing partitions to ensure updates are re-gossiped.
+    /// Includes both locally-originated and transitively received updates
+    /// so bridge nodes can relay updates to previously-partitioned peers.
     pub fn requeue_all_updates(&mut self) {
         for node in &mut self.nodes {
-            for update in &node.local_updates {
+            for update in &node.all_updates {
                 node.outbox.push_back(update.clone());
             }
         }
@@ -1073,6 +1080,228 @@ mod tests {
             assert!(items.contains("item-c"));
             assert!(items.contains("item-d"));
         }
+    }
+
+    // ============ Transitive Requeue Tests (M4 fix) ============
+
+    #[test]
+    fn test_requeue_includes_transitively_received_updates() {
+        // 3 nodes: Node 0 and Node 2 are partitioned from each other.
+        // Node 1 bridges them. After partition healing, requeue must
+        // include updates Node 1 received transitively from Node 0
+        // so that Node 2 can get them.
+        let mut cluster = SimulatedCluster::new(3);
+
+        // Partition Node 0 from Node 2 (Node 1 bridges)
+        cluster.partition(0, 2);
+
+        // Node 0 commits (only Node 1 can receive this)
+        let mut tx0 = AlgebraicTransaction::new();
+        tx0.add_operation(add_op("counter", 10));
+        cluster.commit_on_node(0, tx0).unwrap();
+
+        // Node 2 commits (only Node 1 can receive this)
+        let mut tx2 = AlgebraicTransaction::new();
+        tx2.add_operation(add_op("counter", 30));
+        cluster.commit_on_node(2, tx2).unwrap();
+
+        // Propagate: Node 1 receives both updates via gossip
+        cluster.propagate_all();
+
+        // Node 1 should have both (10 + 30 = 40)
+        assert_eq!(
+            cluster.get_node_state(1, "counter").unwrap().as_integer(),
+            Some(40)
+        );
+
+        // Now: partition Node 1 from Node 0, heal Node 0 <-> Node 2
+        // Node 2 has only its own update (30). It needs Node 0's update (10)
+        // which was transitively received by Node 1.
+        cluster.config.partitions.clear();
+        cluster.partition(0, 1);
+        cluster.partition(1, 2);
+        // Only Node 0 <-> Node 2 is open now
+
+        // Requeue all — Node 0 should re-send its local update to Node 2
+        cluster.requeue_all_updates();
+        cluster.propagate_all();
+
+        // Node 2 should now have counter = 40 (received Node 0's update)
+        assert_eq!(
+            cluster.get_node_state(2, "counter").unwrap().as_integer(),
+            Some(40)
+        );
+        // Node 0 should also have counter = 40 (received Node 2's update)
+        assert_eq!(
+            cluster.get_node_state(0, "counter").unwrap().as_integer(),
+            Some(40)
+        );
+    }
+
+    #[test]
+    fn test_requeue_bridge_node_relays_after_heal() {
+        // 4 nodes split into two groups: {0,1} and {2,3}
+        // After full heal + requeue, all should converge.
+        let mut cluster = SimulatedCluster::new(4);
+
+        // Partition all cross-group pairs
+        cluster.partition(0, 2);
+        cluster.partition(0, 3);
+        cluster.partition(1, 2);
+        cluster.partition(1, 3);
+
+        // Each node commits
+        for i in 0..4 {
+            let mut tx = AlgebraicTransaction::new();
+            tx.add_operation(add_op("total", ((i + 1) * 10) as i64));
+            cluster.commit_on_node(i, tx).unwrap();
+        }
+
+        // Propagate: 0 <-> 1 share, 2 <-> 3 share (cross-group blocked)
+        cluster.propagate_all();
+
+        // Node 0 has 10+20=30, Node 3 has 30+40=70
+        assert_eq!(
+            cluster.get_node_state(0, "total").unwrap().as_integer(),
+            Some(30)
+        );
+        assert_eq!(
+            cluster.get_node_state(3, "total").unwrap().as_integer(),
+            Some(70)
+        );
+        assert!(!cluster.verify_convergence());
+
+        // Full heal + requeue
+        cluster.heal_partitions();
+        cluster.requeue_all_updates();
+        cluster.propagate_all();
+
+        // All should converge: 10+20+30+40 = 100
+        assert!(cluster.verify_convergence());
+        for i in 0..4 {
+            assert_eq!(
+                cluster.get_node_state(i, "total").unwrap().as_integer(),
+                Some(100),
+                "Node {} has wrong value",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn test_requeue_multi_hop_transitive() {
+        // 5 nodes in a chain: 0 -- 1 -- 2 -- 3 -- 4
+        // Only adjacent nodes can communicate.
+        // Node 0 commits, update must reach Node 4 via 3 hops.
+        let mut cluster = SimulatedCluster::new(5);
+
+        // Partition all non-adjacent pairs
+        for i in 0..5 {
+            for j in (i + 2)..5 {
+                cluster.partition(i, j);
+            }
+        }
+
+        // Only Node 0 commits
+        let mut tx = AlgebraicTransaction::new();
+        tx.add_operation(add_op("signal", 42));
+        cluster.commit_on_node(0, tx).unwrap();
+
+        // Propagate through chain
+        cluster.propagate_all();
+
+        // All should have signal=42 (gossip through chain)
+        assert!(cluster.verify_convergence());
+        assert_eq!(
+            cluster.get_node_state(4, "signal").unwrap().as_integer(),
+            Some(42)
+        );
+    }
+
+    #[test]
+    fn test_requeue_after_cascading_partitions() {
+        // Scenario: updates propagate partially, then a new partition
+        // isolates the bridge. After heal+requeue, everything converges.
+        let mut cluster = SimulatedCluster::new(3);
+
+        // Node 0 commits
+        let mut tx0 = AlgebraicTransaction::new();
+        tx0.add_operation(add_op("x", 100));
+        cluster.commit_on_node(0, tx0).unwrap();
+
+        // Propagate freely — all nodes get x=100
+        cluster.propagate_all();
+        assert!(cluster.verify_convergence());
+
+        // Now partition Node 2 from both 0 and 1
+        cluster.partition(0, 2);
+        cluster.partition(1, 2);
+
+        // Node 0 and Node 1 commit new updates
+        let mut tx0b = AlgebraicTransaction::new();
+        tx0b.add_operation(add_op("x", 50));
+        cluster.commit_on_node(0, tx0b).unwrap();
+
+        let mut tx1 = AlgebraicTransaction::new();
+        tx1.add_operation(add_op("x", 25));
+        cluster.commit_on_node(1, tx1).unwrap();
+
+        // Propagate: 0 and 1 converge to 175, Node 2 still at 100
+        cluster.propagate_all();
+        assert_eq!(
+            cluster.get_node_state(0, "x").unwrap().as_integer(),
+            Some(175)
+        );
+        assert_eq!(
+            cluster.get_node_state(2, "x").unwrap().as_integer(),
+            Some(100)
+        );
+
+        // Heal + requeue
+        cluster.heal_partitions();
+        cluster.requeue_all_updates();
+        cluster.propagate_all();
+
+        // All converge to 175
+        assert!(cluster.verify_convergence());
+        assert_eq!(
+            cluster.get_node_state(2, "x").unwrap().as_integer(),
+            Some(175)
+        );
+    }
+
+    #[test]
+    fn test_requeue_deduplication_still_works() {
+        // Ensure requeue doesn't cause double-application of updates.
+        // With AbelianAdd, double-application would give wrong sum.
+        let mut cluster = SimulatedCluster::new(2);
+
+        let mut tx0 = AlgebraicTransaction::new();
+        tx0.add_operation(add_op("counter", 10));
+        cluster.commit_on_node(0, tx0).unwrap();
+
+        let mut tx1 = AlgebraicTransaction::new();
+        tx1.add_operation(add_op("counter", 20));
+        cluster.commit_on_node(1, tx1).unwrap();
+
+        // Propagate normally
+        cluster.propagate_all();
+        assert!(cluster.verify_convergence());
+        assert_eq!(
+            cluster.get_node_state(0, "counter").unwrap().as_integer(),
+            Some(30)
+        );
+
+        // Requeue all updates and propagate again
+        cluster.requeue_all_updates();
+        cluster.propagate_all();
+
+        // Should still be 30, not 60 (deduplication must prevent re-application)
+        assert!(cluster.verify_convergence());
+        assert_eq!(
+            cluster.get_node_state(0, "counter").unwrap().as_integer(),
+            Some(30)
+        );
     }
 
     #[test]
