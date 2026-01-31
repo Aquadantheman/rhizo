@@ -251,15 +251,19 @@ Every headline number can be reproduced on your machine. No trust required.
 
 ### Verify Transaction Latency
 
-**Claim**: 0.001ms local commit — 59x faster than localhost 2PC, 355x faster than durable writes
+**Claim**: 0.001ms local commit — 30,000x faster than remote 2PC, 59x faster than localhost 2PC, 355x faster than durable writes
 
 ```bash
+# Localhost benchmarks
 python benchmarks/real_consensus_benchmark.py
+
+# Cloud benchmarks (requires remote participant servers)
+python benchmarks/real_consensus_benchmark.py --remote-2pc host1:9000,host2:9000
 ```
 
-**What it measures**: All systems measured on the same machine with no simulated delays. The benchmark spawns real OS processes that coordinate over TCP sockets.
+**What it measures**: Real coordination overhead — both on localhost and over the network. No simulated delays.
 
-**Expected output** (measured, not simulated):
+**Localhost results** (same machine):
 
 | System | Latency | Speedup | Measured? |
 |--------|---------|---------|-----------|
@@ -268,12 +272,16 @@ python benchmarks/real_consensus_benchmark.py
 | Localhost 2PC (3 nodes over TCP) | 0.065ms | **59x** | Yes |
 | SQLite WAL (FULL sync / fsync) | 0.386ms | **355x** | Yes |
 
-The 2PC benchmark is a real two-phase commit protocol: coordinator + 2 participants as separate OS processes communicating over localhost TCP. Each transaction performs PREPARE (2 round-trips) + COMMIT (2 round-trips) = 4 socket round-trips with process context switches.
+**Cloud results** (Long Island, NY → AWS US-East Virginia, ~25ms RTT):
 
-**Projected cross-region speedups** (measured protocol overhead + typical network RTT):
-- vs 50ms RTT + 2PC overhead: ~46,000x
-- vs 100ms RTT + 2PC overhead: ~92,000x
-- vs 150ms RTT + 2PC overhead: ~138,000x
+| System | Latency | Speedup | Measured? |
+|--------|---------|---------|-----------|
+| Rhizo algebraic (ADD) | 0.001ms | baseline | Yes |
+| Remote 2PC (3 machines over network) | 33.8ms | **30,000x** | Yes |
+
+The localhost 2PC benchmark spawns real OS processes coordinating over TCP sockets. The cloud benchmark connects to `2pc_participant_server.py` instances running on AWS EC2 VMs. Each transaction performs PREPARE (2 round-trips) + COMMIT (2 round-trips) = 4 network round-trips.
+
+**Scaling**: At ~25ms RTT we measured 30,000x. Cross-continent RTT (100-150ms) would yield 100,000x+.
 
 **Why coordination-free commits are faster**: Algebraic operations (ADD, MAX, UNION) satisfy commutativity and associativity, mathematically guaranteeing convergence without coordination. See [TECHNICAL_FOUNDATIONS.md](TECHNICAL_FOUNDATIONS.md#algebraic-classification-for-conflict-free-merge).
 

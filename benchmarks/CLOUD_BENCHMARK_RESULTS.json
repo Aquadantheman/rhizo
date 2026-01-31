@@ -1,0 +1,77 @@
+{
+  "timestamp": "2026-01-30T21:49:14",
+  "mode": "cloud",
+  "methodology": "All measurements taken on real systems. Rhizo values are coordination-free local commits. SQLite values are local disk durability. 2PC values are real TCP coordination. Remote benchmarks measure actual network + protocol overhead.",
+  "results": [
+    {
+      "system": "Rhizo algebraic",
+      "operation": "ADD counter",
+      "iterations": 10000,
+      "mean_ms": 0.0011,
+      "median_ms": 0.001,
+      "p99_ms": 0.0017,
+      "min_ms": 0.0008,
+      "max_ms": 0.0553
+    },
+    {
+      "system": "Rhizo algebraic",
+      "operation": "MAX high_score",
+      "iterations": 10000,
+      "mean_ms": 0.0011,
+      "median_ms": 0.001,
+      "p99_ms": 0.0016,
+      "min_ms": 0.0008,
+      "max_ms": 0.0825
+    },
+    {
+      "system": "SQLite WAL (NORMAL)",
+      "operation": "UPDATE counter",
+      "iterations": 1000,
+      "mean_ms": 0.0328,
+      "median_ms": 0.0241,
+      "p99_ms": 0.0811,
+      "min_ms": 0.0211,
+      "max_ms": 5.3949
+    },
+    {
+      "system": "SQLite WAL (FULL sync)",
+      "operation": "UPDATE counter",
+      "iterations": 1000,
+      "mean_ms": 0.3742,
+      "median_ms": 0.3456,
+      "p99_ms": 0.7712,
+      "min_ms": 0.2869,
+      "max_ms": 1.1101
+    },
+    {
+      "system": "Localhost 2PC (3 nodes)",
+      "operation": "2-phase commit over TCP",
+      "iterations": 500,
+      "mean_ms": 0.057,
+      "median_ms": 0.0496,
+      "p99_ms": 0.1764,
+      "min_ms": 0.0414,
+      "max_ms": 0.2329
+    },
+    {
+      "system": "Remote 2PC (3 nodes: coordinator + 34.229.148.227:9000 + 18.234.194.185:9000)",
+      "operation": "2-phase commit over network",
+      "iterations": 200,
+      "mean_ms": 33.8048,
+      "median_ms": 32.147,
+      "p99_ms": 42.0348,
+      "min_ms": 28.7869,
+      "max_ms": 262.4328
+    }
+  ],
+  "measured_speedups": {
+    "SQLite WAL (NORMAL)": 29.5,
+    "SQLite WAL (FULL sync)": 337.5,
+    "Localhost 2PC (3 nodes)": 51.4,
+    "Remote 2PC (3 nodes: coordinator + 34.229.148.227:9000 + 18.234.194.185:9000)": 30492.1
+  },
+  "endpoint_rtts_ms": {
+    "34.229.148.227:9000": 23.1,
+    "18.234.194.185:9000": 30.4
+  }
+}

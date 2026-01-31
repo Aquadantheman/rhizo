@@ -134,15 +134,20 @@ def parse_host_port(s: str, default_port: int) -> Tuple[str, int]:
     return s, default_port
 
 
-def measure_rtt(host: str, port: int, samples: int = 10) -> Optional[float]:
-    """Measure TCP round-trip time to a host:port in milliseconds."""
+def measure_rtt(host: str, port: int = 22, samples: int = 10) -> Optional[float]:
+    """Measure TCP round-trip time to a host using SSH port (22).
+
+    Uses port 22 instead of the application port because the participant
+    server only accepts one connection. SSH port is always available on
+    cloud VMs and gives the same network RTT measurement.
+    """
     latencies = []
     for _ in range(samples):
         try:
             start = time.perf_counter()
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(5.0)
-            s.connect((host, port))
+            s.connect((host, 22))
             elapsed = (time.perf_counter() - start) * 1000
             s.close()
             latencies.append(elapsed)

@@ -207,7 +207,7 @@ All core capabilities are complete and tested:
 - **Git for Data** — Branch, diff, merge for tables. ~140 bytes per branch.
 - **Cross-Table ACID** — Atomic commits across your entire data estate.
 - **Unified Batch/Stream** — Same API for "what is" and "what changed."
-- **Coordination-Free Transactions** — 59x measured vs localhost 2PC, 355x vs durable writes (all measured, same machine).
+- **Coordination-Free Transactions** — 30,000x measured vs remote 2PC (Long Island → AWS Virginia), 59x vs localhost 2PC, 355x vs durable writes (all measured).
 
 See [README](./README.md#quick-start) for code examples and usage.
 

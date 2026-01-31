@@ -8,12 +8,13 @@ In 1980, Deleuze and Guattari contrasted the rhizome with the tree: hierarchies 
 
 | Metric | Rhizo (measured) | Baseline (measured) | Improvement |
 |--------|------------------|---------------------|-------------|
+| Transaction latency | 0.001ms | 33.8ms (remote 2PC over network) | [**30,000x faster**](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#verify-transaction-latency) |
 | Transaction latency | 0.001ms | 0.065ms (localhost 2PC) | [**59x faster**](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#verify-transaction-latency) |
 | Transaction latency | 0.001ms | 0.386ms (SQLite FULL sync) | [**355x faster**](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#verify-transaction-latency) |
 | Branch overhead | 140 bytes | 63 MB (Delta Lake) | [**450,000x smaller**](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#verify-branch-overhead) |
 | OLAP queries | 0.9ms | 26ms (DuckDB) | [**32x faster**](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#verify-olap-performance) |
 
-<sub>All values measured on the same machine. 2PC benchmark uses real TCP coordination between 3 OS processes. [Full methodology →](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#benchmark-methodology)</sub>
+<sub>All values measured. Remote 2PC uses real TCP coordination between 3 machines (Long Island, NY → AWS Virginia). Localhost benchmarks on same machine. [Full methodology →](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#benchmark-methodology)</sub>
 
 [![CI](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml/badge.svg)](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
