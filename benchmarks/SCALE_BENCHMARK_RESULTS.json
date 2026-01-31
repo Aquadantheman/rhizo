@@ -1,0 +1,87 @@
+{
+  "scales": [
+    {
+      "scale": 1000000,
+      "label": "1M",
+      "rhizo_write_ms": 438.84110008366406,
+      "rhizo_read_ms": 3.213499905541539,
+      "rhizo_filter_ms": 1.5596000012010336,
+      "rhizo_agg_ms": 4.287099931389093,
+      "rhizo_complex_ms": 6.681900005787611,
+      "rhizo_storage_mb": 30.421983,
+      "duckdb_write_ms": 587.1429999824613,
+      "duckdb_read_ms": 246.35949986986816,
+      "duckdb_filter_ms": 13.047500047832727,
+      "duckdb_agg_ms": 3.553900169208646,
+      "duckdb_complex_ms": 11.598699958994985,
+      "duckdb_storage_mb": 28.061696
+    },
+    {
+      "scale": 5000000,
+      "label": "5M",
+      "rhizo_write_ms": 2349.810800049454,
+      "rhizo_read_ms": 14.505499973893166,
+      "rhizo_filter_ms": 3.9677999448031187,
+      "rhizo_agg_ms": 10.411499999463558,
+      "rhizo_complex_ms": 19.437999930232763,
+      "rhizo_storage_mb": 154.694793,
+      "duckdb_write_ms": 1848.5775000881404,
+      "duckdb_read_ms": 1334.05840001069,
+      "duckdb_filter_ms": 46.659099869430065,
+      "duckdb_agg_ms": 7.7639000955969095,
+      "duckdb_complex_ms": 21.425699815154076,
+      "duckdb_storage_mb": 140.259328
+    },
+    {
+      "scale": 10000000,
+      "label": "10M",
+      "rhizo_write_ms": 4218.152499990538,
+      "rhizo_read_ms": 30.724699841812253,
+      "rhizo_filter_ms": 6.984600098803639,
+      "rhizo_agg_ms": 17.362500075250864,
+      "rhizo_complex_ms": 35.20580008625984,
+      "rhizo_storage_mb": 308.084781,
+      "duckdb_write_ms": 4235.236000036821,
+      "duckdb_read_ms": 2718.759500188753,
+      "duckdb_filter_ms": 122.88770009763539,
+      "duckdb_agg_ms": 13.75550008378923,
+      "duckdb_complex_ms": 30.31929978169501,
+      "duckdb_storage_mb": 279.457792
+    }
+  ],
+  "joins": [
+    {
+      "users": 10000,
+      "orders": 100000,
+      "label": "10K users x 100K orders",
+      "rhizo_join_ms": 2.0312999840825796,
+      "rhizo_join_filter_ms": 2.73349997587502,
+      "rhizo_join_agg_ms": 5.055800080299377,
+      "duckdb_join_ms": 8.22610012255609,
+      "duckdb_join_filter_ms": 6.0906000435352325,
+      "duckdb_join_agg_ms": 6.71470002271235
+    },
+    {
+      "users": 50000,
+      "orders": 1000000,
+      "label": "50K users x 1M orders",
+      "rhizo_join_ms": 9.178200038149953,
+      "rhizo_join_filter_ms": 8.43179994262755,
+      "rhizo_join_agg_ms": 9.73869999870658,
+      "duckdb_join_ms": 69.82499989680946,
+      "duckdb_join_filter_ms": 36.44510009326041,
+      "duckdb_join_agg_ms": 11.346499901264906
+    },
+    {
+      "users": 100000,
+      "orders": 5000000,
+      "label": "100K users x 5M orders",
+      "rhizo_join_ms": 31.939500011503696,
+      "rhizo_join_filter_ms": 21.92589989863336,
+      "rhizo_join_agg_ms": 36.36760008521378,
+      "duckdb_join_ms": 389.78049997240305,
+      "duckdb_join_filter_ms": 229.26379996351898,
+      "duckdb_join_agg_ms": 27.20339992083609
+    }
+  ]
+}
