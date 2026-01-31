@@ -1,95 +1,95 @@
 {
-  "timestamp": "2026-01-20T21:55:45.225039",
+  "timestamp": "2026-01-31T12:45:40.114373",
   "platform": "Windows-11-10.0.26200-SP0",
   "cpu_info": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
   "measurements": [
     {
       "operation": "local_commit",
       "iterations": 50000,
-      "total_time_ms": 60.5921,
-      "energy_kwh": 1.1139039185312388e-06,
-      "co2_kg": 4.115574224914924e-07,
-      "power_watts": 66.18,
-      "energy_per_op_kwh": 2.2278078370624776e-11,
-      "co2_per_op_kg": 8.231148449829847e-12
+      "total_time_ms": 49.1775,
+      "energy_kwh": 4.098124996138116e-07,
+      "co2_kg": 1.6392499984552465e-07,
+      "power_watts": 30,
+      "energy_per_op_kwh": 8.196249992276232e-12,
+      "co2_per_op_kg": 3.278499996910493e-12
     },
     {
       "operation": "simulated_consensus",
       "iterations": 100,
-      "total_time_ms": 10031.789,
-      "energy_kwh": 0.00021186392993423724,
-      "co2_kg": 7.827800178459244e-05,
-      "power_watts": 76.03,
-      "energy_per_op_kwh": 2.1186392993423723e-06,
-      "co2_per_op_kg": 7.827800178459244e-07
+      "total_time_ms": 10050.9424,
+      "energy_kwh": 8.375785333337262e-05,
+      "co2_kg": 3.350314133334905e-05,
+      "power_watts": 30,
+      "energy_per_op_kwh": 8.375785333337262e-07,
+      "co2_per_op_kg": 3.350314133334905e-07
     },
     {
       "operation": "cluster_2_nodes",
       "iterations": 10,
-      "total_time_ms": 3.9018,
-      "energy_kwh": 9.467527803887304e-08,
-      "co2_kg": 3.4979959002856536e-08,
-      "power_watts": 87.35,
-      "energy_per_op_kwh": 9.467527803887303e-09,
-      "co2_per_op_kg": 3.4979959002856536e-09
+      "total_time_ms": 4.5927,
+      "energy_kwh": 3.8272499417265255e-08,
+      "co2_kg": 1.5308999766906103e-08,
+      "power_watts": 30,
+      "energy_per_op_kwh": 3.827249941726526e-09,
+      "co2_per_op_kg": 1.5308999766906103e-09
     },
     {
       "operation": "cluster_5_nodes",
       "iterations": 10,
-      "total_time_ms": 31.7778,
-      "energy_kwh": 5.805926384912002e-07,
-      "co2_kg": 2.145133039212592e-07,
-      "power_watts": 65.77,
-      "energy_per_op_kwh": 5.805926384912002e-08,
-      "co2_per_op_kg": 2.145133039212592e-08
+      "total_time_ms": 46.6183,
+      "energy_kwh": 3.884858335368335e-07,
+      "co2_kg": 1.5539433341473342e-07,
+      "power_watts": 30,
+      "energy_per_op_kwh": 3.8848583353683354e-08,
+      "co2_per_op_kg": 1.5539433341473342e-08
     },
     {
       "operation": "cluster_10_nodes",
       "iterations": 10,
-      "total_time_ms": 272.9152,
-      "energy_kwh": 5.535224160672373e-06,
-      "co2_kg": 2.045115876316104e-06,
-      "power_watts": 73.01,
-      "energy_per_op_kwh": 5.535224160672373e-07,
-      "co2_per_op_kg": 2.045115876316104e-07
+      "total_time_ms": 410.4631,
+      "energy_kwh": 3.4205258338867377e-06,
+      "co2_kg": 1.3682103335546952e-06,
+      "power_watts": 30,
+      "energy_per_op_kwh": 3.420525833886738e-07,
+      "co2_per_op_kg": 1.3682103335546952e-07
     },
     {
       "operation": "unique_data_writes",
       "iterations": 10000,
-      "total_time_ms": 6.3466,
-      "energy_kwh": 3.132527826483372e-07,
-      "co2_kg": 1.1573844536342908e-07,
-      "power_watts": 177.69,
-      "energy_per_op_kwh": 3.1325278264833717e-11,
-      "co2_per_op_kg": 1.1573844536342908e-11
+      "total_time_ms": 7.4245,
+      "energy_kwh": 6.187083393645783e-08,
+      "co2_kg": 2.4748333574583133e-08,
+      "power_watts": 30,
+      "energy_per_op_kwh": 6.187083393645783e-12,
+      "co2_per_op_kg": 2.4748333574583134e-12
     },
     {
       "operation": "deduplicated_writes",
       "iterations": 10000,
-      "total_time_ms": 0.329,
-      "energy_kwh": 2.9435416500847272e-08,
-      "co2_kg": 1.0875591640817545e-08,
-      "power_watts": 322.09,
-      "energy_per_op_kwh": 2.943541650084727e-12,
-      "co2_per_op_kg": 1.0875591640817545e-12
+      "total_time_ms": 0.2919,
+      "energy_kwh": 2.4325000898291667e-09,
+      "co2_kg": 9.730000359316667e-10,
+      "power_watts": 30,
+      "energy_per_op_kwh": 2.432500089829167e-13,
+      "co2_per_op_kg": 9.730000359316667e-14
     }
   ],
   "comparisons": [
     {
-      "rhizo_energy_kwh": 2.2278078370624776e-11,
-      "consensus_energy_kwh": 2.1186392993423723e-06,
-      "energy_savings_ratio": 95099.73,
-      "rhizo_co2_kg": 8.231148449829847e-12,
-      "consensus_co2_kg": 7.827800178459244e-07,
-      "co2_savings_ratio": 95099.73,
+      "rhizo_energy_kwh": 8.196249992276232e-12,
+      "consensus_energy_kwh": 8.375785333337262e-07,
+      "energy_savings_ratio": 102190.46,
+      "rhizo_co2_kg": 3.278499996910493e-12,
+      "consensus_co2_kg": 3.350314133334905e-07,
+      "co2_savings_ratio": 102190.46,
       "operations": 50000
     }
   ],
   "summary": {
-    "energy_savings_ratio": 95099.73,
-    "co2_savings_ratio": 95099.73,
-    "rhizo_energy_per_tx_kwh": 2.2278078370624776e-11,
-    "consensus_energy_per_tx_kwh": 2.1186392993423723e-06,
+    "energy_savings_ratio": 102190.46,
+    "co2_savings_ratio": 102190.46,
+    "rhizo_energy_per_tx_kwh": 8.196249992276232e-12,
+    "consensus_energy_per_tx_kwh": 8.375785333337262e-07,
     "theoretical_model": {
       "rhizo_energy_wh_per_tx": 2.9333333333333337e-07,
       "consensus_energy_wh_per_tx": 0.0020833333333333333,
@@ -114,6 +114,6 @@
       "annual_cost_savings_usd": 76.03,
       "equivalent_trees_planted": 14.5
     },
-    "codecarbon_available": true
+    "codecarbon_available": false
   }
 }

@@ -1,0 +1,30 @@
+{
+  "rhizo": {
+    "write_ms": 50.85,
+    "read_ms": 0.27,
+    "storage_5_versions_bytes": 3851093,
+    "dedup_actual_bytes": 3848464,
+    "dedup_naive_bytes": 11545392,
+    "dedup_savings_pct": 66.7,
+    "time_travel_ms": 0.13,
+    "transaction_ms": 39.36,
+    "multi_table_tx_ms": 64.87,
+    "branch_create_ms": 0.8,
+    "branch_diff_ms": 0.22,
+    "changelog_query_ms": 1.42,
+    "merkle_build_ms": 1.06
+  },
+  "delta_lake": {
+    "write_ms": 67.21,
+    "read_ms": 20.73,
+    "storage_5_versions_bytes": 22057227,
+    "dedup_savings_pct": 0,
+    "time_travel_ms": 19.64,
+    "multi_table_tx_ms": "N/A",
+    "branch_create_ms": "N/A",
+    "branch_diff_ms": "N/A",
+    "changelog_query_ms": "Requires setup",
+    "merkle_build_ms": "N/A"
+  },
+  "feature_comparison": {}
+}

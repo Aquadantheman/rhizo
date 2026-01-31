@@ -753,9 +753,9 @@ impl PyChunkStore {
     ///     >>> hashes = store.put_batch([b"chunk1", b"chunk2", b"chunk3"])
     ///     >>> len(hashes)
     ///     3
-    fn put_batch(&self, chunks: Vec<Vec<u8>>) -> PyResult<Vec<String>> {
+    fn put_batch(&self, py: Python<'_>, chunks: Vec<Vec<u8>>) -> PyResult<Vec<String>> {
         let refs: Vec<&[u8]> = chunks.iter().map(|c| c.as_slice()).collect();
-        self.inner.put_batch(&refs).map_err(chunk_err_to_py)
+        py.detach(|| self.inner.put_batch(&refs).map_err(chunk_err_to_py))
     }
 
     /// Retrieve multiple chunks in parallel by their hashes.

@@ -181,8 +181,12 @@ class TableWriter:
             parquet_chunks = [self._to_parquet_bytes(chunk) for chunk in chunks]
         total_bytes = sum(len(p) for p in parquet_chunks)
 
-        # Store all chunks in parallel using batch operation
-        chunk_hashes = self.store.put_batch(parquet_chunks)
+        # Store chunks: use zero-copy put() for single chunks,
+        # put_batch() for multiple chunks (parallelizes via Rayon)
+        if len(parquet_chunks) == 1:
+            chunk_hashes = [self.store.put(parquet_chunks[0])]
+        else:
+            chunk_hashes = self.store.put_batch(parquet_chunks)
 
         # Commit with catalog-assigned version (atomic read-increment-write
         # prevents race where concurrent writers compute the same version)
@@ -254,8 +258,12 @@ class TableWriter:
             parquet_chunks = [self._to_parquet_bytes(chunk) for chunk in chunks]
         total_bytes = sum(len(p) for p in parquet_chunks)
 
-        # Store all chunks in parallel using batch operation
-        chunk_hashes = self.store.put_batch(parquet_chunks)
+        # Store chunks: use zero-copy put() for single chunks,
+        # put_batch() for multiple chunks (parallelizes via Rayon)
+        if len(parquet_chunks) == 1:
+            chunk_hashes = [self.store.put(parquet_chunks[0])]
+        else:
+            chunk_hashes = self.store.put_batch(parquet_chunks)
 
         # Determine what the next version WILL be (don't commit yet)
         next_version = self._get_next_version(table_name)

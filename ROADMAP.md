@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**910 tests passing (443 Rust + 467 Python)**
+**912 tests passing (445 Rust + 467 Python)**
 
 Rhizo is feature-complete for single-node deployments with full ACID transactions, time travel, branching, and OLAP queries.
 
@@ -81,7 +81,7 @@ Rhizo is feature-complete for single-node deployments with full ACID transaction
 | Energy per transaction | 2.2e-11 kWh | 97,943x less than consensus |
 | OLAP read (100K rows) | 0.9ms | 32x faster than DuckDB |
 | Branch creation | <10ms | 450,000x smaller than Delta Lake |
-| Write throughput | 211 MB/s | Competitive with Delta Lake |
+| Write throughput | 2,277 MB/s | Competitive with DuckDB |
 | Storage deduplication | 84% | Best in class |
 
 ---
@@ -103,7 +103,7 @@ cd rhizo_python && maturin develop --release && cd ..
 pip install -e python/
 
 # Run tests
-cargo test --all      # 443 Rust tests
+cargo test --all      # 445 Rust tests
 pytest tests/ -v      # 467 Python tests
 ```
 

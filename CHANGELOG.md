@@ -5,6 +5,19 @@ All notable changes to Rhizo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.7] - 2026-01-31
+
+### Changed
+
+#### Write Path Performance Optimization
+- **35% write speed improvement**: 79ms -> 51ms (100K rows), now within 5% of DuckDB
+- **10.8x storage throughput**: 211 MB/s -> 2,277 MB/s (BLAKE3 hash + file write)
+- **Multithreaded BLAKE3 hashing**: Enabled `rayon` feature for `blake3` crate, uses `update_rayon()` for buffers >= 128KB (2.7x hash speedup)
+- **Zero-copy single-chunk writes**: Single-chunk writes now use `put()` with borrowed `&[u8]` instead of `put_batch(Vec<Vec<u8>>)`, eliminating a full buffer copy across the Python-Rust FFI boundary
+- **GIL release during storage**: `put_batch` now releases the Python GIL via `py.detach()` during hashing and disk I/O
+- 2 new Rust tests for BLAKE3 rayon hash correctness verification
+- **912 total tests** (445 Rust + 467 Python)
+
 ## [0.5.6] - 2026-01-30
 
 ### Added

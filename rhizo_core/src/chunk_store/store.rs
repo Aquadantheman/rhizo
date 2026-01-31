@@ -65,8 +65,26 @@ impl ChunkStore {
         Ok(Self { base_path })
     }
 
+    /// Compute BLAKE3 hash, using multithreaded hashing for large buffers.
+    ///
+    /// For buffers >= 128 KB, uses \ to spread the work across
+    /// the Rayon thread pool. For small buffers, falls back to single-threaded
+    /// \ to avoid thread-pool overhead.
+    ///
+    /// Both paths produce identical hashes -- BLAKE3's tree structure guarantees
+    /// the same output regardless of parallelism.
+    fn blake3_hash(data: &[u8]) -> String {
+        if data.len() >= 128 * 1024 {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update_rayon(data);
+            hasher.finalize().to_hex().to_string()
+        } else {
+            blake3::hash(data).to_hex().to_string()
+        }
+    }
+
     pub fn put(&self, data: &[u8]) -> Result<String, ChunkStoreError> {
-        let hash = blake3::hash(data).to_hex().to_string();
+        let hash = Self::blake3_hash(data);
         let chunk_path = self.hash_to_path(&hash)?;
 
         if !chunk_path.exists() {
@@ -126,7 +144,7 @@ impl ChunkStore {
     /// Returns error if the data doesn't hash to the expected value.
     pub fn get_verified(&self, hash: &str) -> Result<Vec<u8>, ChunkStoreError> {
         let data = self.get(hash)?;
-        let actual_hash = blake3::hash(&data).to_hex().to_string();
+        let actual_hash = Self::blake3_hash(&data);
 
         if actual_hash != hash {
             return Err(ChunkStoreError::HashMismatch {
@@ -1173,6 +1191,54 @@ mod tests {
         assert!(!store.exists(&h2).unwrap());
 
         fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_blake3_rayon_produces_same_hash() {
+        // Verify that multithreaded hashing produces identical results
+        let data: Vec<u8> = (0..3_000_000).map(|i| (i % 256) as u8).collect();
+        
+        let single = blake3::hash(&data).to_hex().to_string();
+        let multi = ChunkStore::blake3_hash(&data);
+        
+        assert_eq!(single, multi, "Rayon hash must match single-threaded hash");
+    }
+
+    #[test]
+    fn test_blake3_small_buffer_uses_direct_hash() {
+        // Small buffers should still work correctly
+        let data = b"small data";
+        let expected = blake3::hash(data).to_hex().to_string();
+        let actual = ChunkStore::blake3_hash(data);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_blake3_hash_performance() {
+        let data: Vec<u8> = (0..3_000_000).map(|i| (i % 256) as u8).collect();
+        let iters = 50;
+
+        // Single-threaded
+        let start = std::time::Instant::now();
+        for _ in 0..iters {
+            let _h = blake3::hash(&data).to_hex().to_string();
+        }
+        let st_us = start.elapsed().as_micros() as f64 / iters as f64;
+
+        // Multi-threaded (update_rayon)
+        let start = std::time::Instant::now();
+        for _ in 0..iters {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update_rayon(&data);
+            let _h = hasher.finalize().to_hex().to_string();
+        }
+        let mt_us = start.elapsed().as_micros() as f64 / iters as f64;
+
+        println!();
+        println!("BLAKE3 hash of {:.1}MB ({} iters):", data.len() as f64 / 1e6, iters);
+        println!("  Single-threaded: {:.0}us ({:.1}ms)", st_us, st_us / 1000.0);
+        println!("  update_rayon:    {:.0}us ({:.1}ms)", mt_us, mt_us / 1000.0);
+        println!("  Speedup: {:.2}x", st_us / mt_us);
     }
 
     #[test]

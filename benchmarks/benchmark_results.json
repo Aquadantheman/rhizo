@@ -1,0 +1,157 @@
+[
+  {
+    "name": "Write throughput",
+    "value": 2277.3,
+    "unit": "MB/s",
+    "details": {
+      "chunk_size_mb": 10.0,
+      "iterations": 5,
+      "includes": "BLAKE3 hashing + file write"
+    }
+  },
+  {
+    "name": "Read throughput (verified)",
+    "value": 724.6,
+    "unit": "MB/s",
+    "details": {
+      "chunk_size_mb": 10.0,
+      "iterations": 5,
+      "includes": "File read + BLAKE3 verification"
+    }
+  },
+  {
+    "name": "Branch creation (1,000 rows)",
+    "value": 1.86,
+    "unit": "ms",
+    "details": {
+      "rows": 1000,
+      "storage_overhead_bytes": 170.0,
+      "branches_created": 10
+    }
+  },
+  {
+    "name": "Branch creation (10,000 rows)",
+    "value": 0.67,
+    "unit": "ms",
+    "details": {
+      "rows": 10000,
+      "storage_overhead_bytes": 170.0,
+      "branches_created": 10
+    }
+  },
+  {
+    "name": "Branch creation (50,000 rows)",
+    "value": 0.63,
+    "unit": "ms",
+    "details": {
+      "rows": 50000,
+      "storage_overhead_bytes": 170.0,
+      "branches_created": 10
+    }
+  },
+  {
+    "name": "Branch creation (100,000 rows)",
+    "value": 0.63,
+    "unit": "ms",
+    "details": {
+      "rows": 100000,
+      "storage_overhead_bytes": 170.0,
+      "branches_created": 10
+    }
+  },
+  {
+    "name": "Deduplication (identical tables)",
+    "value": 5.0,
+    "unit": "x reduction",
+    "details": {
+      "tables": 5,
+      "rows_per_table": 10000,
+      "total_storage": "119.8 KB"
+    }
+  },
+  {
+    "name": "Deduplication (10 versions, 5% change)",
+    "value": 1.0,
+    "unit": "x reduction",
+    "details": {
+      "versions": 11,
+      "change_rate": "5%",
+      "rows": 50000,
+      "naive_storage": "6.6 MB",
+      "actual_storage": "6.6 MB"
+    }
+  },
+  {
+    "name": "Time travel query",
+    "value": 4.5,
+    "unit": "ms",
+    "details": {
+      "versions_tested": [
+        1,
+        5,
+        10,
+        15,
+        20
+      ],
+      "time_variance_ratio": 1.57,
+      "note": "Time should be constant regardless of version (O(1) lookup)"
+    }
+  },
+  {
+    "name": "Single-table write",
+    "value": 12.4,
+    "unit": "ms",
+    "details": {
+      "rows": 1000
+    }
+  },
+  {
+    "name": "3-table transaction",
+    "value": 71.2,
+    "unit": "ms",
+    "details": {
+      "tables": 3,
+      "rows_per_table": 1000,
+      "overhead_vs_3x_single": "91%"
+    }
+  },
+  {
+    "name": "Algebraic merge (ADD)",
+    "value": 4541.3,
+    "unit": "K ops/sec",
+    "details": {
+      "iterations": 10000,
+      "operation": "AbelianAdd",
+      "use_case": "Counter increments"
+    }
+  },
+  {
+    "name": "Algebraic merge (MAX)",
+    "value": 4390.2,
+    "unit": "K ops/sec",
+    "details": {
+      "iterations": 10000,
+      "operation": "SemilatticeMax",
+      "use_case": "Timestamp comparison"
+    }
+  },
+  {
+    "name": "Algebraic merge (UNION)",
+    "value": 685.0,
+    "unit": "K ops/sec",
+    "details": {
+      "iterations": 10000,
+      "operation": "SemilatticeUnion",
+      "use_case": "Tag accumulation"
+    }
+  },
+  {
+    "name": "Schema registry lookup",
+    "value": 11607.7,
+    "unit": "K ops/sec",
+    "details": {
+      "iterations": 30000,
+      "note": "3 column lookups per iteration"
+    }
+  }
+]

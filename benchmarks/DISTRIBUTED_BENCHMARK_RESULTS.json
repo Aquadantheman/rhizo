@@ -1,22 +1,22 @@
 {
-  "timestamp": "2026-01-20T21:52:10.840678",
+  "timestamp": "2026-01-31T12:45:25.263245",
   "latency": [
     {
       "local_commit_ms": 0.0012,
       "simulated_consensus_ms": 100.0012,
-      "speedup": 81753.78,
+      "speedup": 82427.61,
       "operations": 1
     },
     {
-      "local_commit_ms": 0.0059,
-      "simulated_consensus_ms": 100.0059,
-      "speedup": 16940.97,
+      "local_commit_ms": 0.0058,
+      "simulated_consensus_ms": 100.0058,
+      "speedup": 17326.02,
       "operations": 10
     },
     {
-      "local_commit_ms": 0.0573,
-      "simulated_consensus_ms": 100.0573,
-      "speedup": 1746.91,
+      "local_commit_ms": 0.0558,
+      "simulated_consensus_ms": 100.0558,
+      "speedup": 1793.83,
       "operations": 100
     }
   ],
@@ -25,8 +25,8 @@
       "num_nodes": 2,
       "operations_per_node": 100,
       "total_operations": 200,
-      "total_time_ms": 1.0,
-      "ops_per_sec": 200985.0,
+      "total_time_ms": 0.96,
+      "ops_per_sec": 207361.0,
       "messages_sent": 400,
       "messages_delivered": 400
     },
@@ -34,8 +34,8 @@
       "num_nodes": 5,
       "operations_per_node": 100,
       "total_operations": 500,
-      "total_time_ms": 7.64,
-      "ops_per_sec": 65442.0,
+      "total_time_ms": 10.05,
+      "ops_per_sec": 49739.0,
       "messages_sent": 10000,
       "messages_delivered": 10000
     },
@@ -43,8 +43,8 @@
       "num_nodes": 10,
       "operations_per_node": 100,
       "total_operations": 1000,
-      "total_time_ms": 58.96,
-      "ops_per_sec": 16961.0,
+      "total_time_ms": 84.28,
+      "ops_per_sec": 11866.0,
       "messages_sent": 90000,
       "messages_delivered": 90000
     },
@@ -52,8 +52,8 @@
       "num_nodes": 20,
       "operations_per_node": 100,
       "total_operations": 2000,
-      "total_time_ms": 483.05,
-      "ops_per_sec": 4140.0,
+      "total_time_ms": 685.11,
+      "ops_per_sec": 2919.0,
       "messages_sent": 760000,
       "messages_delivered": 760000
     }
@@ -63,7 +63,7 @@
       "num_nodes": 5,
       "operations_per_node": 10,
       "rounds_to_converge": 3,
-      "convergence_time_ms": 1.04,
+      "convergence_time_ms": 1.33,
       "all_converged": true,
       "final_value": 50,
       "network_condition": "perfect"
@@ -72,7 +72,7 @@
       "num_nodes": 10,
       "operations_per_node": 10,
       "rounds_to_converge": 3,
-      "convergence_time_ms": 22.96,
+      "convergence_time_ms": 23.11,
       "all_converged": true,
       "final_value": 100,
       "network_condition": "perfect"
@@ -81,7 +81,7 @@
       "num_nodes": 20,
       "operations_per_node": 10,
       "rounds_to_converge": 3,
-      "convergence_time_ms": 43.38,
+      "convergence_time_ms": 61.44,
       "all_converged": true,
       "final_value": 200,
       "network_condition": "perfect"
@@ -90,7 +90,7 @@
       "num_nodes": 5,
       "operations_per_node": 100,
       "rounds_to_converge": 3,
-      "convergence_time_ms": 9.98,
+      "convergence_time_ms": 9.31,
       "all_converged": true,
       "final_value": 500,
       "network_condition": "contention"
@@ -99,7 +99,7 @@
       "num_nodes": 10,
       "operations_per_node": 100,
       "rounds_to_converge": 3,
-      "convergence_time_ms": 60.31,
+      "convergence_time_ms": 83.23,
       "all_converged": true,
       "final_value": 1000,
       "network_condition": "contention"
@@ -108,16 +108,16 @@
       "num_nodes": 5,
       "operations_per_node": 10,
       "rounds_to_converge": 3,
-      "convergence_time_ms": 0.81,
+      "convergence_time_ms": 1.1,
       "all_converged": true,
       "final_value": 50,
       "network_condition": "partition"
     }
   ],
   "summary": {
-    "average_local_commit_ms": 0.0215,
-    "average_speedup_vs_consensus": 33480.6,
-    "max_throughput_ops_sec": 200985.0,
+    "average_local_commit_ms": 0.0209,
+    "average_speedup_vs_consensus": 33849.2,
+    "max_throughput_ops_sec": 207361.0,
     "all_scenarios_converged": true,
     "mathematical_soundness_verified": true,
     "operation_types_tested": [
