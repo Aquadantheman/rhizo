@@ -329,7 +329,7 @@ The energy savings follow directly from the time savings: $E = P \cdot t$. By re
 
 We presented Rhizo, a distributed data system that achieves strong consistency without consensus for algebraic operations. By classifying operations by their mathematical properties, we enable $O(1)$ local commit latency (0.02ms average) while maintaining provable convergence. Our evaluation demonstrates:
 
-- **33,000x latency improvement** over consensus-based systems
+- **33,000x latency improvement** over typical cross-region consensus (measured 0.021ms local commit vs 100ms standard estimate; 30x measured vs SQLite WAL)
 - **255,000 ops/sec throughput** at the 2-node scale
 - **Constant-round convergence** (3 rounds regardless of operation count)
 - **100% mathematical soundness** (commutativity, associativity, idempotency verified)

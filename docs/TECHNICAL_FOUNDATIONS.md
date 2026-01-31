@@ -311,9 +311,9 @@ When $V_a \| V_b$ (concurrent), algebraic merge resolves automatically.
 
 ### Performance Results
 
-| Metric | Rhizo | Consensus Baseline | Improvement |
-|--------|-------|-------------------|-------------|
-| Local commit latency | 0.021 ms | 100 ms | **33,000x faster** |
+| Metric | Rhizo (measured) | Baseline | Improvement |
+|--------|------------------|----------|-------------|
+| Local commit latency | 0.021 ms | 100 ms (typical cross-region, not measured) | **33,000x faster** |
 | Throughput (2 nodes) | 255,297 ops/sec | ~1,000 ops/sec | **255x higher** |
 | Convergence rounds | 3 (constant) | N/A | Guaranteed |
 
@@ -350,8 +350,9 @@ When $V_a \| V_b$ (concurrent), algebraic merge resolves automatically.
 | 32x faster OLAP reads | **Measured** | DataFusion vs DuckDB benchmarks |
 | Algebraic merge 11M+ ops/sec | **Measured** | Benchmark suite |
 | 100% conflict-free merge (algebraic) | **Verified** | Mathematical proofs + tests |
-| 33,000x faster than consensus | **Measured** | Coordination-free benchmarks |
-| 97,943x less energy | **Measured** | CodeCarbon benchmarks |
+| 30x faster than SQLite WAL | **Measured** | Real consensus benchmarks |
+| 33,000x faster than consensus | **Extrapolated** | Measured local commit vs typical 100ms cross-region |
+| 97,943x less energy | **Estimated** | Measured local energy vs typical consensus energy model |
 | 3-round convergence (constant) | **Measured** | Distributed simulation |
 | Commutativity/associativity | **Verified** | Mathematical proofs |
 

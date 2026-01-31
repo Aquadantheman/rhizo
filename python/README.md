@@ -8,10 +8,12 @@ In 1980, Deleuze and Guattari contrasted the rhizome with the tree: hierarchies 
 
 | Metric | Rhizo | Industry Standard | Improvement |
 |--------|-------|-------------------|-------------|
-| Transaction latency | 0.021ms | 100ms (consensus) | [**33,000x faster**](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#verify-transaction-latency) |
-| Energy per transaction | 2.2e-11 kWh | 2.1e-6 kWh | [**97,943x less**](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#verify-energy-efficiency) |
+| Transaction latency | 0.021ms | 100ms (typical cross-region consensus)\* | [**33,000x faster**](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#verify-transaction-latency) |
+| Energy per transaction | 2.2e-11 kWh | 2.1e-6 kWh (estimated consensus)\* | [**97,943x less**](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#verify-energy-efficiency) |
 | Branch overhead | 140 bytes | 63 MB (Delta Lake) | [**450,000x smaller**](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#verify-branch-overhead) |
 | OLAP queries | 0.9ms | 26ms (DuckDB) | [**32x faster**](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#verify-olap-performance) |
+
+<sub>\*Consensus baselines use typical cross-region latency estimates, not measured systems. Rhizo values are measured. Measured vs SQLite WAL: 30x faster. [Full methodology →](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#benchmark-methodology)</sub>
 
 <sub>All claims link to verification methodology. [Run benchmarks yourself →](https://github.com/rhizodata/rhizo/blob/main/docs/PERFORMANCE.md#verify-these-claims)</sub>
 

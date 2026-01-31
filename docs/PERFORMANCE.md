@@ -251,13 +251,13 @@ Every headline number can be reproduced on your machine. No trust required.
 
 ### Verify Transaction Latency
 
-**Claim**: 0.021ms local commit, 33,000x faster than consensus
+**Claim**: 0.021ms measured local commit vs 100ms typical cross-region consensus baseline (not measured in same benchmark)
 
 ```bash
 python benchmarks/distributed_benchmark.py
 ```
 
-**What it measures**: Time to commit an algebraic transaction locally (vector clock tick + state update) vs simulated cross-region consensus (100ms baseline).
+**What it measures**: Time to commit an algebraic transaction locally (vector clock tick + state update). The consensus baseline (100ms) is a **hardcoded constant** representing typical cross-region Paxos/Raft latency, not a measured system in this benchmark.
 
 **Expected output**:
 ```
@@ -271,7 +271,12 @@ SUMMARY
   Average speedup vs consensus: 33480.6x
 ```
 
-**Why it's valid**: Algebraic operations (ADD, MAX, UNION) satisfy commutativity and associativity, mathematically guaranteeing convergence without coordination. See [TECHNICAL_FOUNDATIONS.md](TECHNICAL_FOUNDATIONS.md#algebraic-classification-for-conflict-free-merge).
+**What's measured vs assumed**:
+- **Measured**: Local commit latency (0.021ms average across 1/10/100 ops)
+- **Assumed**: 100ms consensus baseline (typical for cross-region Paxos/Raft, which requires 2-3 RTTs at 50-150ms each)
+- **Separately validated**: `benchmarks/real_consensus_benchmark.py` measures against SQLite WAL (~30x speedup for local durability)
+
+**Why the comparison is reasonable**: Algebraic operations (ADD, MAX, UNION) satisfy commutativity and associativity, mathematically guaranteeing convergence without coordination. The 100ms baseline represents the latency these operations *avoid* by not requiring consensus. See [TECHNICAL_FOUNDATIONS.md](TECHNICAL_FOUNDATIONS.md#algebraic-classification-for-conflict-free-merge).
 
 ---
 
@@ -375,23 +380,25 @@ This section explains the measurement conditions behind Rhizo's headline perform
 ### Algebraic Operation Speedup (33,000x / 97,943x claims)
 
 These claims compare:
-- **Rhizo**: Local algebraic commit using vector clocks (~0.001-0.02ms)
-- **Baseline**: Cross-region Paxos/Raft consensus (~50-150ms RTT)
+- **Rhizo (measured)**: Local algebraic commit using vector clocks (~0.001-0.02ms)
+- **Baseline (not measured)**: Typical cross-region Paxos/Raft consensus (~100ms)
 
-**Why this comparison is valid**: Algebraic operations (semilattices like MAX/MIN/UNION, abelian groups like ADD) are mathematically proven to converge without coordination. They can be applied locally and merged later with guaranteed consistency. The speedup represents the latency saved by avoiding consensus round-trips.
+The consensus baseline is a hardcoded 100ms constant in `benchmarks/distributed_benchmark.py`, representing typical cross-region consensus latency. It is **not measured against a real consensus system** in the same benchmark. The Rhizo local commit time (0.021ms average) is genuinely measured.
+
+**Why this comparison is reasonable**: Algebraic operations (semilattices like MAX/MIN/UNION, abelian groups like ADD) are mathematically proven to converge without coordination. They can be applied locally and merged later with guaranteed consistency. The speedup represents the latency saved by avoiding consensus round-trips. Cross-region Paxos/Raft typically requires 2-3 RTTs at 50-150ms each, making 100ms a representative middle estimate.
 
 See [TECHNICAL_FOUNDATIONS.md](TECHNICAL_FOUNDATIONS.md#algebraic-classification-for-conflict-free-merge) for the mathematical proofs.
 
-**Empirical validation** (`benchmarks/real_consensus_benchmark.py`):
+**Real system comparison** (`benchmarks/real_consensus_benchmark.py`):
 
-| System | Latency | Speedup vs Rhizo |
-|--------|---------|------------------|
-| Rhizo algebraic | 0.001ms | baseline |
-| SQLite WAL (local durability) | 0.033ms | 30x slower |
-| Cross-region consensus (50ms) | 50ms | 46,000x slower |
-| Cross-region consensus (100ms) | 100ms | 93,000x slower |
+| System | Latency | Measured? | Speedup vs Rhizo |
+|--------|---------|-----------|------------------|
+| Rhizo algebraic | 0.001ms | Yes | baseline |
+| SQLite WAL (local durability) | 0.033ms | Yes | 30x slower |
+| Cross-region consensus (50ms) | 50ms | No (typical estimate) | ~46,000x slower |
+| Cross-region consensus (100ms) | 100ms | No (typical estimate) | ~93,000x slower |
 
-The theoretical 33,000-97,000x speedup is confirmed empirically when comparing in-memory algebraic operations to cross-region consensus latencies.
+The 33,000x figure is valid under the assumption of 100ms cross-region consensus. Against a locally-measured real system (SQLite WAL), the measured speedup is ~30x.
 
 ### OLAP Cache Performance
 
