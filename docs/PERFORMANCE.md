@@ -251,7 +251,7 @@ Every headline number can be reproduced on your machine. No trust required.
 
 ### Verify Transaction Latency
 
-**Claim**: 0.001ms local commit — 30,000x faster than remote 2PC, 59x faster than localhost 2PC, 355x faster than durable writes
+**Claim**: 0.001ms local commit — 160,000x faster than cross-continent 2PC, 30,000x faster than same-region 2PC, 59x faster than localhost 2PC, 355x faster than durable writes
 
 ```bash
 # Localhost benchmarks
