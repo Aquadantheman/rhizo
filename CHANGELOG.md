@@ -5,6 +5,25 @@ All notable changes to Rhizo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] - 2026-01-30
+
+### Added
+
+#### Concurrent/Stress Test Suite
+- **New `tests/test_stress.py`**: 13 stress tests covering concurrent operations at scale
+  - `TestHighConcurrencyStress`: 20-thread writes, 15-thread mixed R/W, 10-thread contention, read atomicity (4 tests)
+  - `TestSustainedLoadStress`: 50 rapid transactions, 30 sequential versions (2 tests)
+  - `TestBranchStress`: 10 concurrent branch creates, merge under read pressure (2 tests)
+  - `TestDistributedConvergenceStress`: 10-node/100-op convergence, partition-heal-converge, mixed algebraic ops (3 tests)
+  - `TestCacheStress`: 10 threads × 50 ops on shared CacheManager (1 test)
+  - `TestRecoveryStress`: 3 committers + 2 aborters, verify only committed data persists (1 test)
+- Registered `slow` pytest marker in `pyproject.toml`
+
+### Changed
+
+- **467 Python tests** (was 454, +13 stress tests)
+- **910 total tests** (443 Rust + 467 Python)
+
 ## [0.5.5] - 2026-01-30
 
 ### Added
