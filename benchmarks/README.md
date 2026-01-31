@@ -32,7 +32,20 @@ python benchmarks/real_consensus_benchmark.py \
   --remote-2pc us-east-vm:9000,eu-west-vm:9000
 ```
 
-See [CLOUD_BENCHMARK.md](CLOUD_BENCHMARK.md) for geo-distributed benchmark setup.
+See [CLOUD_BENCHMARK.md](CLOUD_BENCHMARK.md) for geo-distributed benchmark setup and measured results.
+
+## Key Results (January 2026)
+
+| Benchmark | Rhizo | Baseline | Speedup | Methodology |
+|-----------|-------|----------|---------|-------------|
+| Cross-continent 2PC | 0.001ms | 187.9ms | **160,000x** | NYC → AWS Oregon + Ireland, 500 iters |
+| Same-region 2PC | 0.001ms | 33.3ms | **30,000x** | NYC → AWS Virginia, 500 iters |
+| Localhost 2PC | 0.001ms | 0.065ms | **59x** | 3 OS processes, real TCP |
+| SQLite FULL sync | 0.001ms | 0.386ms | **355x** | fsync per commit |
+| OLAP read (100K) | 0.9ms | 26ms (DuckDB) | **32x** | DataFusion vs DuckDB |
+| OLAP read (1M) | 3.7ms | 283ms (DuckDB) | **76x** | DataFusion vs DuckDB |
+
+Raw result files: `CLOUD_MULTI_REGION_RESULTS.json`, `CLOUD_SAME_REGION_RESULTS.json`, `REAL_CONSENSUS_BENCHMARK_RESULTS.json`
 
 ## Dependencies
 

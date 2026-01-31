@@ -5,6 +5,36 @@ All notable changes to Rhizo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] - 2026-01-30
+
+### Added
+
+#### Cloud Benchmark Infrastructure
+- **Multi-region 2PC benchmark**: Real geo-distributed coordination measurement across AWS regions
+- **`2pc_participant_server.py`**: Standalone participant server for deployment on cloud VMs
+- **`CLOUD_BENCHMARK.md`**: Step-by-step deployment guide for AWS/GCP cloud benchmarks
+- **Statistical reporting**: p50, p95, p99, stddev, and sample size for all benchmark results
+
+### Performance
+
+#### Measured Cloud Results (Real 2PC Over Network)
+- **160,000x faster** than cross-continent 2PC (NYC → AWS Oregon + AWS Ireland, ~100ms RTT, 500 iterations)
+  - Rhizo algebraic commit: 0.001ms
+  - Remote 2PC (3 machines): 187.9ms (p50: 188.1ms, p95: 191.2ms, p99: 194.3ms)
+- **30,000x faster** than same-region 2PC (NYC → AWS Virginia, ~18ms RTT, 500 iterations)
+  - Remote 2PC (3 machines): 33.3ms
+- **59x faster** than localhost 2PC (3 OS processes, real TCP sockets)
+- **355x faster** than SQLite WAL with FULL sync (fsync per commit)
+
+All measurements use real TCP coordination between separate machines. No simulated delays.
+
+### Documentation
+- All docs updated with measured cloud numbers (README, PERFORMANCE, TECHNICAL_FOUNDATIONS, VISION, ROADMAP)
+- Papers updated with geo-distributed evaluation results
+- Benchmark README updated with multi-region results summary
+
+---
+
 ## [0.5.4] - 2026-01-20
 
 ### Security

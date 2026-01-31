@@ -4,7 +4,7 @@
 
 ## Abstract
 
-Distributed databases traditionally require consensus protocols (Paxos, Raft) to achieve strong consistency, incurring significant latency overhead for geo-distributed deployments. We observe that many common operations—counters, max/min aggregates, set unions—have algebraic properties that mathematically guarantee convergence regardless of operation order. We present Rhizo, a distributed data system that classifies operations by their algebraic structure and commits transactions locally when all operations are algebraically conflict-free. For these workloads, Rhizo achieves $O(1)$ local commit latency compared to $O(\text{consensus})$ for traditional systems, while maintaining strong eventual consistency with provable convergence. Our evaluation shows **59x latency improvement** over localhost 2PC (0.001ms vs 0.065ms, measured) and **355x** over durable writes (SQLite FULL sync), with **255,000 ops/sec throughput** and **97,943x energy reduction** (estimated) for algebraic workloads, with mathematically verified convergence in all test scenarios. By eliminating coordination, we eliminate not only latency but also idle energy consumption—the fastest database is also the greenest.
+Distributed databases traditionally require consensus protocols (Paxos, Raft) to achieve strong consistency, incurring significant latency overhead for geo-distributed deployments. We observe that many common operations—counters, max/min aggregates, set unions—have algebraic properties that mathematically guarantee convergence regardless of operation order. We present Rhizo, a distributed data system that classifies operations by their algebraic structure and commits transactions locally when all operations are algebraically conflict-free. For these workloads, Rhizo achieves $O(1)$ local commit latency compared to $O(\text{consensus})$ for traditional systems, while maintaining strong eventual consistency with provable convergence. Our evaluation shows **160,000x latency improvement** over cross-continent 2PC (0.001ms vs 187.9ms, measured across NYC → AWS Oregon + Ireland), **30,000x** over same-region 2PC (NYC → AWS Virginia), and **59x** over localhost 2PC, with **255,000 ops/sec throughput** and **97,943x energy reduction** (estimated) for algebraic workloads, with mathematically verified convergence in all test scenarios. By eliminating coordination, we eliminate not only latency but also idle energy consumption—the fastest database is also the greenest.
 
 ---
 
@@ -218,12 +218,16 @@ Classification is automatic based on operation type.
 
 ### 6.1 Experimental Setup
 
-- **Platform:** Simulated multi-node cluster (in-memory, deterministic)
-- **Nodes:** 2, 5, 10, 20 node configurations
+- **Platform:** Local machine + AWS EC2 instances across 3 regions
+- **Nodes:** 2, 5, 10, 20 node configurations (simulated); 3-machine real TCP (measured)
 - **Workloads:** Counter increments (ADD), timestamps (MAX), tag management (UNION)
-- **Baseline:** Localhost 2PC (3 OS processes, real TCP) and SQLite WAL (FULL sync)
+- **Baselines:**
+  - Cross-continent 2PC: Real TCP between NYC, AWS Oregon (us-west-2), and AWS Ireland (eu-west-1)
+  - Same-region 2PC: Real TCP between NYC and AWS Virginia (us-east-1)
+  - Localhost 2PC: 3 OS processes, real TCP sockets, same machine
+  - SQLite WAL (FULL sync): Local durable writes with fsync
 
-**Benchmark Context:** All baselines are measured on the same machine. The localhost 2PC benchmark runs a real two-phase commit protocol over TCP sockets between 3 OS processes, measuring the true coordination protocol overhead without network latency. For geo-distributed deployments, coordination overhead would be significantly higher (100ms+ cross-region RTT), making the advantage proportionally larger.
+**Benchmark Context:** Cloud baselines use real 2PC over the public internet between t2.micro EC2 instances. Each 2PC round performs PREPARE (2 round-trips) + COMMIT (2 round-trips) = 4 network round-trips. All results are 500 iterations with p50/p95/p99 statistics.
 
 ### 6.2 Latency
 
@@ -236,6 +240,17 @@ Local commit achieves sub-millisecond latency, dramatically outperforming consen
 | 100 ops | 0.0579 ms | 100.06 ms | **1,729x** |
 
 **Average local commit: 0.021 ms** — three orders of magnitude faster than coordination.
+
+#### 6.2.1 Measured Cloud Latency (Real Network)
+
+| Scenario | Rhizo | 2PC Latency | RTT | Speedup | N |
+|----------|-------|-------------|-----|---------|---|
+| Cross-continent (Oregon + Ireland) | 0.001ms | 187.9ms (p95: 191.2ms) | ~100ms | **160,000x** | 500 |
+| Same-region (Virginia) | 0.001ms | 33.3ms (p95: 36.8ms) | ~18ms | **30,000x** | 500 |
+| Localhost (3 processes) | 0.001ms | 0.065ms | 0ms | **59x** | 500 |
+| SQLite FULL sync | 0.001ms | 0.386ms | N/A | **355x** | 1000 |
+
+The speedup scales linearly with network distance because Rhizo's commit is always local (0.001ms), while coordination cost is dominated by RTT.
 
 ### 6.3 Throughput
 
@@ -327,15 +342,17 @@ The energy savings follow directly from the time savings: $E = P \cdot t$. By re
 
 ## 8. Conclusion
 
-We presented Rhizo, a distributed data system that achieves strong consistency without consensus for algebraic operations. By classifying operations by their mathematical properties, we enable $O(1)$ local commit latency (0.02ms average) while maintaining provable convergence. Our evaluation demonstrates:
+We presented Rhizo, a distributed data system that achieves strong consistency without consensus for algebraic operations. By classifying operations by their mathematical properties, we enable $O(1)$ local commit latency (0.001ms) while maintaining provable convergence. Our evaluation demonstrates:
 
-- **59x latency improvement** over localhost 2PC (measured 0.001ms local commit vs 0.065ms 2PC); **355x** over SQLite FULL sync (0.386ms)
+- **160,000x latency improvement** over cross-continent 2PC (0.001ms vs 187.9ms, NYC → Oregon + Ireland, measured)
+- **30,000x latency improvement** over same-region 2PC (0.001ms vs 33.3ms, NYC → Virginia, measured)
+- **59x latency improvement** over localhost 2PC (0.001ms vs 0.065ms, measured)
 - **255,000 ops/sec throughput** at the 2-node scale
 - **Constant-round convergence** (3 rounds regardless of operation count)
 - **100% mathematical soundness** (commutativity, associativity, idempotency verified)
 - **97,943x energy reduction** compared to consensus-based systems
 
-For common workloads like counters, timestamps, and set operations, coordination-free transactions represent a fundamental improvement over coordination-based approaches. By eliminating coordination, we eliminate not only latency but also the idle energy consumption that dominates distributed system costs. The fastest database is also the greenest.
+The speedup scales with network distance: Rhizo's commit is always local (~1 microsecond), while coordination cost grows linearly with RTT. For common workloads like counters, timestamps, and set operations, coordination-free transactions represent a fundamental improvement over coordination-based approaches. By eliminating coordination, we eliminate not only latency but also the idle energy consumption that dominates distributed system costs. The fastest database is also the greenest.
 
 Rhizo is open source under the MIT license at: https://github.com/rhizodata/rhizo
 

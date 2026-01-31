@@ -172,6 +172,42 @@ The JSON output includes:
 
 The remote 2PC speedup is the headline number for geo-distributed claims.
 
+## Measured Results (January 2026)
+
+Benchmarks run from NYC to AWS EC2 t2.micro instances.
+
+### Cross-Continent (NYC → Oregon + Ireland)
+
+| Endpoint | Region | RTT |
+|----------|--------|-----|
+| 54.244.106.26 (Oregon) | us-west-2 | 92ms |
+| 52.49.21.132 (Ireland) | eu-west-1 | 107ms |
+
+| System | Mean | p50 | p95 | p99 | Speedup | N |
+|--------|------|-----|-----|-----|---------|---|
+| Rhizo algebraic (ADD) | 0.001ms | 0.001ms | 0.002ms | 0.002ms | baseline | 500 |
+| Remote 2PC (3 machines) | 187.9ms | 188.1ms | 191.2ms | 194.3ms | **160,000x** | 500 |
+
+### Same-Region (NYC → Virginia)
+
+| Endpoint | Region | RTT |
+|----------|--------|-----|
+| 34.229.148.227 | us-east-1 | 17ms |
+| 18.234.194.185 | us-east-1 | 19ms |
+
+| System | Mean | Speedup | N |
+|--------|------|---------|---|
+| Rhizo algebraic (ADD) | 0.001ms | baseline | 500 |
+| Remote 2PC (3 machines) | 33.3ms | **30,000x** | 500 |
+
+### Why Rhizo is Always 0.001ms
+
+Rhizo algebraic commits are **local operations** — they never touch the network. The math (commutativity + associativity) guarantees all nodes converge regardless of operation order. So the cost is constant: ~1 microsecond for a local memory operation. The further apart your nodes are, the more coordination costs — but Rhizo's cost stays flat.
+
+Raw results: `CLOUD_MULTI_REGION_RESULTS.json`, `CLOUD_SAME_REGION_RESULTS.json`
+
+---
+
 ## Local Testing
 
 Test the remote 2PC flow locally before deploying to cloud:
