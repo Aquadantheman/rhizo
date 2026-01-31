@@ -321,6 +321,83 @@ class TestSnapshotIsolation:
             # This is tricky to test without actual concurrency,
             # but we can verify the buffered write mechanism works
 
+    def test_new_table_not_visible_in_transaction(self, engine_with_tx):
+        """Test that a table created after tx.begin is not readable within tx."""
+        engine, _ = engine_with_tx
+
+        # Write initial table so we have something in the snapshot
+        df1 = pd.DataFrame({"id": [1], "value": [100]})
+        engine.write_table("existing", df1)
+
+        with engine.transaction() as tx:
+            # Table "existing" is in the snapshot and readable
+            result = tx.query("SELECT value FROM existing")
+            assert result.to_pandas()["value"].iloc[0] == 100
+
+            # Create a NEW table outside the transaction
+            df_new = pd.DataFrame({"id": [1], "name": ["phantom"]})
+            engine.write_table("phantom_table", df_new)
+
+            # Querying the new table within the transaction should fail
+            # because it didn't exist in the snapshot
+            with pytest.raises(ValueError, match="does not exist in transaction snapshot"):
+                tx.query("SELECT * FROM phantom_table")
+
+    def test_existing_table_still_readable_in_transaction(self, engine_with_tx):
+        """Test that existing tables in the snapshot are still fully readable."""
+        engine, _ = engine_with_tx
+
+        # Write multiple tables before starting the transaction
+        df_users = pd.DataFrame({"id": [1, 2], "name": ["alice", "bob"]})
+        df_orders = pd.DataFrame({"id": [1], "user_id": [1], "amount": [50]})
+        engine.write_table("users", df_users)
+        engine.write_table("orders", df_orders)
+
+        with engine.transaction() as tx:
+            # Both tables should be readable from the snapshot
+            users = tx.query("SELECT * FROM users")
+            assert users.row_count == 2
+
+            orders = tx.query("SELECT * FROM orders")
+            assert orders.row_count == 1
+
+            # Can query them multiple times consistently
+            users2 = tx.query("SELECT name FROM users WHERE id = 1")
+            assert users2.to_pandas()["name"].iloc[0] == "alice"
+
+    def test_transaction_can_write_new_table(self, engine_with_tx):
+        """Test that buffered writes to new tables still work within tx."""
+        engine, _ = engine_with_tx
+
+        with engine.transaction() as tx:
+            # Writing a new table within the transaction should succeed
+            df = pd.DataFrame({"id": [1], "value": [42]})
+            tx.write_table("brand_new", df)
+
+            # Can query the buffered write within the transaction
+            result = tx.query("SELECT value FROM brand_new")
+            assert result.to_pandas()["value"].iloc[0] == 42
+
+        # After commit, the table should be visible
+        result = engine.query("SELECT value FROM brand_new")
+        assert result.to_pandas()["value"].iloc[0] == 42
+
+    def test_new_table_visible_after_commit(self, engine_with_tx):
+        """Test that tables created outside a tx are visible in subsequent queries."""
+        engine, _ = engine_with_tx
+
+        with engine.transaction() as tx:
+            # Write something so the tx has work to do
+            tx.write_table("tx_data", pd.DataFrame({"x": [1]}))
+
+        # Now create a new table outside any transaction
+        engine.write_table("later_table", pd.DataFrame({"y": [99]}))
+
+        # A new transaction should see the new table in its snapshot
+        with engine.transaction() as tx2:
+            result = tx2.query("SELECT y FROM later_table")
+            assert result.to_pandas()["y"].iloc[0] == 99
+
 
 class TestBranchIntegration:
     """Tests for transaction + branch integration."""

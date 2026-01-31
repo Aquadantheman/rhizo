@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Zero-copy single-chunk writes**: Single-chunk writes now use `put()` with borrowed `&[u8]` instead of `put_batch(Vec<Vec<u8>>)`, eliminating a full buffer copy across the Python-Rust FFI boundary
 - **GIL release during storage**: `put_batch` now releases the Python GIL via `py.detach()` during hashing and disk I/O
 - 2 new Rust tests for BLAKE3 rayon hash correctness verification
-- **916 total tests** (449 Rust + 467 Python)
+- **920 total tests** (449 Rust + 471 Python)
 
 ## [0.5.6] - 2026-01-30
 

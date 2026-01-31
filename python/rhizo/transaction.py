@@ -156,12 +156,12 @@ class TransactionContext:
                     if version is not None:
                         self._engine._ensure_registered(table_name, version, self._branch)
                     else:
-                        # Table doesn't exist in snapshot - try catalog
-                        try:
-                            self._engine._ensure_registered(table_name, None, self._branch)
-                        except IOError:
-                            # Table doesn't exist at all - will error on query
-                            pass
+                        # Table didn't exist when transaction started.
+                        # Snapshot isolation: cannot read tables created after tx began.
+                        raise ValueError(
+                            f"Table '{table_name}' does not exist in transaction snapshot. "
+                            f"It may have been created after this transaction started."
+                        )
 
             # Execute query directly on DuckDB connection
             if params:
