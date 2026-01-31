@@ -207,7 +207,7 @@ All core capabilities are complete and tested:
 - **Git for Data** — Branch, diff, merge for tables. ~140 bytes per branch.
 - **Cross-Table ACID** — Atomic commits across your entire data estate.
 - **Unified Batch/Stream** — Same API for "what is" and "what changed."
-- **Coordination-Free Transactions** — 30x measured speedup vs SQLite WAL; ~33,000x vs typical cross-region consensus.
+- **Coordination-Free Transactions** — 59x measured vs localhost 2PC, 355x vs durable writes (all measured, same machine).
 
 See [README](./README.md#quick-start) for code examples and usage.
 
@@ -225,7 +225,7 @@ Rhizo rearchitects data infrastructure around content-addressable storage. This 
 
 All core phases complete. 897 tests passing (443 Rust + 454 Python).
 
-**Results:** 30x measured speedup vs SQLite WAL (33,000x vs typical cross-region consensus), 32x faster OLAP than DuckDB, 450,000x smaller branches than Delta Lake.
+**Measured results:** 59x faster than localhost 2PC, 355x faster than durable writes, 32x faster OLAP than DuckDB, 450,000x smaller branches than Delta Lake.
 
 ---
 

@@ -17,7 +17,7 @@ Rhizo is feature-complete for single-node deployments with full ACID transaction
 | Phase A: Merkle Storage | Complete | O(change) deduplication |
 | Phase P: Performance | Complete | Native Rust Parquet, parallel I/O, Arrow cache |
 | Phase DF: OLAP | Complete | DataFusion engine, 32x faster than DuckDB |
-| Phase CF: Coordination-Free | Complete | Algebraic transactions, 30x measured vs SQLite WAL |
+| Phase CF: Coordination-Free | Complete | Algebraic transactions, 59x measured vs localhost 2PC |
 
 ---
 
@@ -77,7 +77,7 @@ Rhizo is feature-complete for single-node deployments with full ACID transaction
 
 | Metric | Rhizo | Comparison |
 |--------|-------|------------|
-| Transaction latency | 0.021ms | 30x vs SQLite WAL (33,000x vs typical cross-region consensus) |
+| Transaction latency | 0.001ms | 59x vs localhost 2PC, 355x vs SQLite FULL sync (measured) |
 | Energy per transaction | 2.2e-11 kWh | 97,943x less than consensus |
 | OLAP read (100K rows) | 0.9ms | 32x faster than DuckDB |
 | Branch creation | <10ms | 450,000x smaller than Delta Lake |

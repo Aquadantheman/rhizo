@@ -251,32 +251,31 @@ Every headline number can be reproduced on your machine. No trust required.
 
 ### Verify Transaction Latency
 
-**Claim**: 0.021ms measured local commit vs 100ms typical cross-region consensus baseline (not measured in same benchmark)
+**Claim**: 0.001ms local commit — 59x faster than localhost 2PC, 355x faster than durable writes
 
 ```bash
-python benchmarks/distributed_benchmark.py
+python benchmarks/real_consensus_benchmark.py
 ```
 
-**What it measures**: Time to commit an algebraic transaction locally (vector clock tick + state update). The consensus baseline (100ms) is a **hardcoded constant** representing typical cross-region Paxos/Raft latency, not a measured system in this benchmark.
+**What it measures**: All systems measured on the same machine with no simulated delays. The benchmark spawns real OS processes that coordinate over TCP sockets.
 
-**Expected output**:
-```
-1. LATENCY BENCHMARK
-  1 ops/tx: Local=0.0012ms, Consensus=100.00ms, Speedup=81753.8x
-  10 ops/tx: Local=0.0059ms, Consensus=100.01ms, Speedup=16941.0x
-  100 ops/tx: Local=0.0573ms, Consensus=100.06ms, Speedup=1746.9x
+**Expected output** (measured, not simulated):
 
-SUMMARY
-  Average local commit latency: 0.0215 ms
-  Average speedup vs consensus: 33480.6x
-```
+| System | Latency | Speedup | Measured? |
+|--------|---------|---------|-----------|
+| Rhizo algebraic (ADD) | 0.001ms | baseline | Yes |
+| SQLite WAL (NORMAL sync) | 0.045ms | **41x** | Yes |
+| Localhost 2PC (3 nodes over TCP) | 0.065ms | **59x** | Yes |
+| SQLite WAL (FULL sync / fsync) | 0.386ms | **355x** | Yes |
 
-**What's measured vs assumed**:
-- **Measured**: Local commit latency (0.021ms average across 1/10/100 ops)
-- **Assumed**: 100ms consensus baseline (typical for cross-region Paxos/Raft, which requires 2-3 RTTs at 50-150ms each)
-- **Separately validated**: `benchmarks/real_consensus_benchmark.py` measures against SQLite WAL (~30x speedup for local durability)
+The 2PC benchmark is a real two-phase commit protocol: coordinator + 2 participants as separate OS processes communicating over localhost TCP. Each transaction performs PREPARE (2 round-trips) + COMMIT (2 round-trips) = 4 socket round-trips with process context switches.
 
-**Why the comparison is reasonable**: Algebraic operations (ADD, MAX, UNION) satisfy commutativity and associativity, mathematically guaranteeing convergence without coordination. The 100ms baseline represents the latency these operations *avoid* by not requiring consensus. See [TECHNICAL_FOUNDATIONS.md](TECHNICAL_FOUNDATIONS.md#algebraic-classification-for-conflict-free-merge).
+**Projected cross-region speedups** (measured protocol overhead + typical network RTT):
+- vs 50ms RTT + 2PC overhead: ~46,000x
+- vs 100ms RTT + 2PC overhead: ~92,000x
+- vs 150ms RTT + 2PC overhead: ~138,000x
+
+**Why coordination-free commits are faster**: Algebraic operations (ADD, MAX, UNION) satisfy commutativity and associativity, mathematically guaranteeing convergence without coordination. See [TECHNICAL_FOUNDATIONS.md](TECHNICAL_FOUNDATIONS.md#algebraic-classification-for-conflict-free-merge).
 
 ---
 
@@ -377,28 +376,24 @@ Results are saved to `benchmarks/*_RESULTS.json` with timestamps for reproducibi
 
 This section explains the measurement conditions behind Rhizo's headline performance claims.
 
-### Algebraic Operation Speedup (33,000x / 97,943x claims)
+### Algebraic Operation Speedup
 
-These claims compare:
-- **Rhizo (measured)**: Local algebraic commit using vector clocks (~0.001-0.02ms)
-- **Baseline (not measured)**: Typical cross-region Paxos/Raft consensus (~100ms)
-
-The consensus baseline is a hardcoded 100ms constant in `benchmarks/distributed_benchmark.py`, representing typical cross-region consensus latency. It is **not measured against a real consensus system** in the same benchmark. The Rhizo local commit time (0.021ms average) is genuinely measured.
-
-**Why this comparison is reasonable**: Algebraic operations (semilattices like MAX/MIN/UNION, abelian groups like ADD) are mathematically proven to converge without coordination. They can be applied locally and merged later with guaranteed consistency. The speedup represents the latency saved by avoiding consensus round-trips. Cross-region Paxos/Raft typically requires 2-3 RTTs at 50-150ms each, making 100ms a representative middle estimate.
-
-See [TECHNICAL_FOUNDATIONS.md](TECHNICAL_FOUNDATIONS.md#algebraic-classification-for-conflict-free-merge) for the mathematical proofs.
-
-**Real system comparison** (`benchmarks/real_consensus_benchmark.py`):
+All headline speedups are measured against real systems on the same machine (`benchmarks/real_consensus_benchmark.py`):
 
 | System | Latency | Measured? | Speedup vs Rhizo |
 |--------|---------|-----------|------------------|
-| Rhizo algebraic | 0.001ms | Yes | baseline |
-| SQLite WAL (local durability) | 0.033ms | Yes | 30x slower |
-| Cross-region consensus (50ms) | 50ms | No (typical estimate) | ~46,000x slower |
-| Cross-region consensus (100ms) | 100ms | No (typical estimate) | ~93,000x slower |
+| Rhizo algebraic (ADD) | 0.001ms | Yes | baseline |
+| SQLite WAL (NORMAL sync) | 0.045ms | Yes | **41x** slower |
+| Localhost 2PC (3 nodes, TCP) | 0.065ms | Yes | **59x** slower |
+| SQLite WAL (FULL sync / fsync) | 0.386ms | Yes | **355x** slower |
 
-The 33,000x figure is valid under the assumption of 100ms cross-region consensus. Against a locally-measured real system (SQLite WAL), the measured speedup is ~30x.
+The localhost 2PC benchmark runs a real two-phase commit protocol between 3 OS processes communicating over TCP sockets. It measures the actual cost of coordination: socket round-trips, process context switches, and protocol overhead.
+
+**Why Rhizo is faster**: Algebraic operations (semilattices like MAX/MIN/UNION, abelian groups like ADD) are mathematically proven to converge without coordination. They commit locally with zero network or protocol overhead.
+
+See [TECHNICAL_FOUNDATIONS.md](TECHNICAL_FOUNDATIONS.md#algebraic-classification-for-conflict-free-merge) for the mathematical proofs.
+
+**Cross-region projection**: Real consensus systems add 50-150ms of network RTT on top of the measured protocol overhead. Adding typical RTT to the measured 2PC overhead gives projected speedups of 46,000-138,000x. The previously cited "33,000x" figure (from `benchmarks/distributed_benchmark.py`) used a hardcoded 100ms baseline without measured protocol overhead; the actual projected speedup at 100ms RTT is ~92,000x.
 
 ### OLAP Cache Performance
 

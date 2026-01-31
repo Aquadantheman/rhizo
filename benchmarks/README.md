@@ -7,10 +7,10 @@ Performance benchmarks comparing Rhizo against industry alternatives.
 | File | Purpose | Compares Against |
 |------|---------|------------------|
 | `comprehensive_benchmark.py` | Main benchmark - OLAP, JOINs, scale, branching, dedup | Delta Lake, DuckDB, Parquet |
-| `real_consensus_benchmark.py` | **Empirical validation** against real systems | SQLite WAL, Redis, etcd |
+| `real_consensus_benchmark.py` | **Empirical validation** against real systems | Localhost 2PC, SQLite WAL (NORMAL + FULL sync), Redis, etcd |
 | `benchmark_suite.py` | arXiv paper benchmarks - throughput, branching, dedup | N/A (Rhizo-only) |
 | `unique_features_benchmark.py` | Rhizo-only features | Branching, CDC, Merkle verification |
-| `distributed_benchmark.py` | Coordination-free transactions | Simulated consensus baseline |
+| `distributed_benchmark.py` | Coordination-free transactions (simulated multi-node) | Simulated consensus baseline |
 | `energy_benchmark.py` | Energy/CO2 measurements | Consensus-based systems (simulated) |
 | `merkle_benchmark.py` | Merkle tree deduplication | Full file storage |
 | `parallel_encoding_benchmark.py` | Parallel Parquet encoding | Sequential encoding |

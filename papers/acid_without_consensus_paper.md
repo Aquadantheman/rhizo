@@ -4,7 +4,7 @@
 
 ## Abstract
 
-Distributed databases traditionally require consensus protocols (Paxos, Raft) to achieve strong consistency, incurring significant latency overhead for geo-distributed deployments. We observe that many common operations—counters, max/min aggregates, set unions—have algebraic properties that mathematically guarantee convergence regardless of operation order. We present Rhizo, a distributed data system that classifies operations by their algebraic structure and commits transactions locally when all operations are algebraically conflict-free. For these workloads, Rhizo achieves $O(1)$ local commit latency compared to $O(\text{consensus})$ for traditional systems, while maintaining strong eventual consistency with provable convergence. Our evaluation shows **33,000x latency improvement** (0.02ms vs 100ms consensus baseline), **255,000 ops/sec throughput**, and **97,943x energy reduction** for algebraic workloads, with mathematically verified convergence in all test scenarios. By eliminating coordination, we eliminate not only latency but also idle energy consumption—the fastest database is also the greenest.
+Distributed databases traditionally require consensus protocols (Paxos, Raft) to achieve strong consistency, incurring significant latency overhead for geo-distributed deployments. We observe that many common operations—counters, max/min aggregates, set unions—have algebraic properties that mathematically guarantee convergence regardless of operation order. We present Rhizo, a distributed data system that classifies operations by their algebraic structure and commits transactions locally when all operations are algebraically conflict-free. For these workloads, Rhizo achieves $O(1)$ local commit latency compared to $O(\text{consensus})$ for traditional systems, while maintaining strong eventual consistency with provable convergence. Our evaluation shows **59x latency improvement** over localhost 2PC (0.001ms vs 0.065ms, measured) and **355x** over durable writes (SQLite FULL sync), with **255,000 ops/sec throughput** and **97,943x energy reduction** (estimated) for algebraic workloads, with mathematically verified convergence in all test scenarios. By eliminating coordination, we eliminate not only latency but also idle energy consumption—the fastest database is also the greenest.
 
 ---
 
@@ -221,9 +221,9 @@ Classification is automatic based on operation type.
 - **Platform:** Simulated multi-node cluster (in-memory, deterministic)
 - **Nodes:** 2, 5, 10, 20 node configurations
 - **Workloads:** Counter increments (ADD), timestamps (MAX), tag management (UNION)
-- **Baseline:** Simulated consensus latency of 100ms (typical geo-distributed RTT)
+- **Baseline:** Localhost 2PC (3 OS processes, real TCP) and SQLite WAL (FULL sync)
 
-**Deployment Context:** This paper evaluates geo-distributed deployments where nodes span multiple continents (e.g., San Francisco, London, Tokyo). The 100ms consensus baseline reflects typical cross-continental round-trip times for quorum-based protocols. For single-datacenter deployments, consensus latency would be lower (~5-10ms), proportionally reducing the speedup factor while maintaining the same absolute local commit latency.
+**Benchmark Context:** All baselines are measured on the same machine. The localhost 2PC benchmark runs a real two-phase commit protocol over TCP sockets between 3 OS processes, measuring the true coordination protocol overhead without network latency. For geo-distributed deployments, coordination overhead would be significantly higher (100ms+ cross-region RTT), making the advantage proportionally larger.
 
 ### 6.2 Latency
 
@@ -329,7 +329,7 @@ The energy savings follow directly from the time savings: $E = P \cdot t$. By re
 
 We presented Rhizo, a distributed data system that achieves strong consistency without consensus for algebraic operations. By classifying operations by their mathematical properties, we enable $O(1)$ local commit latency (0.02ms average) while maintaining provable convergence. Our evaluation demonstrates:
 
-- **33,000x latency improvement** over typical cross-region consensus (measured 0.021ms local commit vs 100ms standard estimate; 30x measured vs SQLite WAL)
+- **59x latency improvement** over localhost 2PC (measured 0.001ms local commit vs 0.065ms 2PC); **355x** over SQLite FULL sync (0.386ms)
 - **255,000 ops/sec throughput** at the 2-node scale
 - **Constant-round convergence** (3 rounds regardless of operation count)
 - **100% mathematical soundness** (commutativity, associativity, idempotency verified)

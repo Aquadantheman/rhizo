@@ -206,7 +206,7 @@ Equivalent to 292 kg CO2/year or 14 trees planted.
 
 **Implementation:** `benchmarks/energy_benchmark.py`, `sandbox/coordination_free/proofs/energy_efficiency_proof.md`
 
-**Empirical Validation:** The theoretical model above uses simulated consensus delays (100ms) to establish baselines. For empirical validation against real systems (SQLite WAL, Redis, etcd), see `benchmarks/real_consensus_benchmark.py`. Measured speedups of 30-93,000x confirm the mathematical predictions across different baseline systems.
+**Empirical Validation:** For empirical validation against real systems, see `benchmarks/real_consensus_benchmark.py`. Measured results: 59x faster than localhost 2PC (3 OS processes, real TCP), 355x faster than SQLite WAL with FULL sync. The energy model above uses simulated consensus delays (100ms) for the baseline; actual measured coordination overhead is lower on localhost but higher over real networks.
 
 Global data center electricity: 200-250 TWh/year [5]. Storage is ~15%. Deduplication and coordination-free transactions at scale have measurable impact.
 
@@ -313,7 +313,8 @@ When $V_a \| V_b$ (concurrent), algebraic merge resolves automatically.
 
 | Metric | Rhizo (measured) | Baseline | Improvement |
 |--------|------------------|----------|-------------|
-| Local commit latency | 0.021 ms | 100 ms (typical cross-region, not measured) | **33,000x faster** |
+| Local commit latency | 0.001 ms | 0.065ms (localhost 2PC, measured) | **59x faster** |
+| Local commit latency | 0.001 ms | 0.386ms (SQLite FULL sync, measured) | **355x faster** |
 | Throughput (2 nodes) | 255,297 ops/sec | ~1,000 ops/sec | **255x higher** |
 | Convergence rounds | 3 (constant) | N/A | Guaranteed |
 
@@ -350,8 +351,8 @@ When $V_a \| V_b$ (concurrent), algebraic merge resolves automatically.
 | 32x faster OLAP reads | **Measured** | DataFusion vs DuckDB benchmarks |
 | Algebraic merge 11M+ ops/sec | **Measured** | Benchmark suite |
 | 100% conflict-free merge (algebraic) | **Verified** | Mathematical proofs + tests |
-| 30x faster than SQLite WAL | **Measured** | Real consensus benchmarks |
-| 33,000x faster than consensus | **Extrapolated** | Measured local commit vs typical 100ms cross-region |
+| 59x faster than localhost 2PC | **Measured** | Real TCP coordination, 3 OS processes |
+| 355x faster than SQLite FULL sync | **Measured** | Real durable writes |
 | 97,943x less energy | **Estimated** | Measured local energy vs typical consensus energy model |
 | 3-round convergence (constant) | **Measured** | Distributed simulation |
 | Commutativity/associativity | **Verified** | Mathematical proofs |
