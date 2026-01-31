@@ -272,16 +272,23 @@ python benchmarks/real_consensus_benchmark.py --remote-2pc host1:9000,host2:9000
 | Localhost 2PC (3 nodes over TCP) | 0.065ms | **59x** | Yes |
 | SQLite WAL (FULL sync / fsync) | 0.386ms | **355x** | Yes |
 
-**Cloud results** (Long Island, NY → AWS US-East Virginia, ~25ms RTT):
+**Same-region cloud results** (NYC → AWS Virginia, ~18ms RTT):
 
 | System | Latency | Speedup | Measured? |
 |--------|---------|---------|-----------|
 | Rhizo algebraic (ADD) | 0.001ms | baseline | Yes |
-| Remote 2PC (3 machines over network) | 33.8ms | **30,000x** | Yes |
+| Remote 2PC (3 machines over network) | 33.3ms | **30,000x** | Yes |
+
+**Cross-continent cloud results** (NYC → AWS Oregon + AWS Ireland, ~92ms + ~107ms RTT):
+
+| System | Latency (mean) | p50 | p95 | p99 | Speedup | N |
+|--------|---------------|-----|-----|-----|---------|---|
+| Rhizo algebraic (ADD) | 0.001ms | 0.001ms | 0.002ms | 0.002ms | baseline | 500 |
+| Remote 2PC (3 machines) | 187.9ms | 188.1ms | 191.2ms | 194.3ms | **160,000x** | 500 |
 
 The localhost 2PC benchmark spawns real OS processes coordinating over TCP sockets. The cloud benchmark connects to `2pc_participant_server.py` instances running on AWS EC2 VMs. Each transaction performs PREPARE (2 round-trips) + COMMIT (2 round-trips) = 4 network round-trips.
 
-**Scaling**: At ~25ms RTT we measured 30,000x. Cross-continent RTT (100-150ms) would yield 100,000x+.
+**Scaling**: At ~18ms RTT we measured 30,000x. At ~100ms RTT (cross-continent) we measured **160,000x**.
 
 **Why coordination-free commits are faster**: Algebraic operations (ADD, MAX, UNION) satisfy commutativity and associativity, mathematically guaranteeing convergence without coordination. See [TECHNICAL_FOUNDATIONS.md](TECHNICAL_FOUNDATIONS.md#algebraic-classification-for-conflict-free-merge).
 

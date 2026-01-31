@@ -91,6 +91,22 @@ class BenchmarkResult:
     def max_ms(self) -> float:
         return max(self.latencies_ms)
 
+    @property
+    def p50_ms(self) -> float:
+        return self.median_ms
+
+    @property
+    def p95_ms(self) -> float:
+        if len(self.latencies_ms) >= 20:
+            return statistics.quantiles(self.latencies_ms, n=20)[18]
+        return max(self.latencies_ms)
+
+    @property
+    def stddev_ms(self) -> float:
+        if len(self.latencies_ms) >= 2:
+            return statistics.stdev(self.latencies_ms)
+        return 0.0
+
     def summary_dict(self) -> dict:
         return {
             "system": self.system,
@@ -98,6 +114,9 @@ class BenchmarkResult:
             "iterations": self.iterations,
             "mean_ms": round(self.mean_ms, 4),
             "median_ms": round(self.median_ms, 4),
+            "stddev_ms": round(self.stddev_ms, 4),
+            "p50_ms": round(self.p50_ms, 4),
+            "p95_ms": round(self.p95_ms, 4),
             "p99_ms": round(self.p99_ms, 4),
             "min_ms": round(self.min_ms, 4),
             "max_ms": round(self.max_ms, 4),
@@ -402,7 +421,7 @@ def benchmark_localhost_2pc(iterations: int = 500) -> Optional[BenchmarkResult]:
 # =============================================================================
 
 def benchmark_remote_2pc(
-    endpoints: List[Tuple[str, int]], iterations: int = 200,
+    endpoints: List[Tuple[str, int]], iterations: int = 500,
 ) -> Optional[BenchmarkResult]:
     """
     Benchmark 2PC against remote participant servers.
@@ -592,16 +611,20 @@ def benchmark_etcd(
 
 def print_result(result: BenchmarkResult) -> None:
     print(f"  {result.system}: {result.operation}")
-    print(f"    Mean:   {result.mean_ms:.4f} ms")
-    print(f"    Median: {result.median_ms:.4f} ms")
+    print(f"    Mean:   {result.mean_ms:.4f} ms  (stddev: {result.stddev_ms:.4f})")
+    print(f"    p50:    {result.p50_ms:.4f} ms")
+    print(f"    p95:    {result.p95_ms:.4f} ms")
     print(f"    p99:    {result.p99_ms:.4f} ms")
     print(f"    Range:  {result.min_ms:.4f} - {result.max_ms:.4f} ms")
+    print(f"    N:      {result.iterations}")
 
 
 def print_comparison(rhizo: BenchmarkResult, other: BenchmarkResult) -> None:
-    speedup = other.mean_ms / rhizo.mean_ms
+    speedup_mean = other.mean_ms / rhizo.mean_ms
+    speedup_median = other.median_ms / rhizo.median_ms
     print(f"\n  SPEEDUP vs {other.system}:")
-    print(f"    {speedup:.1f}x faster (mean)")
+    print(f"    {speedup_mean:,.0f}x faster (mean)")
+    print(f"    {speedup_median:,.0f}x faster (median)")
     print(f"    Rhizo: {rhizo.mean_ms:.4f} ms vs {other.system}: {other.mean_ms:.4f} ms")
 
 
@@ -733,7 +756,7 @@ def main():
         endpoints = [
             parse_host_port(ep.strip(), 9000) for ep in args.remote_2pc.split(",")
         ]
-        iters_remote = args.iterations or 200
+        iters_remote = args.iterations or 500
         remote_2pc = benchmark_remote_2pc(endpoints, iterations=iters_remote)
         if remote_2pc:
             print_result(remote_2pc)

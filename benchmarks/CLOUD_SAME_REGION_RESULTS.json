@@ -1,0 +1,53 @@
+{
+  "timestamp": "2026-01-30T22:15:40",
+  "mode": "cloud",
+  "methodology": "All measurements taken on real systems. Rhizo values are coordination-free local commits. SQLite values are local disk durability. 2PC values are real TCP coordination. Remote benchmarks measure actual network + protocol overhead.",
+  "results": [
+    {
+      "system": "Rhizo algebraic",
+      "operation": "ADD counter",
+      "iterations": 500,
+      "mean_ms": 0.0012,
+      "median_ms": 0.0011,
+      "stddev_ms": 0.0013,
+      "p50_ms": 0.0011,
+      "p95_ms": 0.0016,
+      "p99_ms": 0.0022,
+      "min_ms": 0.001,
+      "max_ms": 0.0288
+    },
+    {
+      "system": "Rhizo algebraic",
+      "operation": "MAX high_score",
+      "iterations": 500,
+      "mean_ms": 0.0011,
+      "median_ms": 0.0011,
+      "stddev_ms": 0.0002,
+      "p50_ms": 0.0011,
+      "p95_ms": 0.0015,
+      "p99_ms": 0.0018,
+      "min_ms": 0.001,
+      "max_ms": 0.0021
+    },
+    {
+      "system": "Remote 2PC (3 nodes: coordinator + 34.229.148.227:9000 + 18.234.194.185:9000)",
+      "operation": "2-phase commit over network",
+      "iterations": 500,
+      "mean_ms": 33.2811,
+      "median_ms": 32.8021,
+      "stddev_ms": 11.0202,
+      "p50_ms": 32.8021,
+      "p95_ms": 36.8489,
+      "p99_ms": 39.0732,
+      "min_ms": 29.6398,
+      "max_ms": 274.2066
+    }
+  ],
+  "measured_speedups": {
+    "Remote 2PC (3 nodes: coordinator + 34.229.148.227:9000 + 18.234.194.185:9000)": 27084.3
+  },
+  "endpoint_rtts_ms": {
+    "34.229.148.227:9000": 16.99,
+    "18.234.194.185:9000": 19.22
+  }
+}

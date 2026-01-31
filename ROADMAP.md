@@ -77,7 +77,7 @@ Rhizo is feature-complete for single-node deployments with full ACID transaction
 
 | Metric | Rhizo | Comparison |
 |--------|-------|------------|
-| Transaction latency | 0.001ms | 30,000x vs remote 2PC, 59x vs localhost 2PC, 355x vs SQLite FULL sync (all measured) |
+| Transaction latency | 0.001ms | 160,000x vs cross-continent 2PC, 30,000x vs same-region 2PC, 59x vs localhost 2PC, 355x vs SQLite FULL sync (all measured) |
 | Energy per transaction | 2.2e-11 kWh | 97,943x less than consensus |
 | OLAP read (100K rows) | 0.9ms | 32x faster than DuckDB |
 | Branch creation | <10ms | 450,000x smaller than Delta Lake |

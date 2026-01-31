@@ -313,7 +313,8 @@ When $V_a \| V_b$ (concurrent), algebraic merge resolves automatically.
 
 | Metric | Rhizo (measured) | Baseline | Improvement |
 |--------|------------------|----------|-------------|
-| Local commit latency | 0.001 ms | 33.8ms (remote 2PC over network, measured) | **30,000x faster** |
+| Local commit latency | 0.001 ms | 187.9ms (cross-continent 2PC, measured) | **160,000x faster** |
+| Local commit latency | 0.001 ms | 33.3ms (same-region 2PC, measured) | **30,000x faster** |
 | Local commit latency | 0.001 ms | 0.065ms (localhost 2PC, measured) | **59x faster** |
 | Local commit latency | 0.001 ms | 0.386ms (SQLite FULL sync, measured) | **355x faster** |
 | Throughput (2 nodes) | 255,297 ops/sec | ~1,000 ops/sec | **255x higher** |
@@ -352,7 +353,8 @@ When $V_a \| V_b$ (concurrent), algebraic merge resolves automatically.
 | 32x faster OLAP reads | **Measured** | DataFusion vs DuckDB benchmarks |
 | Algebraic merge 11M+ ops/sec | **Measured** | Benchmark suite |
 | 100% conflict-free merge (algebraic) | **Verified** | Mathematical proofs + tests |
-| 30,000x faster than remote 2PC | **Measured** | Real 2PC over network (Long Island → AWS Virginia) |
+| 160,000x faster than cross-continent 2PC | **Measured** | Real 2PC: NYC → AWS Oregon + Ireland, 500 iterations |
+| 30,000x faster than same-region 2PC | **Measured** | Real 2PC: NYC → AWS Virginia, 500 iterations |
 | 59x faster than localhost 2PC | **Measured** | Real TCP coordination, 3 OS processes |
 | 355x faster than SQLite FULL sync | **Measured** | Real durable writes |
 | 97,943x less energy | **Estimated** | Measured local energy vs typical consensus energy model |
