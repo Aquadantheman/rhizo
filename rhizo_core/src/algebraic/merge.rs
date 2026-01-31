@@ -183,6 +183,18 @@ impl AlgebraicMerger {
         }
     }
 
+    /// Cross-type numeric result: prefer Integer when the result is exact.
+    /// This prevents permanent type divergence when Float(3.0) merges with Integer(5).
+    fn numeric_result(value: f64) -> AlgebraicValue {
+        if value.is_finite() && value == value.trunc()
+            && value >= i64::MIN as f64 && value <= i64::MAX as f64
+        {
+            AlgebraicValue::Integer(value as i64)
+        } else {
+            AlgebraicValue::Float(value)
+        }
+    }
+
     /// Merge using MAX (semilattice join with ordering).
     ///
     /// Mathematical property: max(a, b) = max(b, a) and max(a, a) = a
@@ -194,14 +206,12 @@ impl AlgebraicMerger {
             (AlgebraicValue::Float(a), AlgebraicValue::Float(b)) => {
                 MergeResult::Merged(AlgebraicValue::Float(a.max(*b)))
             }
-            // Cross-type numeric comparison (promote to float)
+            // Cross-type numeric comparison (prefer Integer when exact)
             (AlgebraicValue::Integer(a), AlgebraicValue::Float(b)) => {
-                let af = *a as f64;
-                MergeResult::Merged(AlgebraicValue::Float(af.max(*b)))
+                MergeResult::Merged(Self::numeric_result((*a as f64).max(*b)))
             }
             (AlgebraicValue::Float(a), AlgebraicValue::Integer(b)) => {
-                let bf = *b as f64;
-                MergeResult::Merged(AlgebraicValue::Float(a.max(bf)))
+                MergeResult::Merged(Self::numeric_result(a.max(*b as f64)))
             }
             (AlgebraicValue::Boolean(a), AlgebraicValue::Boolean(b)) => {
                 // true > false in boolean ordering
@@ -226,14 +236,12 @@ impl AlgebraicMerger {
             (AlgebraicValue::Float(a), AlgebraicValue::Float(b)) => {
                 MergeResult::Merged(AlgebraicValue::Float(a.min(*b)))
             }
-            // Cross-type numeric comparison (promote to float)
+            // Cross-type numeric comparison (prefer Integer when exact)
             (AlgebraicValue::Integer(a), AlgebraicValue::Float(b)) => {
-                let af = *a as f64;
-                MergeResult::Merged(AlgebraicValue::Float(af.min(*b)))
+                MergeResult::Merged(Self::numeric_result((*a as f64).min(*b)))
             }
             (AlgebraicValue::Float(a), AlgebraicValue::Integer(b)) => {
-                let bf = *b as f64;
-                MergeResult::Merged(AlgebraicValue::Float(a.min(bf)))
+                MergeResult::Merged(Self::numeric_result(a.min(*b as f64)))
             }
             (AlgebraicValue::Boolean(a), AlgebraicValue::Boolean(b)) => {
                 // false < true in boolean ordering
@@ -316,12 +324,12 @@ impl AlgebraicMerger {
             (AlgebraicValue::Float(a), AlgebraicValue::Float(b)) => {
                 MergeResult::Merged(AlgebraicValue::Float(a + b))
             }
-            // Cross-type addition (promote to float)
+            // Cross-type addition (prefer Integer when exact)
             (AlgebraicValue::Integer(a), AlgebraicValue::Float(b)) => {
-                MergeResult::Merged(AlgebraicValue::Float(*a as f64 + b))
+                MergeResult::Merged(Self::numeric_result(*a as f64 + b))
             }
             (AlgebraicValue::Float(a), AlgebraicValue::Integer(b)) => {
-                MergeResult::Merged(AlgebraicValue::Float(a + *b as f64))
+                MergeResult::Merged(Self::numeric_result(a + *b as f64))
             }
             _ => MergeResult::TypeMismatch {
                 type1: v1.type_name(),
@@ -350,12 +358,12 @@ impl AlgebraicMerger {
             (AlgebraicValue::Float(a), AlgebraicValue::Float(b)) => {
                 MergeResult::Merged(AlgebraicValue::Float(a * b))
             }
-            // Cross-type multiplication (promote to float)
+            // Cross-type multiplication (prefer Integer when exact)
             (AlgebraicValue::Integer(a), AlgebraicValue::Float(b)) => {
-                MergeResult::Merged(AlgebraicValue::Float(*a as f64 * b))
+                MergeResult::Merged(Self::numeric_result(*a as f64 * b))
             }
             (AlgebraicValue::Float(a), AlgebraicValue::Integer(b)) => {
-                MergeResult::Merged(AlgebraicValue::Float(a * *b as f64))
+                MergeResult::Merged(Self::numeric_result(a * *b as f64))
             }
             _ => MergeResult::TypeMismatch {
                 type1: v1.type_name(),
@@ -706,6 +714,133 @@ mod tests {
             &AlgebraicValue::float(10.5),
         );
         assert_eq!(result, MergeResult::Merged(AlgebraicValue::float(10.5)));
+    }
+
+    // ============ Cross-Type Integer Preservation Tests ============
+
+    #[test]
+    fn test_cross_type_add_preserves_integer() {
+        // Integer(5) + Float(3.0) should stay Integer(8), not Float(8.0)
+        let result = AlgebraicMerger::merge(
+            OpType::AbelianAdd,
+            &AlgebraicValue::integer(5),
+            &AlgebraicValue::float(3.0),
+        );
+        assert_eq!(result, MergeResult::Merged(AlgebraicValue::integer(8)));
+    }
+
+    #[test]
+    fn test_cross_type_add_returns_float_for_fractional() {
+        // Integer(5) + Float(2.5) = Float(7.5) — fractional, must be Float
+        let result = AlgebraicMerger::merge(
+            OpType::AbelianAdd,
+            &AlgebraicValue::integer(5),
+            &AlgebraicValue::float(2.5),
+        );
+        assert_eq!(result, MergeResult::Merged(AlgebraicValue::float(7.5)));
+    }
+
+    #[test]
+    fn test_cross_type_max_preserves_integer() {
+        // max(Integer(10), Float(3.0)) = Integer(10)
+        let result = AlgebraicMerger::merge(
+            OpType::SemilatticeMax,
+            &AlgebraicValue::integer(10),
+            &AlgebraicValue::float(3.0),
+        );
+        assert_eq!(result, MergeResult::Merged(AlgebraicValue::integer(10)));
+    }
+
+    #[test]
+    fn test_cross_type_min_preserves_integer() {
+        // min(Integer(3), Float(10.0)) = Integer(3)
+        let result = AlgebraicMerger::merge(
+            OpType::SemilatticeMin,
+            &AlgebraicValue::integer(3),
+            &AlgebraicValue::float(10.0),
+        );
+        assert_eq!(result, MergeResult::Merged(AlgebraicValue::integer(3)));
+    }
+
+    #[test]
+    fn test_cross_type_multiply_preserves_integer() {
+        // Integer(4) * Float(3.0) = Integer(12)
+        let result = AlgebraicMerger::merge(
+            OpType::AbelianMultiply,
+            &AlgebraicValue::integer(4),
+            &AlgebraicValue::float(3.0),
+        );
+        assert_eq!(result, MergeResult::Merged(AlgebraicValue::integer(12)));
+    }
+
+    #[test]
+    fn test_cross_type_multiply_returns_float() {
+        // Integer(3) * Float(2.5) = Float(7.5)
+        let result = AlgebraicMerger::merge(
+            OpType::AbelianMultiply,
+            &AlgebraicValue::integer(3),
+            &AlgebraicValue::float(2.5),
+        );
+        assert_eq!(result, MergeResult::Merged(AlgebraicValue::float(7.5)));
+    }
+
+    #[test]
+    fn test_type_divergence_prevented() {
+        // Simulate distributed merge: Integer(0) + Float(1.0) + Integer(2)
+        // Without fix: Integer(0) + Float(1.0) = Float(1.0), then Float(1.0) + Integer(2) = Float(3.0)
+        // With fix: Integer(0) + Float(1.0) = Integer(1), then Integer(1) + Integer(2) = Integer(3)
+        let step1 = AlgebraicMerger::merge(
+            OpType::AbelianAdd,
+            &AlgebraicValue::integer(0),
+            &AlgebraicValue::float(1.0),
+        );
+        let intermediate = match &step1 {
+            MergeResult::Merged(v) => v.clone(),
+            _ => panic!("Expected merged result"),
+        };
+        assert_eq!(intermediate, AlgebraicValue::integer(1)); // Key: stays Integer
+
+        let step2 = AlgebraicMerger::merge(
+            OpType::AbelianAdd,
+            &intermediate,
+            &AlgebraicValue::integer(2),
+        );
+        assert_eq!(step2, MergeResult::Merged(AlgebraicValue::integer(3)));
+    }
+
+    #[test]
+    fn test_cross_type_commutativity() {
+        // Verify merge(Int, Float) == merge(Float, Int) for all operations
+        let int_val = AlgebraicValue::integer(7);
+        let float_val = AlgebraicValue::float(3.0);
+
+        for op in [OpType::AbelianAdd, OpType::SemilatticeMax,
+                    OpType::SemilatticeMin, OpType::AbelianMultiply] {
+            let ab = AlgebraicMerger::merge(op, &int_val, &float_val);
+            let ba = AlgebraicMerger::merge(op, &float_val, &int_val);
+            assert_eq!(ab, ba, "Commutativity violated for {:?}", op);
+        }
+    }
+
+    #[test]
+    fn test_cross_type_special_values() {
+        // NaN and Infinity can't be Integer, should remain Float
+        let result_nan = AlgebraicMerger::merge(
+            OpType::AbelianAdd,
+            &AlgebraicValue::integer(0),
+            &AlgebraicValue::float(f64::NAN),
+        );
+        match result_nan {
+            MergeResult::Merged(AlgebraicValue::Float(v)) => assert!(v.is_nan()),
+            _ => panic!("Expected Float(NaN)"),
+        }
+
+        let result_inf = AlgebraicMerger::merge(
+            OpType::AbelianAdd,
+            &AlgebraicValue::integer(1),
+            &AlgebraicValue::float(f64::INFINITY),
+        );
+        assert_eq!(result_inf, MergeResult::Merged(AlgebraicValue::float(f64::INFINITY)));
     }
 
     // ============ Boolean Tests ============

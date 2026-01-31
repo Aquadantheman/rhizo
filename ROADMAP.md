@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**920 tests passing (449 Rust + 471 Python)**
+**929 tests passing (458 Rust + 471 Python)**
 
 Rhizo is feature-complete for single-node deployments with full ACID transactions, time travel, branching, and OLAP queries.
 
