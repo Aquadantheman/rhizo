@@ -5,6 +5,23 @@ All notable changes to Rhizo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.8] - 2026-01-31
+
+### Added
+
+#### PyO3 Bindings Test Suite
+- **New `tests/test_pyo3_bindings.py`**: 127 tests covering the entire Rust↔Python bridge
+  - `TestPyBranchManager`: 10 tests — create, list, delete, update_head, diff, merge, default branch
+  - `TestPyTransactionManager`: 8 tests — begin/commit/abort, info, active list, recover, verify, latest_tx_id
+  - `TestPyChangelog`: 6 tests — entries, attributes, changes, table_change, repr, changed_tables
+  - `TestPyMerkle`: 11 tests — build tree, config, chunks, hashes, offset, range, diff, verify, repr
+  - `TestPyAlgebraicTypes`: 28 tests — OpType, AlgebraicValue, merge, TableAlgebraicSchema, SchemaRegistry
+  - `TestPyDistributedTypes`: 22 tests — NodeId, VectorClock, CausalOrder, LocalCommitProtocol
+  - `TestPyAlgebraicTransaction`: 8 tests — empty tx, operations, properties, metadata
+  - `TestPyFilterPredicates`: 29 tests — FilterOp names/symbols, ScalarValue types, PredicateFilter
+  - `TestPyParquetAdvanced`: 5 tests — column projection, filtering, pruning stats
+- **1,210 total tests** (468 Rust + 742 Python)
+
 ## [0.5.7] - 2026-01-31
 
 ### Changed
