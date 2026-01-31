@@ -185,35 +185,42 @@ impl BranchManager {
     /// - Added tables from source are included
     /// - True conflicts (both changed same table) cause an error
     ///
-    /// Without a fork point, falls back to fast-forward (all source heads
-    /// overwrite target).
+    /// Without a fork point, uses safe forward-only merge: source tables
+    /// are applied only when they are new to the target or have a higher
+    /// version. Target-only tables and higher target versions are preserved.
     pub fn merge_fast_forward(&self, source: &str, into: &str) -> Result<(), BranchError> {
-        let diff = self.diff(source, into)?;
-
-        if diff.has_conflicts {
-            let conflicting = diff.conflicting_tables();
-            return Err(BranchError::MergeConflict(conflicting));
-        }
-
         let source_branch = self.get(source)?;
         let mut target_branch = self.get(into)?;
 
-        // Apply source-only changes (source diverged from base, target didn't)
-        for (table, src_version, _) in &diff.source_only_changes {
-            target_branch.set_table_version(table, *src_version);
-        }
+        if source_branch.fork_point.is_some() {
+            // Three-way merge: use diff to classify changes
+            let diff = self.diff(source, into)?;
 
-        // Target-only changes: target already has the right version, nothing to do
+            if diff.has_conflicts {
+                let conflicting = diff.conflicting_tables();
+                return Err(BranchError::MergeConflict(conflicting));
+            }
 
-        // Apply tables added only in source
-        for (table, version) in &diff.added_in_source {
-            target_branch.set_table_version(table, *version);
-        }
+            // Apply source-only changes (source diverged from base, target didn't)
+            for (table, src_version, _) in &diff.source_only_changes {
+                target_branch.set_table_version(table, *src_version);
+            }
 
-        // If no fork point was available, fall back to overwriting all source heads
-        if source_branch.fork_point.is_none() {
-            for (table, version) in &source_branch.head {
+            // Target-only changes: target already has the right version, nothing to do
+
+            // Apply tables added only in source
+            for (table, version) in &diff.added_in_source {
                 target_branch.set_table_version(table, *version);
+            }
+        } else {
+            // No fork point: safe forward-only merge.
+            // Apply source tables only when new or higher version.
+            // Never regress a target table version.
+            for (table, &src_version) in &source_branch.head {
+                let tgt_version = target_branch.get_table_version(table).unwrap_or(0);
+                if src_version > tgt_version {
+                    target_branch.set_table_version(table, src_version);
+                }
             }
         }
 
@@ -569,6 +576,133 @@ mod tests {
         assert!(!manager.can_fast_forward("feature", "main").unwrap());
         let result = manager.merge_fast_forward("feature", "main");
         assert!(matches!(result, Err(BranchError::MergeConflict(_))));
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // ============ No-fork-point merge safety tests (M7 fix) ============
+
+    #[test]
+    fn test_no_fork_point_merge_preserves_target_only_tables() {
+        // Bug: no-fork-point fallback overwrote all source heads onto target,
+        // destroying tables that only existed on target.
+        let dir = temp_dir();
+        let manager = BranchManager::new(&dir).unwrap();
+
+        // Main has users=3 and orders=5
+        manager.update_head("main", "users", 3).unwrap();
+        manager.update_head("main", "orders", 5).unwrap();
+
+        // Create a root branch (no fork point) with only users=1
+        let mut legacy = Branch::new("legacy", HashMap::new());
+        legacy.set_table_version("users", 1);
+        assert!(legacy.fork_point.is_none());
+        manager.save_branch(&legacy).unwrap();
+
+        // Merge legacy into main — should NOT destroy orders
+        manager.merge_fast_forward("legacy", "main").unwrap();
+
+        let main = manager.get("main").unwrap();
+        // orders must still be v5 (target-only, never touched by source)
+        assert_eq!(main.get_table_version("orders"), Some(5));
+        // users should stay v3 (target has higher version than source's v1)
+        assert_eq!(main.get_table_version("users"), Some(3));
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_no_fork_point_merge_applies_higher_source_version() {
+        // When source has a higher version, the merge should apply it.
+        let dir = temp_dir();
+        let manager = BranchManager::new(&dir).unwrap();
+
+        manager.update_head("main", "users", 1).unwrap();
+
+        // Legacy branch with users=5 (higher than main's v1)
+        let mut legacy = Branch::new("legacy", HashMap::new());
+        legacy.set_table_version("users", 5);
+        manager.save_branch(&legacy).unwrap();
+
+        manager.merge_fast_forward("legacy", "main").unwrap();
+
+        let main = manager.get("main").unwrap();
+        assert_eq!(main.get_table_version("users"), Some(5));
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_no_fork_point_merge_adds_new_tables() {
+        // Source has a table that target doesn't — should be added.
+        let dir = temp_dir();
+        let manager = BranchManager::new(&dir).unwrap();
+
+        manager.update_head("main", "users", 1).unwrap();
+
+        let mut legacy = Branch::new("legacy", HashMap::new());
+        legacy.set_table_version("metrics", 3);
+        manager.save_branch(&legacy).unwrap();
+
+        manager.merge_fast_forward("legacy", "main").unwrap();
+
+        let main = manager.get("main").unwrap();
+        assert_eq!(main.get_table_version("users"), Some(1)); // preserved
+        assert_eq!(main.get_table_version("metrics"), Some(3)); // added
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_no_fork_point_never_regresses_version() {
+        // Source has lower versions for multiple tables — none should regress.
+        let dir = temp_dir();
+        let manager = BranchManager::new(&dir).unwrap();
+
+        manager.update_head("main", "users", 10).unwrap();
+        manager.update_head("main", "orders", 8).unwrap();
+        manager.update_head("main", "products", 5).unwrap();
+
+        let mut legacy = Branch::new("legacy", HashMap::new());
+        legacy.set_table_version("users", 3);    // lower
+        legacy.set_table_version("orders", 12);   // higher
+        legacy.set_table_version("products", 5);  // equal
+        manager.save_branch(&legacy).unwrap();
+
+        manager.merge_fast_forward("legacy", "main").unwrap();
+
+        let main = manager.get("main").unwrap();
+        assert_eq!(main.get_table_version("users"), Some(10));    // kept (higher)
+        assert_eq!(main.get_table_version("orders"), Some(12));   // updated (source higher)
+        assert_eq!(main.get_table_version("products"), Some(5));  // unchanged (equal)
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_fork_point_merge_unaffected_by_fix() {
+        // Ensure normal three-way merge (with fork point) still works correctly.
+        let dir = temp_dir();
+        let manager = BranchManager::new(&dir).unwrap();
+
+        // Main: users=1, orders=1
+        manager.update_head("main", "users", 1).unwrap();
+        manager.update_head("main", "orders", 1).unwrap();
+
+        // Feature branch (has fork point from main)
+        manager.create("feature", Some("main"), None).unwrap();
+
+        // Feature changes users to v2
+        manager.update_head("feature", "users", 2).unwrap();
+        // Main changes orders to v2
+        manager.update_head("main", "orders", 2).unwrap();
+
+        // Three-way merge should auto-resolve
+        manager.merge_fast_forward("feature", "main").unwrap();
+
+        let main = manager.get("main").unwrap();
+        assert_eq!(main.get_table_version("users"), Some(2));   // from feature
+        assert_eq!(main.get_table_version("orders"), Some(2));  // preserved on main
 
         fs::remove_dir_all(&dir).ok();
     }
