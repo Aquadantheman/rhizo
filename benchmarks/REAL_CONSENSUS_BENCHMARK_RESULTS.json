@@ -1,16 +1,17 @@
 {
-  "timestamp": "2026-01-30T19:16:43",
-  "methodology": "All measurements taken on the same machine. Rhizo values are coordination-free local commits. SQLite values are local disk durability. 2PC values are real TCP coordination between 3 OS processes on localhost. Cross-region projections add typical network RTT to measured protocol overhead.",
+  "timestamp": "2026-01-30T20:39:32",
+  "mode": "local",
+  "methodology": "All measurements taken on real systems. Rhizo values are coordination-free local commits. SQLite values are local disk durability. 2PC values are real TCP coordination. Remote benchmarks measure actual network + protocol overhead.",
   "results": [
     {
       "system": "Rhizo algebraic",
       "operation": "ADD counter",
       "iterations": 10000,
-      "mean_ms": 0.0011,
-      "median_ms": 0.001,
-      "p99_ms": 0.0017,
-      "min_ms": 0.0008,
-      "max_ms": 0.0694
+      "mean_ms": 0.001,
+      "median_ms": 0.0009,
+      "p99_ms": 0.0015,
+      "min_ms": 0.0007,
+      "max_ms": 0.0635
     },
     {
       "system": "Rhizo algebraic",
@@ -18,44 +19,44 @@
       "iterations": 10000,
       "mean_ms": 0.0012,
       "median_ms": 0.0011,
-      "p99_ms": 0.0019,
-      "min_ms": 0.0009,
-      "max_ms": 0.044
+      "p99_ms": 0.0018,
+      "min_ms": 0.0007,
+      "max_ms": 0.1956
     },
     {
       "system": "SQLite WAL (NORMAL)",
       "operation": "UPDATE counter",
       "iterations": 1000,
-      "mean_ms": 0.0448,
-      "median_ms": 0.0298,
-      "p99_ms": 0.1732,
-      "min_ms": 0.023,
-      "max_ms": 5.027
+      "mean_ms": 0.0328,
+      "median_ms": 0.0248,
+      "p99_ms": 0.118,
+      "min_ms": 0.0211,
+      "max_ms": 3.4687
     },
     {
       "system": "SQLite WAL (FULL sync)",
       "operation": "UPDATE counter",
       "iterations": 1000,
-      "mean_ms": 0.3856,
-      "median_ms": 0.3593,
-      "p99_ms": 0.6901,
-      "min_ms": 0.2824,
-      "max_ms": 7.1471
+      "mean_ms": 0.3448,
+      "median_ms": 0.3244,
+      "p99_ms": 0.6844,
+      "min_ms": 0.2589,
+      "max_ms": 1.0561
     },
     {
       "system": "Localhost 2PC (3 nodes)",
       "operation": "2-phase commit over TCP",
       "iterations": 500,
-      "mean_ms": 0.0645,
-      "median_ms": 0.0509,
-      "p99_ms": 0.2346,
-      "min_ms": 0.0453,
-      "max_ms": 0.4083
+      "mean_ms": 0.0663,
+      "median_ms": 0.0531,
+      "p99_ms": 0.2362,
+      "min_ms": 0.0447,
+      "max_ms": 0.2752
     }
   ],
   "measured_speedups": {
-    "SQLite WAL (NORMAL)": 41.2,
-    "SQLite WAL (FULL sync)": 355.0,
-    "Localhost 2PC (3 nodes)": 59.4
+    "SQLite WAL (NORMAL)": 33.2,
+    "SQLite WAL (FULL sync)": 349.2,
+    "Localhost 2PC (3 nodes)": 67.2
   }
 }

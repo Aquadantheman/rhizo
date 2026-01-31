@@ -9,20 +9,34 @@ Systems measured:
 2. SQLite WAL (NORMAL sync) - local durability, no coordination
 3. SQLite WAL (FULL sync) - local durability with fsync per commit
 4. Localhost 2-Phase Commit (3 nodes) - real coordination over TCP sockets
-5. Redis (optional) - network + persistence
-6. etcd (optional) - Raft consensus
+5. Remote 2-Phase Commit - real coordination over network (cloud mode)
+6. Redis (optional) - network + persistence
+7. etcd (optional) - Raft consensus
 
-The 2PC benchmark is the key addition: it spawns 3 real processes that
-coordinate over localhost TCP, measuring the actual protocol overhead of
-consensus-style coordination separate from network latency.
+Modes:
+  Local (default):
+    python benchmarks/real_consensus_benchmark.py
 
-Run: python benchmarks/real_consensus_benchmark.py
+  Remote 2PC (against 2pc_participant_server.py instances):
+    python benchmarks/real_consensus_benchmark.py --remote-2pc host1:9000,host2:9000
+
+  Remote Redis:
+    python benchmarks/real_consensus_benchmark.py --remote-redis host:6379
+
+  Remote etcd:
+    python benchmarks/real_consensus_benchmark.py --remote-etcd host:2379
+
+  All remote:
+    python benchmarks/real_consensus_benchmark.py \\
+      --remote-2pc us.example.com:9000,eu.example.com:9000 \\
+      --remote-redis us.example.com:6379 \\
+      --remote-etcd us.example.com:2379
 """
 
+import argparse
 import json
 import multiprocessing
 import os
-import pickle
 import socket
 import struct
 import sys
@@ -30,9 +44,9 @@ import sqlite3
 import statistics
 import tempfile
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Tuple
 
 # Add rhizo to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
@@ -112,6 +126,33 @@ def benchmark_operation(
     )
 
 
+def parse_host_port(s: str, default_port: int) -> Tuple[str, int]:
+    """Parse 'host:port' string, using default_port if port omitted."""
+    if ":" in s:
+        host, port_str = s.rsplit(":", 1)
+        return host, int(port_str)
+    return s, default_port
+
+
+def measure_rtt(host: str, port: int, samples: int = 10) -> Optional[float]:
+    """Measure TCP round-trip time to a host:port in milliseconds."""
+    latencies = []
+    for _ in range(samples):
+        try:
+            start = time.perf_counter()
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(5.0)
+            s.connect((host, port))
+            elapsed = (time.perf_counter() - start) * 1000
+            s.close()
+            latencies.append(elapsed)
+        except (socket.timeout, ConnectionRefusedError, OSError):
+            pass
+    if latencies:
+        return statistics.median(latencies)
+    return None
+
+
 # =============================================================================
 # Rhizo Algebraic Operations (Coordination-Free)
 # =============================================================================
@@ -185,31 +226,16 @@ def benchmark_sqlite_full_sync(iterations: int = 1000) -> BenchmarkResult:
 
 
 # =============================================================================
-# Localhost Two-Phase Commit (Real Coordination Protocol)
+# Two-Phase Commit Protocol (shared between localhost and remote)
 # =============================================================================
-#
-# This is the key benchmark: it measures the actual overhead of coordinating
-# between multiple processes, which is what consensus protocols do.
-#
-# Architecture:
-#   - 1 coordinator process (runs in the benchmark thread)
-#   - 2 participant processes (spawned via multiprocessing)
-#   - Communication over localhost TCP sockets
-#
-# Protocol per transaction:
-#   Phase 1 (Prepare): Coordinator sends PREPARE to all participants,
-#                       waits for VOTE_COMMIT from each
-#   Phase 2 (Commit):  Coordinator sends COMMIT to all participants,
-#                       waits for ACK from each
-#
-# This measures real IPC overhead: socket creation, serialization,
-# context switches, and protocol round-trips.
 
 MSG_PREPARE = b"PREP"
 MSG_VOTE_COMMIT = b"VOTE"
 MSG_COMMIT = b"COMT"
 MSG_ACK = b"ACKK"
 MSG_SHUTDOWN = b"SHUT"
+MSG_PING = b"PING"
+MSG_PONG = b"PONG"
 
 
 def _send_msg(sock: socket.socket, msg: bytes) -> None:
@@ -259,15 +285,30 @@ def _participant_process(port: int) -> None:
         if not msg or msg == MSG_SHUTDOWN:
             break
         if msg == MSG_PREPARE:
-            # Simulate prepare: validate we can commit
-            counter += 1  # Tentative state change
+            counter += 1
             _send_msg(conn, MSG_VOTE_COMMIT)
         elif msg == MSG_COMMIT:
-            # Commit is final — state already updated
             _send_msg(conn, MSG_ACK)
 
     conn.close()
     server.close()
+
+
+def _do_2pc_round(conns: List[socket.socket]) -> None:
+    """Execute one full 2PC round across all participant connections."""
+    # Phase 1: PREPARE
+    for conn in conns:
+        _send_msg(conn, MSG_PREPARE)
+    for conn in conns:
+        vote = _recv_msg(conn)
+        assert vote == MSG_VOTE_COMMIT
+
+    # Phase 2: COMMIT
+    for conn in conns:
+        _send_msg(conn, MSG_COMMIT)
+    for conn in conns:
+        ack = _recv_msg(conn)
+        assert ack == MSG_ACK
 
 
 def _find_free_ports(n: int) -> List[int]:
@@ -284,23 +325,20 @@ def _find_free_ports(n: int) -> List[int]:
     return ports
 
 
+# =============================================================================
+# Localhost Two-Phase Commit
+# =============================================================================
+
 def benchmark_localhost_2pc(iterations: int = 500) -> Optional[BenchmarkResult]:
     """
     Benchmark a real 2-Phase Commit protocol over localhost TCP.
 
     Spawns 2 participant processes, coordinator runs in the main process.
     Each iteration performs a full 2PC round (PREPARE + COMMIT phases).
-
-    This measures the actual cost of coordination:
-    - TCP socket round-trips (localhost)
-    - Process context switches
-    - Message serialization/deserialization
-    - Protocol overhead (2 phases x 2 participants = 4 round-trips)
     """
     num_participants = 2
     ports = _find_free_ports(num_participants)
 
-    # Start participant processes
     processes = []
     for port in ports:
         p = multiprocessing.Process(target=_participant_process, args=(port,))
@@ -308,10 +346,8 @@ def benchmark_localhost_2pc(iterations: int = 500) -> Optional[BenchmarkResult]:
         p.start()
         processes.append(p)
 
-    # Give participants time to bind
     time.sleep(0.3)
 
-    # Connect coordinator to all participants
     conns = []
     try:
         for port in ports:
@@ -325,33 +361,17 @@ def benchmark_localhost_2pc(iterations: int = 500) -> Optional[BenchmarkResult]:
             p.terminate()
         return None
 
-    def do_2pc_transaction():
-        # Phase 1: PREPARE — send to all, collect votes
-        for conn in conns:
-            _send_msg(conn, MSG_PREPARE)
-        for conn in conns:
-            vote = _recv_msg(conn)
-            assert vote == MSG_VOTE_COMMIT
-
-        # Phase 2: COMMIT — send to all, collect acks
-        for conn in conns:
-            _send_msg(conn, MSG_COMMIT)
-        for conn in conns:
-            ack = _recv_msg(conn)
-            assert ack == MSG_ACK
-
     # Warmup
     for _ in range(50):
-        do_2pc_transaction()
+        _do_2pc_round(conns)
 
     # Measure
     latencies = []
     for _ in range(iterations):
         start = time.perf_counter()
-        do_2pc_transaction()
+        _do_2pc_round(conns)
         latencies.append((time.perf_counter() - start) * 1000)
 
-    # Shutdown participants
     for conn in conns:
         try:
             _send_msg(conn, MSG_SHUTDOWN)
@@ -373,47 +393,159 @@ def benchmark_localhost_2pc(iterations: int = 500) -> Optional[BenchmarkResult]:
 
 
 # =============================================================================
+# Remote Two-Phase Commit (Cloud Mode)
+# =============================================================================
+
+def benchmark_remote_2pc(
+    endpoints: List[Tuple[str, int]], iterations: int = 200,
+) -> Optional[BenchmarkResult]:
+    """
+    Benchmark 2PC against remote participant servers.
+
+    Connects to 2pc_participant_server.py instances running on remote hosts.
+    Measures real network + protocol overhead for geo-distributed coordination.
+
+    Args:
+        endpoints: List of (host, port) tuples for participant servers
+        iterations: Number of 2PC rounds to measure
+    """
+    endpoint_strs = [f"{h}:{p}" for h, p in endpoints]
+    print(f"  Connecting to remote participants: {', '.join(endpoint_strs)}")
+
+    # Measure RTT to each endpoint
+    rtts = {}
+    for host, port in endpoints:
+        rtt = measure_rtt(host, port)
+        if rtt is not None:
+            rtts[f"{host}:{port}"] = round(rtt, 2)
+            print(f"    RTT to {host}:{port}: {rtt:.2f} ms")
+        else:
+            print(f"    RTT to {host}:{port}: FAILED")
+            return None
+
+    # Connect to all participants
+    conns = []
+    try:
+        for host, port in endpoints:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            s.settimeout(10.0)
+            s.connect((host, port))
+            conns.append(s)
+    except (ConnectionRefusedError, socket.timeout, OSError) as e:
+        print(f"  Failed to connect: {e}")
+        for c in conns:
+            c.close()
+        return None
+
+    # Verify connectivity with PING
+    for i, conn in enumerate(conns):
+        try:
+            _send_msg(conn, MSG_PING)
+            pong = _recv_msg(conn)
+            if pong != MSG_PONG:
+                print(f"  Participant {endpoint_strs[i]} did not respond to PING")
+                for c in conns:
+                    c.close()
+                return None
+        except (socket.timeout, OSError) as e:
+            print(f"  PING failed to {endpoint_strs[i]}: {e}")
+            for c in conns:
+                c.close()
+            return None
+
+    print(f"  All {len(conns)} participants connected and responding")
+
+    # Warmup
+    for _ in range(20):
+        _do_2pc_round(conns)
+
+    # Measure
+    latencies = []
+    for _ in range(iterations):
+        start = time.perf_counter()
+        _do_2pc_round(conns)
+        latencies.append((time.perf_counter() - start) * 1000)
+
+    # Shutdown
+    for conn in conns:
+        try:
+            _send_msg(conn, MSG_SHUTDOWN)
+        except OSError:
+            pass
+        conn.close()
+
+    region_str = " + ".join(endpoint_strs)
+    system_name = f"Remote 2PC ({len(endpoints)+1} nodes: coordinator + {region_str})"
+
+    result = BenchmarkResult(
+        system=system_name,
+        operation="2-phase commit over network",
+        iterations=iterations,
+        latencies_ms=latencies,
+    )
+    # Attach RTT info for JSON output
+    result._rtts = rtts  # type: ignore[attr-defined]
+    return result
+
+
+# =============================================================================
 # Redis (Optional — Network + Persistence)
 # =============================================================================
 
-def benchmark_redis_local(iterations: int = 1000) -> Optional[BenchmarkResult]:
-    """Benchmark Redis single-node (no replication)."""
+def benchmark_redis(
+    host: str = "localhost", port: int = 6379, iterations: int = 1000,
+) -> Optional[BenchmarkResult]:
+    """Benchmark Redis single-node."""
     try:
         import redis
-        r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+        r = redis.Redis(host=host, port=port, decode_responses=True)
         r.ping()
     except Exception as e:
-        print(f"  Redis not available: {e}")
+        print(f"  Redis not available at {host}:{port}: {e}")
         return None
 
-    def do_redis_incr():
-        r.incr("counter")
+    location = "local" if host in ("localhost", "127.0.0.1") else host
 
-    result = benchmark_operation("Redis (local)", "INCR counter", do_redis_incr, iterations)
+    def do_redis_incr():
+        r.incr("rhizo_benchmark_counter")
+
+    result = benchmark_operation(
+        f"Redis ({location})", "INCR counter", do_redis_incr, iterations,
+    )
+    r.delete("rhizo_benchmark_counter")
     r.close()
     return result
 
 
-def benchmark_redis_with_sync(iterations: int = 1000) -> Optional[BenchmarkResult]:
+def benchmark_redis_with_sync(
+    host: str = "localhost", port: int = 6379, iterations: int = 100,
+) -> Optional[BenchmarkResult]:
     """Benchmark Redis with synchronous replication (WAIT command)."""
     try:
         import redis
-        r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+        r = redis.Redis(host=host, port=port, decode_responses=True)
         r.ping()
         info = r.info("replication")
         replicas = info.get("connected_slaves", 0)
         if replicas == 0:
-            print(f"  Redis has no replicas (single node mode)")
+            print(f"  Redis at {host}:{port} has no replicas (single node mode)")
             return None
+        print(f"  Redis at {host}:{port} has {replicas} replica(s)")
     except Exception as e:
-        print(f"  Redis not available: {e}")
+        print(f"  Redis not available at {host}:{port}: {e}")
         return None
 
-    def do_redis_incr_sync():
-        r.incr("counter")
-        r.wait(1, 0)
+    location = "local" if host in ("localhost", "127.0.0.1") else host
 
-    result = benchmark_operation("Redis (replicated)", "INCR + WAIT", do_redis_incr_sync, iterations)
+    def do_redis_incr_sync():
+        r.incr("rhizo_benchmark_counter")
+        r.execute_command("WAIT", replicas, 0)
+
+    result = benchmark_operation(
+        f"Redis replicated ({location})", "INCR + WAIT", do_redis_incr_sync, iterations,
+    )
+    r.delete("rhizo_benchmark_counter")
     r.close()
     return result
 
@@ -422,29 +554,35 @@ def benchmark_redis_with_sync(iterations: int = 1000) -> Optional[BenchmarkResul
 # etcd (Optional — Raft Consensus)
 # =============================================================================
 
-def benchmark_etcd(iterations: int = 1000) -> Optional[BenchmarkResult]:
+def benchmark_etcd(
+    host: str = "localhost", port: int = 2379, iterations: int = 100,
+) -> Optional[BenchmarkResult]:
     """Benchmark etcd (Raft consensus)."""
     try:
         import etcd3
-        client = etcd3.client(host="localhost", port=2379)
+        client = etcd3.client(host=host, port=port)
         client.status()
     except Exception as e:
-        print(f"  etcd not available: {e}")
+        print(f"  etcd not available at {host}:{port}: {e}")
         return None
 
+    location = "local" if host in ("localhost", "127.0.0.1") else host
     counter = [0]
 
     def do_etcd_put():
         counter[0] += 1
-        client.put("/counter", str(counter[0]))
+        client.put("/rhizo_benchmark_counter", str(counter[0]))
 
-    result = benchmark_operation("etcd (Raft)", "PUT counter", do_etcd_put, iterations)
+    result = benchmark_operation(
+        f"etcd Raft ({location})", "PUT counter", do_etcd_put, iterations,
+    )
+    client.delete("/rhizo_benchmark_counter")
     client.close()
     return result
 
 
 # =============================================================================
-# Main Benchmark Runner
+# Output Helpers
 # =============================================================================
 
 def print_result(result: BenchmarkResult) -> None:
@@ -462,87 +600,183 @@ def print_comparison(rhizo: BenchmarkResult, other: BenchmarkResult) -> None:
     print(f"    Rhizo: {rhizo.mean_ms:.4f} ms vs {other.system}: {other.mean_ms:.4f} ms")
 
 
+# =============================================================================
+# Main
+# =============================================================================
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Benchmark Rhizo against real coordination systems",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""\
+Examples:
+  # Localhost only (default)
+  python benchmarks/real_consensus_benchmark.py
+
+  # Remote 2PC against participant servers
+  python benchmarks/real_consensus_benchmark.py \\
+    --remote-2pc us-east.example.com:9000,eu-west.example.com:9000
+
+  # Remote Redis
+  python benchmarks/real_consensus_benchmark.py --remote-redis redis.example.com:6379
+
+  # Remote etcd
+  python benchmarks/real_consensus_benchmark.py --remote-etcd etcd.example.com:2379
+
+  # All remote systems
+  python benchmarks/real_consensus_benchmark.py \\
+    --remote-2pc host1:9000,host2:9000 \\
+    --remote-redis host1:6379 \\
+    --remote-etcd host1:2379
+""",
+    )
+    parser.add_argument(
+        "--remote-2pc",
+        help="Comma-separated host:port list for remote 2PC participant servers",
+    )
+    parser.add_argument(
+        "--remote-redis",
+        help="host:port for remote Redis instance",
+    )
+    parser.add_argument(
+        "--remote-etcd",
+        help="host:port for remote etcd instance",
+    )
+    parser.add_argument(
+        "--iterations", type=int, default=None,
+        help="Override default iteration count for all benchmarks",
+    )
+    parser.add_argument(
+        "--skip-local", action="store_true",
+        help="Skip localhost benchmarks (SQLite, localhost 2PC)",
+    )
+    parser.add_argument(
+        "--output", type=str, default=None,
+        help="Output JSON file path (default: benchmarks/REAL_CONSENSUS_BENCHMARK_RESULTS.json)",
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+    has_remote = args.remote_2pc or args.remote_redis or args.remote_etcd
+    mode = "CLOUD" if has_remote else "LOCAL"
+
     print("=" * 70)
-    print("REAL CONSENSUS BENCHMARK")
-    print("All systems measured on the same machine. No simulated delays.")
+    print(f"REAL CONSENSUS BENCHMARK ({mode} MODE)")
+    print("All systems measured. No simulated delays.")
     print("=" * 70)
     print()
 
     results = []
     speedups = {}
 
-    # --- Rhizo ---
+    # --- Rhizo (always runs) ---
     print("1. RHIZO ALGEBRAIC OPERATIONS (Coordination-Free)")
     print("-" * 50)
-    rhizo_add = benchmark_rhizo_algebraic(iterations=10000)
+    iters_rhizo = args.iterations or 10000
+    rhizo_add = benchmark_rhizo_algebraic(iterations=iters_rhizo)
     print_result(rhizo_add)
     results.append(rhizo_add)
 
-    rhizo_max = benchmark_rhizo_max(iterations=10000)
+    rhizo_max = benchmark_rhizo_max(iterations=iters_rhizo)
     print_result(rhizo_max)
     results.append(rhizo_max)
     print()
 
-    # --- SQLite ---
-    print("2. SQLITE (Local Durability Baselines)")
+    # --- SQLite (local only) ---
+    if not args.skip_local:
+        print("2. SQLITE (Local Durability Baselines)")
+        print("-" * 50)
+
+        iters_sqlite = args.iterations or 1000
+        sqlite_normal = benchmark_sqlite_wal(iterations=iters_sqlite)
+        print_result(sqlite_normal)
+        results.append(sqlite_normal)
+        print_comparison(rhizo_add, sqlite_normal)
+        speedups["SQLite WAL (NORMAL)"] = sqlite_normal.mean_ms / rhizo_add.mean_ms
+        print()
+
+        sqlite_full = benchmark_sqlite_full_sync(iterations=iters_sqlite)
+        print_result(sqlite_full)
+        results.append(sqlite_full)
+        print_comparison(rhizo_add, sqlite_full)
+        speedups["SQLite WAL (FULL sync)"] = sqlite_full.mean_ms / rhizo_add.mean_ms
+        print()
+
+    # --- Localhost 2PC (local only) ---
+    tpc_result = None
+    if not args.skip_local:
+        print("3. LOCALHOST 2-PHASE COMMIT (Real Coordination Protocol)")
+        print("-" * 50)
+        print("  Spawning 2 participant processes + coordinator...")
+        iters_2pc = args.iterations or 500
+        tpc_result = benchmark_localhost_2pc(iterations=iters_2pc)
+        if tpc_result:
+            print_result(tpc_result)
+            results.append(tpc_result)
+            print_comparison(rhizo_add, tpc_result)
+            speedups["Localhost 2PC (3 nodes)"] = tpc_result.mean_ms / rhizo_add.mean_ms
+        else:
+            print("  2PC benchmark failed")
+        print()
+
+    # --- Remote 2PC (cloud mode) ---
+    if args.remote_2pc:
+        print("4. REMOTE 2-PHASE COMMIT (Geo-Distributed Coordination)")
+        print("-" * 50)
+        endpoints = [
+            parse_host_port(ep.strip(), 9000) for ep in args.remote_2pc.split(",")
+        ]
+        iters_remote = args.iterations or 200
+        remote_2pc = benchmark_remote_2pc(endpoints, iterations=iters_remote)
+        if remote_2pc:
+            print_result(remote_2pc)
+            results.append(remote_2pc)
+            print_comparison(rhizo_add, remote_2pc)
+            speedups[remote_2pc.system] = remote_2pc.mean_ms / rhizo_add.mean_ms
+        else:
+            print("  Remote 2PC benchmark failed")
+        print()
+
+    # --- Redis ---
+    step = 5 if args.remote_2pc else 4
+    redis_host, redis_port = "localhost", 6379
+    if args.remote_redis:
+        redis_host, redis_port = parse_host_port(args.remote_redis, 6379)
+
+    print(f"{step}. REDIS (Optional — {'Remote' if args.remote_redis else 'Local'})")
     print("-" * 50)
+    iters_redis = args.iterations or 1000
+    redis_result = benchmark_redis(redis_host, redis_port, iterations=iters_redis)
+    if redis_result:
+        print_result(redis_result)
+        results.append(redis_result)
+        print_comparison(rhizo_add, redis_result)
+        speedups[redis_result.system] = redis_result.mean_ms / rhizo_add.mean_ms
 
-    sqlite_normal = benchmark_sqlite_wal(iterations=1000)
-    print_result(sqlite_normal)
-    results.append(sqlite_normal)
-    print_comparison(rhizo_add, sqlite_normal)
-    speedups["SQLite WAL (NORMAL)"] = sqlite_normal.mean_ms / rhizo_add.mean_ms
-    print()
-
-    sqlite_full = benchmark_sqlite_full_sync(iterations=1000)
-    print_result(sqlite_full)
-    results.append(sqlite_full)
-    print_comparison(rhizo_add, sqlite_full)
-    speedups["SQLite WAL (FULL sync)"] = sqlite_full.mean_ms / rhizo_add.mean_ms
-    print()
-
-    # --- Localhost 2PC ---
-    print("3. LOCALHOST 2-PHASE COMMIT (Real Coordination Protocol)")
-    print("-" * 50)
-    print("  Spawning 2 participant processes + coordinator...")
-    tpc_result = benchmark_localhost_2pc(iterations=500)
-    if tpc_result:
-        print_result(tpc_result)
-        results.append(tpc_result)
-        print_comparison(rhizo_add, tpc_result)
-        speedups["Localhost 2PC (3 nodes)"] = tpc_result.mean_ms / rhizo_add.mean_ms
-    else:
-        print("  2PC benchmark failed")
-    print()
-
-    # --- Redis (optional) ---
-    print("4. REDIS (Optional — Network + Persistence)")
-    print("-" * 50)
-    redis_local = benchmark_redis_local(iterations=1000)
-    if redis_local:
-        print_result(redis_local)
-        results.append(redis_local)
-        print_comparison(rhizo_add, redis_local)
-        speedups["Redis (local)"] = redis_local.mean_ms / rhizo_add.mean_ms
-
-    redis_sync = benchmark_redis_with_sync(iterations=100)
+    redis_sync = benchmark_redis_with_sync(redis_host, redis_port, iterations=args.iterations or 100)
     if redis_sync:
         print_result(redis_sync)
         results.append(redis_sync)
         print_comparison(rhizo_add, redis_sync)
-        speedups["Redis (replicated)"] = redis_sync.mean_ms / rhizo_add.mean_ms
+        speedups[redis_sync.system] = redis_sync.mean_ms / rhizo_add.mean_ms
     print()
 
-    # --- etcd (optional) ---
-    print("5. ETCD (Optional — Raft Consensus)")
+    # --- etcd ---
+    step += 1
+    etcd_host, etcd_port = "localhost", 2379
+    if args.remote_etcd:
+        etcd_host, etcd_port = parse_host_port(args.remote_etcd, 2379)
+
+    print(f"{step}. ETCD (Optional — {'Remote' if args.remote_etcd else 'Local'} Raft Consensus)")
     print("-" * 50)
-    etcd_result = benchmark_etcd(iterations=100)
+    etcd_result = benchmark_etcd(etcd_host, etcd_port, iterations=args.iterations or 100)
     if etcd_result:
         print_result(etcd_result)
         results.append(etcd_result)
         print_comparison(rhizo_add, etcd_result)
-        speedups["etcd (Raft)"] = etcd_result.mean_ms / rhizo_add.mean_ms
+        speedups[etcd_result.system] = etcd_result.mean_ms / rhizo_add.mean_ms
     print()
 
     # --- Summary ---
@@ -550,7 +784,7 @@ def main():
     print("SUMMARY")
     print("=" * 70)
     print()
-    print("ALL MEASURED SPEEDUPS (same machine, no simulated delays):")
+    print("ALL MEASURED SPEEDUPS (no simulated delays):")
     print("-" * 50)
     for system, speedup in sorted(speedups.items(), key=lambda x: x[1]):
         print(f"  vs {system}: {speedup:.1f}x faster")
@@ -558,18 +792,17 @@ def main():
     print()
     print("WHAT THIS TELLS US:")
     print(f"  Rhizo algebraic commit:       {rhizo_add.mean_ms:.4f} ms (measured)")
-    print(f"  Local durability (SQLite):     {sqlite_normal.mean_ms:.4f} ms (measured)")
-    print(f"  Local durability + fsync:      {sqlite_full.mean_ms:.4f} ms (measured)")
+    if not args.skip_local:
+        print(f"  Local durability (SQLite):     {sqlite_normal.mean_ms:.4f} ms (measured)")
+        print(f"  Local durability + fsync:      {sqlite_full.mean_ms:.4f} ms (measured)")
     if tpc_result:
         print(f"  Localhost coordination (2PC):  {tpc_result.mean_ms:.4f} ms (measured)")
-    print()
-    print("The coordination overhead on LOCALHOST is real and measurable.")
-    print("Cross-region adds 50-150ms of network latency on top of this.")
-    if tpc_result:
+
+    if not args.skip_local and tpc_result:
         print()
-        low = 50 / rhizo_add.mean_ms
-        mid = 100 / rhizo_add.mean_ms
-        high = 150 / rhizo_add.mean_ms
+        print("The coordination overhead on LOCALHOST is real and measurable.")
+        print("Cross-region adds 50-150ms of network latency on top of this.")
+        print()
         print(f"PROJECTED cross-region speedups (adding typical RTT to measured 2PC):")
         print(f"  vs 50ms RTT + 2PC overhead:  {(50 + tpc_result.mean_ms) / rhizo_add.mean_ms:,.0f}x")
         print(f"  vs 100ms RTT + 2PC overhead: {(100 + tpc_result.mean_ms) / rhizo_add.mean_ms:,.0f}x")
@@ -578,18 +811,25 @@ def main():
     # --- Save results ---
     output = {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "mode": mode.lower(),
         "methodology": (
-            "All measurements taken on the same machine. Rhizo values are "
+            "All measurements taken on real systems. Rhizo values are "
             "coordination-free local commits. SQLite values are local disk "
-            "durability. 2PC values are real TCP coordination between 3 OS "
-            "processes on localhost. Cross-region projections add typical "
-            "network RTT to measured protocol overhead."
+            "durability. 2PC values are real TCP coordination. "
+            "Remote benchmarks measure actual network + protocol overhead."
         ),
         "results": [r.summary_dict() for r in results],
         "measured_speedups": {k: round(v, 1) for k, v in speedups.items()},
     }
 
-    output_path = Path(__file__).parent / "REAL_CONSENSUS_BENCHMARK_RESULTS.json"
+    # Include RTT data for remote benchmarks
+    for r in results:
+        if hasattr(r, "_rtts"):
+            output["endpoint_rtts_ms"] = r._rtts
+
+    output_path = args.output or str(
+        Path(__file__).parent / "REAL_CONSENSUS_BENCHMARK_RESULTS.json"
+    )
     with open(output_path, "w") as f:
         json.dump(output, f, indent=2)
     print()
@@ -597,6 +837,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # Required for multiprocessing on Windows
     multiprocessing.freeze_support()
     main()
