@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**912 tests passing (445 Rust + 467 Python)**
+**916 tests passing (449 Rust + 467 Python)**
 
 Rhizo is feature-complete for single-node deployments with full ACID transactions, time travel, branching, and OLAP queries.
 
@@ -103,7 +103,7 @@ cd rhizo_python && maturin develop --release && cd ..
 pip install -e python/
 
 # Run tests
-cargo test --all      # 445 Rust tests
+cargo test --all      # 449 Rust tests
 pytest tests/ -v      # 467 Python tests
 ```
 

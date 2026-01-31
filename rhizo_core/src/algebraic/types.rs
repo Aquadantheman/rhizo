@@ -322,19 +322,43 @@ impl AlgebraicValue {
     }
 
     /// Try to get as i64.
+    ///
+    /// Returns `Some` for integers and floats that are exact integers within i64 range.
+    /// Returns `None` for fractional floats, NaN, Infinity, or out-of-range values.
     pub fn as_integer(&self) -> Option<i64> {
         match self {
             Self::Integer(v) => Some(*v),
-            Self::Float(v) => Some(*v as i64),
+            Self::Float(v) => {
+                if v.is_finite() && *v == v.trunc()
+                    && *v >= i64::MIN as f64 && *v <= i64::MAX as f64
+                {
+                    Some(*v as i64)
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
 
     /// Try to get as f64.
+    ///
+    /// Returns `Some` for floats and integers that can be exactly represented as f64.
+    /// Returns `None` for integers that would lose precision (e.g., i64::MAX).
     pub fn as_float(&self) -> Option<f64> {
         match self {
             Self::Float(v) => Some(*v),
-            Self::Integer(v) => Some(*v as f64),
+            Self::Integer(v) => {
+                let f = *v as f64;
+                // Round-trip check: f64 -> i64 must give back the same value.
+                // Special case: i64::MAX rounds up to 2^63 which saturates back
+                // to i64::MAX, creating a false positive. Exclude it explicitly.
+                if *v != i64::MAX && f as i64 == *v {
+                    Some(f)
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
@@ -500,7 +524,7 @@ mod tests {
         let v = AlgebraicValue::float(3.5);
         assert!(v.is_numeric());
         assert_eq!(v.as_float(), Some(3.5));
-        assert_eq!(v.as_integer(), Some(3)); // truncates
+        assert_eq!(v.as_integer(), None); // fractional floats no longer convert
         assert_eq!(v.type_name(), "Float");
     }
 
@@ -587,5 +611,55 @@ mod tests {
         let json = serde_json::to_string(&set).unwrap();
         let parsed: AlgebraicValue = serde_json::from_str(&json).unwrap();
         assert_eq!(set, parsed);
+    }
+
+    #[test]
+    fn test_as_integer_exact_float() {
+        // Exact integer floats convert
+        assert_eq!(AlgebraicValue::float(3.0).as_integer(), Some(3));
+        assert_eq!(AlgebraicValue::float(-5.0).as_integer(), Some(-5));
+        assert_eq!(AlgebraicValue::float(0.0).as_integer(), Some(0));
+        assert_eq!(AlgebraicValue::float(-0.0).as_integer(), Some(0));
+
+        // Fractional floats reject
+        assert_eq!(AlgebraicValue::float(3.5).as_integer(), None);
+        assert_eq!(AlgebraicValue::float(3.1).as_integer(), None);
+        assert_eq!(AlgebraicValue::float(-2.9).as_integer(), None);
+        assert_eq!(AlgebraicValue::float(0.1).as_integer(), None);
+
+        // Special values reject
+        assert_eq!(AlgebraicValue::float(f64::NAN).as_integer(), None);
+        assert_eq!(AlgebraicValue::float(f64::INFINITY).as_integer(), None);
+        assert_eq!(AlgebraicValue::float(f64::NEG_INFINITY).as_integer(), None);
+
+        // Large exact float
+        assert_eq!(AlgebraicValue::float(1e15).as_integer(), Some(1_000_000_000_000_000));
+    }
+
+    #[test]
+    fn test_as_float_precision() {
+        // Small integers convert exactly
+        assert_eq!(AlgebraicValue::integer(42).as_float(), Some(42.0));
+        assert_eq!(AlgebraicValue::integer(0).as_float(), Some(0.0));
+        assert_eq!(AlgebraicValue::integer(-1).as_float(), Some(-1.0));
+
+        // i64::MAX loses precision — should return None
+        assert_eq!(AlgebraicValue::integer(i64::MAX).as_float(), None);
+        // i64::MIN is exactly representable (-2^63 is a power of 2)
+        assert_eq!(AlgebraicValue::integer(i64::MIN).as_float(), Some(i64::MIN as f64));
+
+        // 2^53 is the exact representability boundary for f64
+        assert_eq!(AlgebraicValue::integer(1_i64 << 53).as_float(), Some((1_i64 << 53) as f64));
+        assert_eq!(AlgebraicValue::integer((1_i64 << 53) + 1).as_float(), None);
+    }
+
+    #[test]
+    fn test_non_numeric_as_integer_and_float() {
+        assert_eq!(AlgebraicValue::Null.as_integer(), None);
+        assert_eq!(AlgebraicValue::Null.as_float(), None);
+        assert_eq!(AlgebraicValue::Boolean(true).as_integer(), None);
+        assert_eq!(AlgebraicValue::Boolean(true).as_float(), None);
+        assert_eq!(AlgebraicValue::string_set(["a"]).as_integer(), None);
+        assert_eq!(AlgebraicValue::string_set(["a"]).as_float(), None);
     }
 }
