@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union, Dict, List, Any
 
 from .export import ExportEngine, ExportResult
+from .gc import GCPolicy, GCResult, GarbageCollector, AutoGC
 
 import pyarrow as pa
 
@@ -83,6 +84,8 @@ class Database:
         enable_branches: bool = True,
         enable_transactions: bool = True,
         verify_integrity: bool = _DEFAULT_VERIFY_INTEGRITY,
+        auto_gc: Optional[GCPolicy] = None,
+        auto_gc_interval: float = 3600.0,
     ):
         """
         Initialize a Database at the given path.
@@ -96,6 +99,8 @@ class Database:
             verify_integrity: Verify chunk hashes on read (default: True for safety).
                              Set to False for faster reads in trusted environments.
                              Override default via RHIZO_VERIFY_INTEGRITY env var.
+            auto_gc: If set, run background GC with this policy (default: None).
+            auto_gc_interval: Seconds between auto-GC runs (default: 3600).
         """
         self._path = Path(path).resolve()
         self._closed = False
@@ -159,6 +164,16 @@ class Database:
                 branch_manager=self._branch_manager,
                 verify_integrity=verify_integrity,
             )
+
+        # Optional background GC
+        self._auto_gc = None
+        if auto_gc is not None:
+            collector = GarbageCollector(
+                self._catalog, self._store,
+                self._branch_manager, self._transaction_manager,
+            )
+            self._auto_gc = AutoGC(collector, auto_gc, auto_gc_interval)
+            self._auto_gc.start()
 
     @property
     def path(self) -> Path:
@@ -373,6 +388,43 @@ class Database:
         self._check_closed()
         return self._engine.get_table_info(table_name, version)
 
+    def gc(
+        self,
+        *,
+        max_age_seconds: Optional[float] = None,
+        max_versions_per_table: Optional[int] = None,
+    ) -> GCResult:
+        """
+        Run garbage collection to reclaim disk space.
+
+        Deletes old table versions and sweeps unreferenced chunks.
+        At least one policy constraint must be provided.
+
+        Safety: Never deletes the latest version, versions referenced by
+        branches, or versions referenced by active transactions.
+
+        Args:
+            max_age_seconds: Delete versions older than this (seconds).
+            max_versions_per_table: Keep at most this many versions per table.
+
+        Returns:
+            GCResult with counts of deleted versions, chunks, and bytes freed.
+
+        Example:
+            >>> result = db.gc(max_versions_per_table=5)
+            >>> print(f"Freed {result.bytes_freed} bytes")
+        """
+        self._check_closed()
+        policy = GCPolicy(
+            max_age_seconds=max_age_seconds,
+            max_versions_per_table=max_versions_per_table,
+        )
+        collector = GarbageCollector(
+            self._catalog, self._store,
+            self._branch_manager, self._transaction_manager,
+        )
+        return collector.collect(policy)
+
     def export(
         self,
         table_name: str,
@@ -430,6 +482,8 @@ class Database:
         After closing, no further operations are allowed.
         """
         if not self._closed:
+            if self._auto_gc is not None:
+                self._auto_gc.stop()
             self._engine.close()
             self._closed = True
 
@@ -469,6 +523,8 @@ def open(
     enable_branches: bool = True,
     enable_transactions: bool = True,
     verify_integrity: bool = _DEFAULT_VERIFY_INTEGRITY,
+    auto_gc: Optional[GCPolicy] = None,
+    auto_gc_interval: float = 3600.0,
 ) -> Database:
     """
     Open or create a Rhizo database at the given path.
@@ -483,6 +539,8 @@ def open(
         verify_integrity: Verify chunk hashes on every read (default: True for safety).
                          Set to False for faster reads in trusted environments.
                          Override default via RHIZO_VERIFY_INTEGRITY env var.
+        auto_gc: If set, run background GC with this policy (default: None).
+        auto_gc_interval: Seconds between auto-GC runs (default: 3600).
 
     Returns:
         Database instance ready for use
@@ -513,10 +571,16 @@ def open(
         >>> with rhizo.open("./mydata") as db:
         ...     db.write("users", df)
         ...     result = db.sql("SELECT * FROM users")
+
+        # With automatic background GC:
+        >>> with rhizo.open("./mydata", auto_gc=GCPolicy(max_versions_per_table=10)) as db:
+        ...     db.write("users", df)
     """
     return Database(
         path,
         enable_branches=enable_branches,
         enable_transactions=enable_transactions,
         verify_integrity=verify_integrity,
+        auto_gc=auto_gc,
+        auto_gc_interval=auto_gc_interval,
     )

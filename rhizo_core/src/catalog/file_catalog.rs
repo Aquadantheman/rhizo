@@ -339,6 +339,73 @@ impl FileCatalog {
         Ok(tables)
     }
 
+    /// Delete a specific version of a table from the catalog.
+    ///
+    /// Removes the version JSON file from disk and returns the deleted
+    /// `TableVersion` so the caller can collect its chunk hashes for GC.
+    ///
+    /// # Errors
+    /// - `CannotDeleteLatest` if `version` is the current latest version.
+    /// - `TableNotFound` if the table directory does not exist.
+    /// - `VersionNotFound` if the version file does not exist.
+    pub fn delete_version(
+        &self,
+        table_name: &str,
+        version: u64,
+    ) -> Result<TableVersion, CatalogError> {
+        let table_dir = self.base_path.join(table_name);
+        if !table_dir.exists() {
+            return Err(CatalogError::TableNotFound(table_name.to_string()));
+        }
+
+        let _lock = self.acquire_table_lock(table_name)?;
+
+        let latest = self.get_latest_version_num(table_name)?;
+        if version == latest {
+            return Err(CatalogError::CannotDeleteLatest(
+                table_name.to_string(),
+                version,
+            ));
+        }
+
+        let version_path = table_dir.join(format!("{}.json", version));
+        if !version_path.exists() {
+            return Err(CatalogError::VersionNotFound(
+                table_name.to_string(),
+                version,
+            ));
+        }
+
+        let json = fs::read_to_string(&version_path)?;
+        let table_version: TableVersion = serde_json::from_str(&json)?;
+
+        fs::remove_file(&version_path)?;
+
+        Ok(table_version)
+    }
+
+    /// Collect all chunk hashes referenced by all versions of all tables.
+    ///
+    /// Scans every table and every version in the catalog, returning the
+    /// union of all `chunk_hashes`. Used by garbage collection to determine
+    /// which chunks in the store are still needed.
+    pub fn get_all_referenced_chunk_hashes(
+        &self,
+    ) -> Result<std::collections::HashSet<String>, CatalogError> {
+        let mut referenced = std::collections::HashSet::new();
+
+        for table_name in self.list_tables()? {
+            for version_num in self.list_versions(&table_name)? {
+                let version = self.get_version(&table_name, Some(version_num))?;
+                for hash in version.chunk_hashes {
+                    referenced.insert(hash);
+                }
+            }
+        }
+
+        Ok(referenced)
+    }
+
     fn get_latest_version_num(&self, table_name: &str) -> Result<u64, CatalogError> {
         let latest_path = self.base_path.join(table_name).join("latest");
 
@@ -671,6 +738,148 @@ mod tests {
         let tables = catalog.list_tables().unwrap();
         assert_eq!(tables, vec!["alpha", "beta"]);
         assert!(!tables.contains(&".pending".to_string()));
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // =========================================================================
+    // delete_version tests
+    // =========================================================================
+
+    #[test]
+    fn test_delete_version_basic() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        catalog.commit(TableVersion::new("tbl", 1, vec!["h1".to_string()])).unwrap();
+        catalog.commit(TableVersion::new("tbl", 2, vec!["h2".to_string()])).unwrap();
+
+        let deleted = catalog.delete_version("tbl", 1).unwrap();
+        assert_eq!(deleted.version, 1);
+        assert_eq!(deleted.chunk_hashes, vec!["h1"]);
+
+        // Version 1 should no longer be listed
+        let versions = catalog.list_versions("tbl").unwrap();
+        assert_eq!(versions, vec![2]);
+
+        // Latest should still be 2
+        let latest = catalog.get_version("tbl", None).unwrap();
+        assert_eq!(latest.version, 2);
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_delete_version_returns_table_version() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        catalog.commit(TableVersion::new("tbl", 1, vec!["a".to_string(), "b".to_string()])).unwrap();
+        catalog.commit(TableVersion::new("tbl", 2, vec!["c".to_string()])).unwrap();
+
+        let deleted = catalog.delete_version("tbl", 1).unwrap();
+        assert_eq!(deleted.table_name, "tbl");
+        assert_eq!(deleted.version, 1);
+        assert_eq!(deleted.chunk_hashes, vec!["a", "b"]);
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_delete_version_not_found() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        catalog.commit(TableVersion::new("tbl", 1, vec![])).unwrap();
+        catalog.commit(TableVersion::new("tbl", 2, vec![])).unwrap();
+
+        let result = catalog.delete_version("tbl", 999);
+        assert!(matches!(result, Err(CatalogError::VersionNotFound(_, 999))));
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_delete_version_latest_refused() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        catalog.commit(TableVersion::new("tbl", 1, vec![])).unwrap();
+        catalog.commit(TableVersion::new("tbl", 2, vec![])).unwrap();
+
+        let result = catalog.delete_version("tbl", 2);
+        assert!(matches!(result, Err(CatalogError::CannotDeleteLatest(_, 2))));
+
+        // Only version should also be refused
+        let dir2 = temp_dir();
+        let catalog2 = FileCatalog::new(&dir2).unwrap();
+        catalog2.commit(TableVersion::new("single", 1, vec![])).unwrap();
+
+        let result = catalog2.delete_version("single", 1);
+        assert!(matches!(result, Err(CatalogError::CannotDeleteLatest(_, 1))));
+
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&dir2).ok();
+    }
+
+    #[test]
+    fn test_delete_version_table_not_found() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        let result = catalog.delete_version("nonexistent", 1);
+        assert!(matches!(result, Err(CatalogError::TableNotFound(_))));
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_delete_version_file_removed() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        catalog.commit(TableVersion::new("tbl", 1, vec![])).unwrap();
+        catalog.commit(TableVersion::new("tbl", 2, vec![])).unwrap();
+
+        let v1_path = dir.join("tbl").join("1.json");
+        assert!(v1_path.exists());
+
+        catalog.delete_version("tbl", 1).unwrap();
+        assert!(!v1_path.exists());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // =========================================================================
+    // get_all_referenced_chunk_hashes tests
+    // =========================================================================
+
+    #[test]
+    fn test_get_all_referenced_chunk_hashes() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        catalog.commit(TableVersion::new("a", 1, vec!["h1".to_string(), "h2".to_string()])).unwrap();
+        catalog.commit(TableVersion::new("a", 2, vec!["h2".to_string(), "h3".to_string()])).unwrap();
+        catalog.commit(TableVersion::new("b", 1, vec!["h4".to_string()])).unwrap();
+
+        let hashes = catalog.get_all_referenced_chunk_hashes().unwrap();
+        assert_eq!(hashes.len(), 4);
+        assert!(hashes.contains("h1"));
+        assert!(hashes.contains("h2"));
+        assert!(hashes.contains("h3"));
+        assert!(hashes.contains("h4"));
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_get_all_referenced_chunk_hashes_empty() {
+        let dir = temp_dir();
+        let catalog = FileCatalog::new(&dir).unwrap();
+
+        let hashes = catalog.get_all_referenced_chunk_hashes().unwrap();
+        assert!(hashes.is_empty());
 
         fs::remove_dir_all(&dir).ok();
     }

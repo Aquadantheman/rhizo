@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**1,253 tests passing (468 Rust + 785 Python)**
+**1,263 tests passing (476 Rust + 787 Python)**
 
 Rhizo is feature-complete for single-node deployments with full ACID transactions, time travel, branching, and OLAP queries.
 
@@ -52,6 +52,15 @@ Rhizo is feature-complete for single-node deployments with full ACID transaction
 - **Single-chunk fast path**: Raw byte copy (53M rows/s, 2.5x faster than DuckDB COPY TO)
 - **Column projection**: Export subset of columns for smaller files
 - **Atomic writes**: Temp file + rename for crash safety
+
+### Garbage Collection
+- **Two-phase GC**: Phase 1 deletes old versions, Phase 2 sweeps unreferenced chunks
+- **Time-based TTL**: `db.gc(max_age_seconds=86400)` — delete versions older than N seconds
+- **Count-based retention**: `db.gc(max_versions_per_table=5)` — keep only N most recent
+- **AutoGC**: Background daemon thread with configurable interval (`auto_gc=GCPolicy(...)`)
+- **Safety-first**: Never deletes latest, branch-referenced, or transaction-referenced versions
+- **Crash-safe**: Orphaned chunks cleaned on next GC run
+- **~13ms per version deletion**, <5ms protection collection for 50 branches
 
 ### Changelog & Streaming
 - **get_changes()**: Query changes since a checkpoint

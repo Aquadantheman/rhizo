@@ -178,6 +178,9 @@ fn catalog_err_to_py(e: CatalogError) -> PyErr {
         CatalogError::Io(e) => PyIOError::new_err(sanitize_io_error(&e)),
         CatalogError::Json(e) => PyValueError::new_err(format!("JSON error: {}", sanitize_error_message(&e.to_string()))),
         CatalogError::LockError(msg) => PyIOError::new_err(format!("Lock error: {}", sanitize_error_message(&msg))),
+        CatalogError::CannotDeleteLatest(t, v) => {
+            PyValueError::new_err(format!("Cannot delete latest version: {} v{}", t, v))
+        }
     }
 }
 
@@ -838,6 +841,38 @@ impl PyChunkStore {
         let mmaps = self.inner.get_mmap_batch(&refs).map_err(chunk_err_to_py)?;
         Ok(mmaps.iter().map(|m| m.to_vec()).collect())
     }
+
+    // =========================================================================
+    // Garbage Collection
+    // =========================================================================
+
+    /// List all chunk hashes stored on disk.
+    fn list_chunk_hashes(&self) -> PyResult<Vec<String>> {
+        self.inner.list_chunk_hashes().map_err(chunk_err_to_py)
+    }
+
+    /// Delete unreferenced chunks from the store.
+    ///
+    /// Compares all on-disk chunks against the provided set of referenced
+    /// hashes and deletes any chunk not in the set.
+    ///
+    /// Args:
+    ///     referenced_hashes: List of hash strings that are still in use.
+    ///
+    /// Returns:
+    ///     Tuple of (deleted_count, failed_count).
+    fn garbage_collect(&self, py: Python<'_>, referenced_hashes: Vec<String>) -> PyResult<(usize, usize)> {
+        let hash_set: std::collections::HashSet<String> = referenced_hashes.into_iter().collect();
+        py.detach(|| self.inner.garbage_collect(&hash_set).map_err(chunk_err_to_py))
+    }
+
+    /// Clean up orphaned temporary files from incomplete writes.
+    ///
+    /// Returns:
+    ///     Tuple of (removed_count, failed_count).
+    fn cleanup_orphaned_temp_files(&self) -> (usize, usize) {
+        self.inner.cleanup_orphaned_temp_files()
+    }
 }
 
 #[pyclass]
@@ -945,6 +980,25 @@ impl PyCatalog {
 
     fn list_tables(&self) -> PyResult<Vec<String>> {
         self.inner.list_tables().map_err(catalog_err_to_py)
+    }
+
+    /// Delete a specific version of a table.
+    ///
+    /// Returns the deleted version's metadata. Raises ValueError if trying
+    /// to delete the latest version.
+    fn delete_version(&self, table_name: &str, version: u64) -> PyResult<PyTableVersion> {
+        self.inner
+            .delete_version(table_name, version)
+            .map(|tv| tv.into())
+            .map_err(catalog_err_to_py)
+    }
+
+    /// Get all chunk hashes referenced by all versions of all tables.
+    fn get_all_referenced_chunk_hashes(&self) -> PyResult<Vec<String>> {
+        self.inner
+            .get_all_referenced_chunk_hashes()
+            .map(|set| set.into_iter().collect())
+            .map_err(catalog_err_to_py)
     }
 }
 

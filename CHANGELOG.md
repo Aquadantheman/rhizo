@@ -5,6 +5,31 @@ All notable changes to Rhizo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.10] - 2026-01-31
+
+### Added
+
+#### TTL / Garbage Collection
+- **New `python/rhizo/gc.py`**: Two-phase garbage collector with safety guarantees
+  - **GCPolicy**: Time-based TTL (`max_age_seconds`) and count-based retention (`max_versions_per_table`)
+  - **GarbageCollector**: Phase 1 deletes expired versions, Phase 2 sweeps unreferenced chunks
+  - **AutoGC**: Background daemon thread with configurable interval
+  - **Safety**: Never deletes latest version, branch-referenced versions, or active transaction snapshots
+  - **Crash-safe**: Orphaned chunks after crash are cleaned on next GC run
+- **`Database.gc()`**: High-level GC API (`db.gc(max_versions_per_table=5)`)
+- **`rhizo.open(auto_gc=...)`**: Automatic background GC on database open
+- **Rust `delete_version()` and `get_all_referenced_chunk_hashes()`**: Catalog-level version deletion with safety guard (`CannotDeleteLatest` error)
+- **PyO3 bindings**: `PyCatalog.delete_version()`, `PyCatalog.get_all_referenced_chunk_hashes()`, `PyChunkStore.garbage_collect()`, `PyChunkStore.list_chunk_hashes()`, `PyChunkStore.cleanup_orphaned_temp_files()`
+- **New `tests/test_gc.py`**: 50 tests covering policy validation, protected versions, TTL, count retention, combined policies, chunk sweep, two-phase integrity, AutoGC, and Database integration
+- **New `benchmarks/gc_benchmark.py`**: GC performance across version/table/chunk scaling, protection overhead, disk reclamation, AutoGC overhead
+- **1,263 total tests** (476 Rust + 787 Python)
+
+#### GC Benchmark Results
+- Version deletion: **~13ms per version** (consistent across 10-1K versions)
+- Protection collection: **<5ms** for 50 branches
+- Disk reclamation: ~90% of space freed when keeping 2 of 20 versions
+- AutoGC thread: **31ms per idle run**, clean shutdown
+
 ## [0.5.9] - 2026-01-31
 
 ### Added

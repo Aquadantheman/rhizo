@@ -22,4 +22,7 @@ pub enum CatalogError {
 
     #[error("Failed to acquire file lock for table: {0}")]
     LockError(String),
+
+    #[error("Cannot delete latest version: {0} v{1}")]
+    CannotDeleteLatest(String, u64),
 }
