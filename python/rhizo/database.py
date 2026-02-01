@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union, Dict, List, Any
 
 from .export import ExportEngine, ExportResult
+from .diff import DiffEngine, DiffResult, SchemaDiff, RowDiff
 from .gc import GCPolicy, GCResult, GarbageCollector, AutoGC
 
 import pyarrow as pa
@@ -387,6 +388,84 @@ class Database:
         """
         self._check_closed()
         return self._engine.get_table_info(table_name, version)
+
+    def diff(
+        self,
+        table_name: str,
+        *,
+        version_a: Optional[int] = None,
+        version_b: Optional[int] = None,
+        branch_a: Optional[str] = None,
+        branch_b: Optional[str] = None,
+        key_columns: Optional[List[str]] = None,
+        schema=None,
+    ) -> DiffResult:
+        """
+        Diff two versions or branches of a table.
+
+        Computes schema-level, row-level, and column-level diffs with
+        Merkle chunk optimization. Optionally produces semantic diffs
+        (e.g. "counter increased by 47") when an algebraic schema is provided.
+
+        Args:
+            table_name: Name of the table to diff.
+            version_a: Old version number.
+            version_b: New version number.
+            branch_a: Old branch (exclusive with version_a).
+            branch_b: New branch (exclusive with version_b).
+            key_columns: Primary key columns for row-level diff.
+                If None, only schema diff and row counts are returned.
+            schema: Optional PyTableAlgebraicSchema for semantic diffs.
+
+        Returns:
+            DiffResult with schema, row, and column diffs.
+
+        Example:
+            >>> diff = db.diff("users", version_a=1, version_b=3, key_columns=["id"])
+            >>> print(diff.summary())
+        """
+        self._check_closed()
+
+        if (branch_a is not None or branch_b is not None) and \
+           (version_a is not None or version_b is not None):
+            raise ValueError("Cannot specify both version and branch parameters")
+
+        # Resolve versions from branches
+        if branch_a is not None or branch_b is not None:
+            if self._branch_manager is None:
+                raise RuntimeError("Branch manager not available")
+            if branch_a is not None:
+                version_a = self._branch_manager.get_table_version(branch_a, table_name)
+                if version_a is None:
+                    raise ValueError(f"Table '{table_name}' not found on branch '{branch_a}'")
+            if branch_b is not None:
+                version_b = self._branch_manager.get_table_version(branch_b, table_name)
+                if version_b is None:
+                    raise ValueError(f"Table '{table_name}' not found on branch '{branch_b}'")
+
+        # Default: latest vs previous
+        if version_a is None and version_b is None:
+            versions = self._catalog.list_versions(table_name)
+            if len(versions) < 2:
+                raise ValueError(f"Table '{table_name}' has fewer than 2 versions")
+            version_b = versions[-1]
+            version_a = versions[-2]
+        elif version_a is None:
+            version_a = version_b - 1
+        elif version_b is None:
+            versions = self._catalog.list_versions(table_name)
+            version_b = versions[-1]
+
+        if not hasattr(self, "_diff_engine") or self._diff_engine is None:
+            self._diff_engine = DiffEngine(
+                self._catalog, self._store, self._engine.reader,
+                self._branch_manager,
+            )
+
+        return self._diff_engine.diff(
+            table_name, version_a, version_b,
+            key_columns=key_columns, schema=schema,
+        )
 
     def gc(
         self,

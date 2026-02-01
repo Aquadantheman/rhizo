@@ -15,6 +15,8 @@ Mathematical verification of Rhizo's core claims. All formulas have been verifie
 | Commit version | O(k) | O(k) | k = chunk count |
 | Create branch | O(t) | O(t) | t = table count, zero data copy |
 | Cross-table commit | O(t) | O(t) | t = tables in transaction |
+| Version diff (schema) | O(c) | O(c) | c = columns, Merkle fast-path for identical data |
+| Version diff (rows) | O(n) | O(n) | n = rows in changed chunks; unchanged chunks skipped via Merkle |
 
 Operations are constant with respect to total stored data. A 1PB system performs identically to a 1GB system for individual operations.
 
@@ -360,6 +362,8 @@ When $V_a \| V_b$ (concurrent), algebraic merge resolves automatically.
 | 97,943x less energy | **Estimated** | Measured local energy vs typical consensus energy model |
 | 3-round convergence (constant) | **Measured** | Distributed simulation |
 | Commutativity/associativity | **Verified** | Mathematical proofs |
+| 3M rows/s version diff | **Measured** | 100K rows, 5% change, DuckDB vectorized |
+| 100% Merkle skip (identical data) | **Measured** | 767us fast path via chunk hash comparison |
 
 ---
 

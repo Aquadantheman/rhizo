@@ -19,8 +19,8 @@ In 1980, Deleuze and Guattari contrasted the rhizome with the tree: hierarchies 
 
 [![CI](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml/badge.svg)](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-468%20tests-blue)](https://github.com/rhizodata/rhizo)
-[![Python](https://img.shields.io/badge/python-785%20tests-blue)](https://github.com/rhizodata/rhizo)
+[![Rust](https://img.shields.io/badge/rust-476%20tests-blue)](https://github.com/rhizodata/rhizo)
+[![Python](https://img.shields.io/badge/python-837%20tests-blue)](https://github.com/rhizodata/rhizo)
 
 ---
 
@@ -89,6 +89,7 @@ With the new **DataFusion-powered OLAP engine**, Rhizo delivers industry-leading
 | **Arrow Chunk Cache** | **Yes** (15x speedup) | No | No | No |
 | **Algebraic Merge** | **Yes** (11M+ ops/sec) | No | No | No |
 | **Export (Parquet/CSV/JSON)** | **Yes** (53M rows/s) | No | Yes | No |
+| **Version & Branch Diff** | **Yes** (3M rows/s) | No | No | No |
 
 ### Core Operations
 
@@ -101,6 +102,7 @@ With the new **DataFusion-powered OLAP engine**, Rhizo delivers industry-leading
 | Time travel query | **0.5ms** | O(1) version lookup |
 | Cache hit rate | **97.2%** | LRU eviction, no invalidation |
 | Parquet export | **53M rows/s** | 2.5x faster than DuckDB COPY TO |
+| Version diff (100K rows) | **35ms** | 3M rows/s with Merkle skip |
 
 ### Incremental Deduplication (Merkle Tree Storage)
 
@@ -121,6 +123,7 @@ With the new **DataFusion-powered OLAP engine**, Rhizo delivers industry-leading
 | **Global deduplication** | **Yes** | No | No | No |
 | **Merkle tree dedup** | **Yes** | No | No | No |
 | **Corruption detection** | **Built-in** | External | External | External |
+| **Version & Branch Diff** | **Yes** | No | No | No |
 | Time travel | Yes | Yes | Yes | Yes |
 | SQL Query Engine | Yes | Yes | Yes | Yes |
 | Cloud Storage | Planned | Yes | Yes | Yes |
@@ -221,8 +224,9 @@ result_v1 = db.sql(
 # Read specific version directly
 old_data = db.read("users", version=1)
 
-# Compare versions (via engine for advanced features)
-diff = db.engine.diff_versions("users", 1, 2, key_columns=["id"])
+# Compare versions
+diff = db.diff("users", version_a=1, version_b=2, key_columns=["id"])
+print(diff.summary())  # Schema, row, and Merkle stats
 ```
 
 ### Branching
@@ -297,8 +301,10 @@ with db.engine.transaction() as tx:
 | Phase 6: Changelog | Unified batch/stream via subscriptions | Complete |
 | Phase A: Merkle Storage | O(change) deduplication via Merkle trees | Complete |
 | **Phase P: Performance** | Native Rust Parquet, parallel I/O | **Complete** |
+| Phase DF: OLAP | DataFusion engine, 32x faster than DuckDB | Complete |
+| Phase CF: Coordination-Free | Algebraic transactions, 59x vs localhost 2PC | Complete |
 
-**All phases complete. 1,253 tests passing (468 Rust + 785 Python).**
+**All phases complete. 1,313 tests passing (476 Rust + 837 Python).**
 
 ### Performance Optimization Journey
 

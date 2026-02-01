@@ -5,6 +5,33 @@ All notable changes to Rhizo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.11] - 2026-01-31
+
+### Added
+
+#### Version & Branch Diff
+- **New `python/rhizo/diff.py`**: Three-level diff engine with Merkle acceleration
+  - **SchemaDiff**: Detects added/removed columns and type changes automatically
+  - **RowDiff**: Added, removed, and modified rows via DuckDB vectorized FULL OUTER JOIN
+  - **Modified row detail**: Arrow table with `__old_{col}` / `__new_{col}` pairs for each changed column
+  - **Merkle acceleration**: Compares chunk hashes to skip unchanged data — 100% skip on identical versions (<1ms)
+  - **Semantic diffs**: Algebraic-aware descriptions ("counter increased by 47", "new maximum: 100") when `PyTableAlgebraicSchema` provided
+  - **Stats-only mode**: Omit `key_columns` for sub-ms schema diff and row counts without row-level comparison
+- **`Database.diff()`**: High-level API with version and branch resolution
+  - `db.diff("users", version_a=1, version_b=5, key_columns=["id"])`
+  - `db.diff("users", branch_a="main", branch_b="feature", key_columns=["id"])`
+  - Default: latest vs previous version
+- **New `tests/test_diff.py`**: 50 tests across 9 classes — schema, rows, modified detail, Merkle optimization, semantic diffs, branches, edge cases, display, Database integration
+- **New `benchmarks/diff_benchmark.py`**: Row scaling, change %, Merkle skip ratio, column scaling, semantic overhead, end-to-end
+- **1,313 total tests** (476 Rust + 837 Python)
+
+#### Diff Benchmark Results
+- Row diff (100K rows, 5% change): **35ms** (3M rows/s)
+- Identical data detection: **767us** (100% Merkle skip)
+- Stats-only mode: **811us** (sub-millisecond)
+- Semantic diff overhead: **+1.9%** (negligible)
+- Column scaling: 5 cols = 25ms, 20 cols = 66ms, 50 cols = 164ms
+
 ## [0.5.10] - 2026-01-31
 
 ### Added

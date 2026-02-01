@@ -59,6 +59,64 @@ writer = TableWriter(store, catalog, chunk_size_rows=100_000)
 writer.write("big_table", million_row_df)  # Encoded in parallel
 ```
 
+## Version & Branch Diff
+**Throughput: 3M rows/s** (100K rows, 5% change)
+
+Compare any two versions or branches of a table with Merkle-accelerated diffing.
+
+### Usage
+
+```python
+# Version diff (full row-level)
+diff = db.diff("users", version_a=1, version_b=5, key_columns=["id"])
+print(diff.summary())
+
+# Branch diff
+diff = db.diff("users", branch_a="main", branch_b="feature", key_columns=["id"])
+
+# Access results
+diff.rows.added        # Arrow Table of new rows
+diff.rows.removed      # Arrow Table of deleted rows
+diff.rows.modified     # Arrow Table with __old_/__ new_ columns
+diff.schema            # SchemaDiff (added/removed/type changes)
+
+# Stats-only (no key_columns, sub-millisecond)
+diff = db.diff("users")
+
+# Semantic diffs with algebraic schema
+schema = PyTableAlgebraicSchema("counters")
+schema.add_column("views", PyOpType("add"))
+diff = db.diff("counters", version_a=1, version_b=5,
+               key_columns=["page_id"], schema=schema)
+# Shows "incremented by 47" instead of "changed from 100 to 147"
+```
+
+### Performance
+
+| Scenario | Time | Notes |
+|----------|------|-------|
+| 100K rows, 5% change | **35ms** | 3M rows/s |
+| Identical data (Merkle fast path) | **767us** | 100% chunk skip |
+| Stats-only (no key) | **811us** | Sub-millisecond |
+| Semantic diff overhead | **+1.9%** | Negligible |
+
+### How Merkle Acceleration Works
+
+Before loading any row data, the diff engine compares the chunk hash sets from both versions:
+
+```
+chunks_a = {hash1, hash2, hash3, hash4, hash5}
+chunks_b = {hash1, hash2, hash3, hash6, hash7}
+
+unchanged = chunks_a & chunks_b  = {hash1, hash2, hash3}  # skipped
+only_a    = chunks_a - chunks_b  = {hash4, hash5}         # scanned
+only_b    = chunks_b - chunks_a  = {hash6, hash7}         # scanned
+```
+
+When data is identical (`chunks_a == chunks_b`), the diff completes in under 1ms with zero row comparison. For small changes to large tables, most chunks are skipped.
+
+---
+
 ## Benchmark Results
 
 ### Write Performance (1M rows, 10 chunks)

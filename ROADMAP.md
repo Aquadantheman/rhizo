@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**1,263 tests passing (476 Rust + 787 Python)**
+**1,313 tests passing (476 Rust + 837 Python)**
 
 Rhizo is feature-complete for single-node deployments with full ACID transactions, time travel, branching, and OLAP queries.
 
@@ -62,6 +62,15 @@ Rhizo is feature-complete for single-node deployments with full ACID transaction
 - **Crash-safe**: Orphaned chunks cleaned on next GC run
 - **~13ms per version deletion**, <5ms protection collection for 50 branches
 
+### Version & Branch Diff
+- **Schema diff**: Added/removed columns, type changes detected automatically
+- **Row-level diff**: Added, removed, modified rows via DuckDB vectorized comparison
+- **Modified row detail**: `__old_{col}` / `__new_{col}` pairs for each changed column
+- **Merkle acceleration**: Skip unchanged chunks — 100% skip on identical data (767us fast path)
+- **Semantic diffs**: Algebraic-aware descriptions ("counter increased by 47", "new maximum: 100")
+- **Branch diff**: `db.diff("t", branch_a="main", branch_b="feature", key_columns=["id"])`
+- **3M rows/s** at 100K rows, sub-ms stats-only mode, <2% semantic overhead
+
 ### Changelog & Streaming
 - **get_changes()**: Query changes since a checkpoint
 - **subscribe()**: Continuous change notifications
@@ -99,6 +108,8 @@ Rhizo is feature-complete for single-node deployments with full ACID transaction
 | Branch creation | <10ms | 450,000x smaller than Delta Lake |
 | Write throughput | 2,277 MB/s | Competitive with DuckDB |
 | Storage deduplication | 84% | Best in class |
+| Version diff (100K rows) | 35ms | 3M rows/s with Merkle skip |
+| Identical version detect | 0.8ms | 100% chunk skip via Merkle |
 
 ---
 
@@ -119,8 +130,8 @@ cd rhizo_python && maturin develop --release && cd ..
 pip install -e python/
 
 # Run tests
-cargo test --all      # 449 Rust tests
-pytest tests/ -v      # 471 Python tests
+cargo test --all      # 476 Rust tests
+pytest tests/ -v      # 837 Python tests
 ```
 
 ---

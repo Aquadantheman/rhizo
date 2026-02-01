@@ -34,6 +34,7 @@ from .export import ExportEngine, ExportResult
 from .transaction import TransactionContext
 from .subscriber import Subscriber, ChangeEvent
 from .cache import CacheManager, CacheKey, CacheStats
+from .diff import DiffEngine, DiffResult, SchemaDiff, RowDiff
 from .gc import GCPolicy, GCResult, GarbageCollector, AutoGC
 from .olap_engine import OLAPEngine, is_datafusion_available
 from .metrics import (
@@ -180,6 +181,11 @@ __all__ = [
     "MetricsCollector",
     "InstrumentedWriter",
     "run_validation_benchmark",
+    # Diff
+    "DiffEngine",
+    "DiffResult",
+    "SchemaDiff",
+    "RowDiff",
     # Garbage Collection
     "GCPolicy",
     "GCResult",
