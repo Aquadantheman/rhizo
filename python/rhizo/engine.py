@@ -667,6 +667,104 @@ class QueryEngine:
         return self.reader.list_versions(validated_name)
 
     # =========================================================================
+    # Export Operations
+    # =========================================================================
+
+    def export_table(
+        self,
+        table_name: str,
+        path: str,
+        *,
+        version: Optional[int] = None,
+        columns: Optional[List[str]] = None,
+        format: Optional[str] = None,
+        compression: Optional[str] = None,
+        branch: Optional[str] = None,
+    ) -> "ExportResult":
+        """
+        Export a table version to Parquet, CSV, or JSON.
+
+        Format is auto-detected from the file extension unless ``format``
+        is specified explicitly.
+
+        Args:
+            table_name: Name of the table to export.
+            path: Output file path (.parquet, .csv, .json, etc.).
+            version: Table version to export (None for latest or branch head).
+            columns: Columns to include (None for all).
+            format: Explicit format override ('parquet', 'csv', 'json').
+            compression: Parquet compression codec (default: 'zstd').
+            branch: Branch to export from (None for current branch).
+
+        Returns:
+            ExportResult with path, row_count, file_size_bytes, etc.
+
+        Raises:
+            IOError: If table or version doesn't exist.
+            ValueError: If format is unsupported or columns are invalid.
+
+        Example:
+            >>> result = engine.export_table("users", "users.parquet")
+            >>> result = engine.export_table("users", "v3.csv", version=3)
+        """
+        from .export import ExportEngine
+
+        # Resolve version from branch if needed
+        if version is None and self.branch_manager is not None:
+            effective_branch = branch or self._current_branch
+            branch_version = self.branch_manager.get_table_version(
+                effective_branch, table_name
+            )
+            if branch_version is not None:
+                version = branch_version
+
+        export_engine = ExportEngine(self.reader, self.store, self.catalog)
+        return export_engine.export_table(
+            table_name, path,
+            version=version, columns=columns,
+            format=format, compression=compression,
+        )
+
+    def export_query(
+        self,
+        sql: str,
+        path: str,
+        *,
+        format: Optional[str] = None,
+        compression: Optional[str] = None,
+        versions: Optional[Dict[str, int]] = None,
+        branch: Optional[str] = None,
+    ) -> "ExportResult":
+        """
+        Execute a SQL query and export the results to a file.
+
+        Args:
+            sql: SQL query string.
+            path: Output file path (.parquet, .csv, .json, etc.).
+            format: Explicit format override ('parquet', 'csv', 'json').
+            compression: Parquet compression codec (default: 'zstd').
+            versions: Dict mapping table names to specific versions.
+            branch: Branch to query from (None for current).
+
+        Returns:
+            ExportResult with path, row_count, file_size_bytes, etc.
+
+        Example:
+            >>> engine.export_query(
+            ...     "SELECT * FROM users WHERE age > 21",
+            ...     "adults.parquet"
+            ... )
+        """
+        from .export import ExportEngine
+
+        result = self.query(sql, versions=versions, branch=branch)
+        export_engine = ExportEngine(self.reader, self.store, self.catalog)
+        return export_engine.export_arrow(
+            result.to_arrow(), path,
+            format=format, compression=compression,
+        )
+
+    # =========================================================================
     # Transaction Operations
     # =========================================================================
 

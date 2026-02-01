@@ -5,6 +5,31 @@ All notable changes to Rhizo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.9] - 2026-01-31
+
+### Added
+
+#### Export to Parquet / CSV / JSON
+- **New `python/rhizo/export.py`**: ExportEngine with streaming Parquet, CSV, and JSON export
+  - Streaming Parquet export via `pq.ParquetWriter` + `iter_chunks()` — one chunk in memory at a time
+  - Single-chunk fast path: raw byte copy for single-chunk tables (zero deserialize, 53M rows/s)
+  - Atomic writes: temp file + `os.replace()` for crash safety
+  - Format auto-detection from file extension (`.parquet`, `.csv`, `.json`, `.jsonl`, `.ndjson`)
+  - Column projection support for smaller exports
+  - Version-specific export (time travel)
+- **`Database.export()`**: High-level export API (`db.export("users", "users.parquet")`)
+- **`QueryEngine.export_table()`** and **`export_query()`**: Engine-level export with branch awareness
+- **Standalone `rhizo.export()`**: One-liner convenience function
+- **New `tests/test_export.py`**: 43 tests covering all formats, projections, versions, edge cases
+- **New `benchmarks/export_benchmark.py`**: Export performance vs DuckDB COPY TO
+- **1,253 total tests** (468 Rust + 785 Python)
+
+#### Export Benchmark Results (1M rows)
+- Parquet: **53M rows/s** (2.5x faster than DuckDB COPY TO)
+- CSV: 5.4M rows/s (DuckDB 1.7x faster — expected, optimized CSV writer)
+- Single-chunk fast path: **8x faster** than multi-chunk streaming
+- Column projection: 58% file size reduction
+
 ## [0.5.8] - 2026-01-31
 
 ### Added

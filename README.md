@@ -20,7 +20,7 @@ In 1980, Deleuze and Guattari contrasted the rhizome with the tree: hierarchies 
 [![CI](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml/badge.svg)](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-468%20tests-blue)](https://github.com/rhizodata/rhizo)
-[![Python](https://img.shields.io/badge/python-742%20tests-blue)](https://github.com/rhizodata/rhizo)
+[![Python](https://img.shields.io/badge/python-785%20tests-blue)](https://github.com/rhizodata/rhizo)
 
 ---
 
@@ -88,6 +88,7 @@ With the new **DataFusion-powered OLAP engine**, Rhizo delivers industry-leading
 | **Merkle Integrity** | **Yes** | No | No | No |
 | **Arrow Chunk Cache** | **Yes** (15x speedup) | No | No | No |
 | **Algebraic Merge** | **Yes** (11M+ ops/sec) | No | No | No |
+| **Export (Parquet/CSV/JSON)** | **Yes** (53M rows/s) | No | Yes | No |
 
 ### Core Operations
 
@@ -99,6 +100,7 @@ With the new **DataFusion-powered OLAP engine**, Rhizo delivers industry-leading
 | Branch creation | <10 ms | Zero-copy, 280 bytes overhead |
 | Time travel query | **0.5ms** | O(1) version lookup |
 | Cache hit rate | **97.2%** | LRU eviction, no invalidation |
+| Parquet export | **53M rows/s** | 2.5x faster than DuckDB COPY TO |
 
 ### Incremental Deduplication (Merkle Tree Storage)
 
@@ -190,6 +192,23 @@ Or via Python module:
 python -m rhizo info ./mydata
 ```
 
+### Export
+
+```python
+# Export to Parquet (2.5x faster than DuckDB COPY TO)
+db.export("users", "users.parquet")
+
+# Export to CSV or JSON
+db.export("users", "users.csv", version=3)
+db.export("users", "users.json")
+
+# Column projection (58% smaller files)
+db.export("users", "subset.parquet", columns=["id", "name"])
+
+# Standalone one-liner
+rhizo.export("./mydata", "users", "users.parquet")
+```
+
 ### Time Travel
 
 ```python
@@ -279,7 +298,7 @@ with db.engine.transaction() as tx:
 | Phase A: Merkle Storage | O(change) deduplication via Merkle trees | Complete |
 | **Phase P: Performance** | Native Rust Parquet, parallel I/O | **Complete** |
 
-**All phases complete. 1,210 tests passing (468 Rust + 742 Python).**
+**All phases complete. 1,253 tests passing (468 Rust + 785 Python).**
 
 ### Performance Optimization Journey
 

@@ -43,7 +43,7 @@ pytest tests/ -v
 # Rust tests (468 tests)
 cargo test --all
 
-# Python tests (485 tests)
+# Python tests (785 tests)
 pytest tests/ -v
 
 # Run a specific test file

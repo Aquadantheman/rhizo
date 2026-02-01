@@ -20,6 +20,8 @@ import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union, Dict, List, Any
 
+from .export import ExportEngine, ExportResult
+
 import pyarrow as pa
 
 from .engine import QueryEngine, QueryResult
@@ -370,6 +372,56 @@ class Database:
         """
         self._check_closed()
         return self._engine.get_table_info(table_name, version)
+
+    def export(
+        self,
+        table_name: str,
+        path: str,
+        *,
+        version: Optional[int] = None,
+        columns: Optional[List[str]] = None,
+        format: Optional[str] = None,
+        compression: Optional[str] = None,
+    ) -> ExportResult:
+        """
+        Export a table to Parquet, CSV, or JSON.
+
+        The format is auto-detected from the file extension unless
+        explicitly specified with the ``format`` parameter.
+
+        Args:
+            table_name: Name of the table to export.
+            path: Output file path. Recognized extensions:
+                  .parquet, .pq, .csv, .json, .jsonl, .ndjson
+            version: Specific version to export (None for latest).
+            columns: Export only these columns (None for all).
+            format: Explicit format override ('parquet', 'csv', 'json').
+            compression: Parquet compression codec (default: 'zstd').
+                        Ignored for CSV and JSON.
+
+        Returns:
+            ExportResult with path, row_count, file_size_bytes, etc.
+
+        Raises:
+            IOError: If table or version doesn't exist.
+            ValueError: If format is unsupported or columns are invalid.
+            RuntimeError: If the database has been closed.
+
+        Example:
+            >>> db.export("users", "users.parquet")
+            >>> db.export("users", "backup.csv", version=3)
+            >>> db.export("users", "subset.parquet", columns=["id", "name"])
+        """
+        self._check_closed()
+        if not hasattr(self, "_export_engine") or self._export_engine is None:
+            self._export_engine = ExportEngine(
+                self._engine.reader, self._store, self._catalog
+            )
+        return self._export_engine.export_table(
+            table_name, path,
+            version=version, columns=columns,
+            format=format, compression=compression,
+        )
 
     def close(self) -> None:
         """

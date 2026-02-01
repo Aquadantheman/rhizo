@@ -16,6 +16,7 @@ Performance benchmarks comparing Rhizo against industry alternatives.
 | `merkle_benchmark.py` | Merkle tree deduplication | Full file storage |
 | `parallel_encoding_benchmark.py` | Parallel Parquet encoding | Sequential encoding |
 | `row_group_pruning_benchmark.py` | Row group statistics pruning | Full table scan |
+| `export_benchmark.py` | Export to Parquet/CSV/JSON | DuckDB COPY TO |
 
 ## Running Benchmarks
 
@@ -44,6 +45,7 @@ See [CLOUD_BENCHMARK.md](CLOUD_BENCHMARK.md) for geo-distributed benchmark setup
 | SQLite FULL sync | 0.001ms | 0.386ms | **355x** | fsync per commit |
 | OLAP read (100K) | 0.9ms | 26ms (DuckDB) | **32x** | DataFusion vs DuckDB |
 | OLAP read (1M) | 3.7ms | 283ms (DuckDB) | **76x** | DataFusion vs DuckDB |
+| Parquet export (1M) | 0.019s | 0.048s (DuckDB COPY) | **2.5x** | Streaming + fast path |
 
 Raw result files: `CLOUD_MULTI_REGION_RESULTS.json`, `CLOUD_SAME_REGION_RESULTS.json`, `REAL_CONSENSUS_BENCHMARK_RESULTS.json`
 

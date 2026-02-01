@@ -10,6 +10,8 @@ This module provides:
 - TransactionContext: ACID transactions across multiple tables
 - Subscriber: Stream changelog events with polling or callbacks
 - ChangeEvent: Individual table change within a transaction
+- ExportEngine: Export tables to Parquet, CSV, or JSON
+- ExportResult: Metadata from an export operation
 - Filter: Predicate filter builder for pushdown optimization
 
 Low-level types (from _rhizo):
@@ -28,6 +30,7 @@ from .writer import TableWriter
 from .database import Database, open
 from .reader import TableReader, Filter
 from .engine import QueryEngine
+from .export import ExportEngine, ExportResult
 from .transaction import TransactionContext
 from .subscriber import Subscriber, ChangeEvent
 from .cache import CacheManager, CacheKey, CacheStats
@@ -106,6 +109,46 @@ try:
 except ImportError:
     pass
 
+def export(
+    db_path: str,
+    table_name: str,
+    output_path: str,
+    *,
+    version=None,
+    columns=None,
+    format=None,
+    compression=None,
+) -> ExportResult:
+    """
+    Export a table from a Rhizo database to a file.
+
+    Convenience function that opens the database, exports, and closes.
+    For repeated exports, prefer using ``rhizo.open()`` and ``db.export()``.
+
+    Args:
+        db_path: Path to the Rhizo database directory.
+        table_name: Name of the table to export.
+        output_path: Output file path (.parquet, .csv, .json, etc.).
+        version: Table version to export (None for latest).
+        columns: Columns to include (None for all).
+        format: Explicit format override ('parquet', 'csv', 'json').
+        compression: Parquet compression codec (default: 'zstd').
+
+    Returns:
+        ExportResult with path, row_count, file_size_bytes, etc.
+
+    Example:
+        >>> rhizo.export("./mydata", "users", "users.parquet")
+        >>> rhizo.export("./mydata", "users", "backup.csv", version=3)
+    """
+    with open(db_path) as db:
+        return db.export(
+            table_name, output_path,
+            version=version, columns=columns,
+            format=format, compression=compression,
+        )
+
+
 try:
     from ._version import version as __version__
 except ImportError:
@@ -113,10 +156,13 @@ except ImportError:
 __all__ = [
     # High-level API
     "open",
+    "export",
     "Database",
     "TableWriter",
     "TableReader",
     "QueryEngine",
+    "ExportEngine",
+    "ExportResult",
     "OLAPEngine",
     "CacheManager",
     "CacheKey",

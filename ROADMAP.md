@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**1,210 tests passing (468 Rust + 742 Python)**
+**1,253 tests passing (468 Rust + 785 Python)**
 
 Rhizo is feature-complete for single-node deployments with full ACID transactions, time travel, branching, and OLAP queries.
 
@@ -45,6 +45,13 @@ Rhizo is feature-complete for single-node deployments with full ACID transaction
 - **OLAPEngine**: DataFusion-based, 32x faster reads than DuckDB
 - **Extended SQL**: `VERSION` keyword, `@branch` notation, `__changelog` table
 - **Arrow cache**: 15x speedup on repeated reads, 97.2%+ hit rate
+
+### Export
+- **Parquet, CSV, JSON**: `db.export("users", "users.parquet")` — format auto-detected from extension
+- **Streaming Parquet**: One chunk in memory at a time via `pq.ParquetWriter`
+- **Single-chunk fast path**: Raw byte copy (53M rows/s, 2.5x faster than DuckDB COPY TO)
+- **Column projection**: Export subset of columns for smaller files
+- **Atomic writes**: Temp file + rename for crash safety
 
 ### Changelog & Streaming
 - **get_changes()**: Query changes since a checkpoint

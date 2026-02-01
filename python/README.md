@@ -20,7 +20,7 @@ In 1980, Deleuze and Guattari contrasted the rhizome with the tree: hierarchies 
 [![CI](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml/badge.svg)](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-468%20tests-blue)](https://github.com/rhizodata/rhizo)
-[![Python](https://img.shields.io/badge/python-742%20tests-blue)](https://github.com/rhizodata/rhizo)
+[![Python](https://img.shields.io/badge/python-785%20tests-blue)](https://github.com/rhizodata/rhizo)
 
 ---
 
@@ -168,6 +168,15 @@ with rhizo.open("./mydata") as db:
     result = db.sql("SELECT * FROM users")
 ```
 
+### Export
+
+```python
+# Export to Parquet, CSV, or JSON
+db.export("users", "users.parquet")
+db.export("users", "users.csv", version=3)
+db.export("users", "subset.parquet", columns=["id", "name"])
+```
+
 ### Time Travel
 
 ```python
@@ -254,7 +263,7 @@ Application Layer
 | Phase A: Merkle Storage | O(change) deduplication via Merkle trees | Complete |
 | **Phase P: Performance** | Native Rust Parquet, parallel I/O | **Complete** |
 
-**All phases complete. 1,210 tests passing (468 Rust + 742 Python).**
+**All phases complete. 1,253 tests passing (468 Rust + 785 Python).**
 
 ### Performance Optimization Journey
 
