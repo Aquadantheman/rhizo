@@ -184,11 +184,13 @@ class DiffEngine:
         store: "PyChunkStore",
         reader: "TableReader",
         branch_manager: Optional["PyBranchManager"] = None,
+        table_meta_store=None,
     ):
         self.catalog = catalog
         self.store = store
         self.reader = reader
         self.branch_manager = branch_manager
+        self._table_meta_store = table_meta_store
 
     def diff(
         self,
@@ -210,6 +212,15 @@ class DiffEngine:
         Returns:
             DiffResult with schema, row, and column diffs.
         """
+        # Auto-resolve key_columns from primary key metadata
+        if key_columns is None and self._table_meta_store is not None:
+            try:
+                meta = self._table_meta_store.load(table_name)
+                if meta.primary_key:
+                    key_columns = meta.primary_key
+            except Exception:
+                pass
+
         t0 = time.monotonic()
         result = DiffResult(
             table_name=table_name,

@@ -147,6 +147,10 @@ class Database:
                 auto_recover=True,
             )
 
+        # Table metadata store (schema evolution + primary keys)
+        from rhizo.table_meta import TableMetaStore
+        self._table_meta_store = TableMetaStore(str(catalog_dir))
+
         # Create the DuckDB query engine (fallback/compatibility)
         self._engine = QueryEngine(
             store=self._store,
@@ -154,6 +158,7 @@ class Database:
             branch_manager=self._branch_manager,
             transaction_manager=self._transaction_manager,
             verify_integrity=verify_integrity,
+            catalog_path=str(catalog_dir),
         )
 
         # Create the DataFusion OLAP engine (primary, if available)
@@ -283,6 +288,9 @@ class Database:
         table_name: str,
         data: Union["pd.DataFrame", pa.Table],
         metadata: Optional[Dict[str, str]] = None,
+        *,
+        primary_key: Optional[List[str]] = None,
+        schema_mode: Optional[str] = None,
     ) -> WriteResult:
         """
         Write data as a new version of a table.
@@ -291,6 +299,10 @@ class Database:
             table_name: Name of the table (must be a valid SQL identifier)
             data: pandas DataFrame or PyArrow Table to write
             metadata: Optional key-value metadata for this version
+            primary_key: Columns that form the primary key (set once, immutable).
+                        Enforces uniqueness at write time.
+            schema_mode: Schema evolution mode override for this write.
+                        "additive" (default) or "flexible".
 
         Returns:
             WriteResult with version info and statistics
@@ -298,11 +310,14 @@ class Database:
         Example:
             >>> import pandas as pd
             >>> df = pd.DataFrame({"id": [1, 2], "name": ["Alice", "Bob"]})
-            >>> result = db.write("users", df)
+            >>> result = db.write("users", df, primary_key=["id"])
             >>> print(f"Wrote version {result.version}")
         """
         self._check_closed()
-        return self._engine.write_table(table_name, data, metadata=metadata)
+        return self._engine.write_table(
+            table_name, data, metadata=metadata,
+            primary_key=primary_key, schema_mode=schema_mode,
+        )
 
     def read(
         self,
@@ -460,12 +475,137 @@ class Database:
             self._diff_engine = DiffEngine(
                 self._catalog, self._store, self._engine.reader,
                 self._branch_manager,
+                table_meta_store=self._table_meta_store,
             )
 
         return self._diff_engine.diff(
             table_name, version_a, version_b,
             key_columns=key_columns, schema=schema,
         )
+
+    # =========================================================================
+    # Schema & Primary Key API
+    # =========================================================================
+
+    def schema(
+        self,
+        table_name: str,
+        version: Optional[int] = None,
+    ) -> pa.Schema:
+        """
+        Get the Arrow schema for a table.
+
+        Args:
+            table_name: Name of the table.
+            version: Specific version (None for latest).
+
+        Returns:
+            PyArrow Schema.
+
+        Raises:
+            TableNotFoundError: If the table does not exist.
+        """
+        self._check_closed()
+        from rhizo.schema_utils import SCHEMA_METADATA_KEY, deserialize_schema
+        tv = self._catalog.get_version(table_name, version)
+        schema_json = tv.metadata.get(SCHEMA_METADATA_KEY)
+        if schema_json:
+            return deserialize_schema(schema_json)
+        # Fallback: read data to get schema
+        table = self.read(table_name, version=tv.version)
+        return table.schema
+
+    def schema_history(self, table_name: str) -> List[Dict]:
+        """
+        Get the schema for each version with change tracking.
+
+        Returns:
+            List of dicts with 'version', 'schema' (field dict), and 'changes'.
+        """
+        self._check_closed()
+        from rhizo.schema_utils import (
+            SCHEMA_METADATA_KEY,
+            deserialize_schema,
+            compare_schemas,
+        )
+
+        versions = self._catalog.list_versions(table_name)
+        history = []
+        prev_schema = None
+
+        for v in sorted(versions):
+            tv = self._catalog.get_version(table_name, v)
+            schema_json = tv.metadata.get(SCHEMA_METADATA_KEY)
+            if schema_json:
+                schema = deserialize_schema(schema_json)
+            else:
+                schema = None
+
+            entry = {
+                "version": v,
+                "schema": (
+                    {f.name: str(f.type) for f in schema}
+                    if schema else None
+                ),
+                "changes": None,
+            }
+
+            if prev_schema is not None and schema is not None:
+                cmp = compare_schemas(prev_schema, schema, "flexible")
+                entry["changes"] = {
+                    "added": cmp.added_columns,
+                    "removed": cmp.removed_columns,
+                    "type_changes": cmp.type_changes,
+                }
+            prev_schema = schema
+            history.append(entry)
+
+        return history
+
+    def primary_key(self, table_name: str) -> Optional[List[str]]:
+        """Get the primary key columns for a table, or None if not set."""
+        self._check_closed()
+        meta = self._table_meta_store.load(table_name)
+        return meta.primary_key
+
+    def set_primary_key(self, table_name: str, columns: List[str]) -> None:
+        """Set the primary key for a table. Immutable once set.
+
+        Args:
+            table_name: Name of the table.
+            columns: List of column names forming the primary key.
+
+        Raises:
+            ValueError: If primary key is already set to different columns.
+        """
+        self._check_closed()
+        meta = self._table_meta_store.load(table_name)
+        if meta.primary_key is not None and meta.primary_key != columns:
+            raise ValueError(
+                f"Primary key already set to {meta.primary_key} for '{table_name}'. "
+                f"Primary keys are immutable once set."
+            )
+        meta.primary_key = columns
+        self._table_meta_store.save(table_name, meta)
+
+    def set_schema_mode(self, table_name: str, mode: str) -> None:
+        """Set the schema evolution mode for a table.
+
+        Args:
+            table_name: Name of the table.
+            mode: "additive" (new columns only) or "flexible" (any change).
+
+        Raises:
+            ValueError: If mode is invalid.
+        """
+        self._check_closed()
+        if mode not in ("additive", "flexible"):
+            raise ValueError(
+                f"Invalid schema_mode '{mode}': must be 'additive' or 'flexible'"
+            )
+        meta = self._table_meta_store.load(table_name)
+        meta.schema_mode = mode
+        self._table_meta_store.save(table_name, meta)
 
     def gc(
         self,

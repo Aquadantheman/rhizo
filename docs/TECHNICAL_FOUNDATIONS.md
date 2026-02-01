@@ -17,6 +17,8 @@ Mathematical verification of Rhizo's core claims. All formulas have been verifie
 | Cross-table commit | O(t) | O(t) | t = tables in transaction |
 | Version diff (schema) | O(c) | O(c) | c = columns, Merkle fast-path for identical data |
 | Version diff (rows) | O(n) | O(n) | n = rows in changed chunks; unchanged chunks skipped via Merkle |
+| Schema check | O(c) | O(c) | c = columns, compare serialized schemas |
+| PK uniqueness check | O(n) | O(n) | n = rows, DuckDB GROUP BY |
 
 Operations are constant with respect to total stored data. A 1PB system performs identically to a 1GB system for individual operations.
 
@@ -364,6 +366,11 @@ When $V_a \| V_b$ (concurrent), algebraic merge resolves automatically.
 | Commutativity/associativity | **Verified** | Mathematical proofs |
 | 3M rows/s version diff | **Measured** | 100K rows, 5% change, DuckDB vectorized |
 | 100% Merkle skip (identical data) | **Measured** | 767us fast path via chunk hash comparison |
+| Schema evolution enforcement | **Tested** | 65 tests, additive/flexible modes |
+| PK uniqueness 10K rows in 21ms | **Measured** | DuckDB GROUP BY/HAVING |
+| PK uniqueness 100K rows in 42ms | **Measured** | DuckDB GROUP BY/HAVING |
+| Schema roundtrip 0.08ms | **Measured** | 50-column Arrow schema serialize/deserialize |
+| Diff auto-PK 1.04x overhead | **Measured** | Auto-resolve from table metadata |
 
 ---
 

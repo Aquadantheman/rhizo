@@ -966,6 +966,25 @@ impl PyCatalog {
         self.inner.commit_next_version(table_name, chunk_hashes).map_err(catalog_err_to_py)
     }
 
+    /// Commit next version with metadata and optional schema hash.
+    #[pyo3(signature = (table_name, chunk_hashes, metadata=None, schema_hash=None))]
+    fn commit_next_with_meta(
+        &self,
+        table_name: &str,
+        chunk_hashes: Vec<String>,
+        metadata: Option<std::collections::HashMap<String, String>>,
+        schema_hash: Option<String>,
+    ) -> PyResult<u64> {
+        self.inner
+            .commit_next_version_with_meta(
+                table_name,
+                chunk_hashes,
+                metadata.unwrap_or_default(),
+                schema_hash,
+            )
+            .map_err(catalog_err_to_py)
+    }
+
     #[pyo3(signature = (table_name, version=None))]
     fn get_version(&self, table_name: &str, version: Option<u64>) -> PyResult<PyTableVersion> {
         self.inner

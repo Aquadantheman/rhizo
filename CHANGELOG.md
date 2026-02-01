@@ -5,6 +5,37 @@ All notable changes to Rhizo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-01-31
+
+### Added
+
+#### Schema Evolution & Primary Keys
+- **Schema evolution enforcement**: Additive-only by default — new columns OK, removals/type changes blocked
+  - `db.write("users", df, schema_mode="flexible")` to allow breaking changes
+  - `db.set_schema_mode("users", "flexible")` for table-level default
+  - Schema stored in version metadata as serialized Arrow schema JSON
+- **Primary key constraints**: Uniqueness enforced at write time via DuckDB GROUP BY
+  - `db.write("users", df, primary_key=["id"])` — set once, immutable
+  - `db.set_primary_key("users", ["id"])` — set before first write
+  - Composite keys: `primary_key=["region", "id"]`
+  - NULL-safe: NULLs treated as distinct (two NULLs don't conflict)
+- **Schema API**: `db.schema("users")`, `db.schema("users", version=3)`, `db.schema_history("users")`
+- **Diff auto-resolve**: `db.diff("users")` automatically uses primary key when `key_columns` not specified
+- **New `python/rhizo/table_meta.py`**: Per-table `_table_meta.json` for PK and schema mode persistence
+- **New `python/rhizo/schema_utils.py`**: Arrow schema serialize/deserialize/compare utilities
+- **New exceptions**: `SchemaEvolutionError`, `PrimaryKeyViolationError`
+- **Rust**: `commit_next_version_with_meta()` for attaching metadata to auto-versioned commits
+- **New `tests/test_schema_pk.py`**: 65 tests across 7 classes
+- **New `benchmarks/schema_pk_benchmark.py`**: Schema, PK, and diff overhead benchmarks
+- **1,426 total tests** (476 Rust + 950 Python)
+
+#### Schema/PK Benchmark Results
+- Schema roundtrip (50 cols): **0.08ms**
+- Schema comparison (50 cols): **0.065ms**
+- PK check 10K rows: **21ms**
+- PK check 100K rows: **42ms**
+- Diff auto-PK overhead: **1.04x** (negligible)
+
 ## [0.5.11] - 2026-01-31
 
 ### Added

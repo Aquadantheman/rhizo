@@ -125,6 +125,7 @@ class QueryEngine:
         transaction_manager: Optional["_rhizo.PyTransactionManager"] = None,
         enable_olap: bool = True,
         olap_cache_size: int = 1_000_000_000,
+        catalog_path: Optional[str] = None,
     ):
         """
         Initialize the QueryEngine.
@@ -147,7 +148,7 @@ class QueryEngine:
         self.store = store
         self.catalog = catalog
         self.reader = TableReader(store, catalog, verify_integrity)
-        self.writer = TableWriter(store, catalog)
+        self.writer = TableWriter(store, catalog, catalog_path=catalog_path)
         self.branch_manager = branch_manager
         self.transaction_manager = transaction_manager
 
@@ -619,6 +620,9 @@ class QueryEngine:
         data: Union["pd.DataFrame", pa.Table],
         metadata: Optional[Dict[str, str]] = None,
         branch: Optional[str] = None,
+        *,
+        primary_key: Optional[List[str]] = None,
+        schema_mode: Optional[str] = None,
     ) -> WriteResult:
         """
         Write data as a new version of a table.
@@ -632,6 +636,8 @@ class QueryEngine:
             metadata: Optional metadata for this version
             branch: Branch to update. If None, uses current_branch.
                    Only used if branch_manager is configured.
+            primary_key: Columns that form the primary key (set once, immutable).
+            schema_mode: Schema evolution mode override ("additive" or "flexible").
 
         Returns:
             WriteResult with version info
@@ -641,7 +647,10 @@ class QueryEngine:
         """
         # Validate table name to prevent path traversal
         validated_name = validate_table_name(table_name)
-        result = self.writer.write(validated_name, data, metadata)
+        result = self.writer.write(
+            validated_name, data, metadata,
+            primary_key=primary_key, schema_mode=schema_mode,
+        )
 
         # Update branch head if branch_manager is configured
         if self.branch_manager is not None:

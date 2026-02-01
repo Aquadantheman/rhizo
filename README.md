@@ -20,7 +20,7 @@ In 1980, Deleuze and Guattari contrasted the rhizome with the tree: hierarchies 
 [![CI](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml/badge.svg)](https://github.com/rhizodata/rhizo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-476%20tests-blue)](https://github.com/rhizodata/rhizo)
-[![Python](https://img.shields.io/badge/python-837%20tests-blue)](https://github.com/rhizodata/rhizo)
+[![Python](https://img.shields.io/badge/python-950%20tests-blue)](https://github.com/rhizodata/rhizo)
 
 ---
 
@@ -89,6 +89,8 @@ With the new **DataFusion-powered OLAP engine**, Rhizo delivers industry-leading
 | **Arrow Chunk Cache** | **Yes** (15x speedup) | No | No | No |
 | **Algebraic Merge** | **Yes** (11M+ ops/sec) | No | No | No |
 | **Export (Parquet/CSV/JSON)** | **Yes** (53M rows/s) | No | Yes | No |
+| **Schema Evolution** | **Yes** (additive/flexible) | No | No | No |
+| **Primary Keys** | **Yes** (21ms @ 10K rows) | No | No | No |
 | **Version & Branch Diff** | **Yes** (3M rows/s) | No | No | No |
 
 ### Core Operations
@@ -155,7 +157,7 @@ df = pd.DataFrame({
     "name": ["Alice", "Bob", "Charlie"],
     "score": [85.5, 92.0, 78.5]
 })
-db.write("users", df)
+db.write("users", df, primary_key=["id"])
 
 # Query with SQL
 result = db.sql("SELECT * FROM users WHERE score > 80")
@@ -251,6 +253,25 @@ main_result = db.sql("SELECT * FROM scores")  # main branch
 engine.merge_branch("experiment/new-scoring", into="main")
 ```
 
+### Schema Evolution & Primary Keys
+
+```python
+# Write with primary key (enforces uniqueness)
+db.write("users", df, primary_key=["id"])
+
+# Add columns freely (additive mode, default)
+df_v2 = df.copy()
+df_v2["email"] = ["alice@co.com", "bob@co.com", "charlie@co.com"]
+db.write("users", df_v2)  # New column OK
+
+# Schema introspection
+schema = db.schema("users")              # Arrow schema
+history = db.schema_history("users")     # Changes per version
+
+# Diff auto-uses primary key
+diff = db.diff("users")                  # No key_columns needed
+```
+
 ### Cross-Table Transactions
 
 ```python
@@ -304,7 +325,7 @@ with db.engine.transaction() as tx:
 | Phase DF: OLAP | DataFusion engine, 32x faster than DuckDB | Complete |
 | Phase CF: Coordination-Free | Algebraic transactions, 59x vs localhost 2PC | Complete |
 
-**All phases complete. 1,313 tests passing (476 Rust + 837 Python).**
+**All phases complete. 1,426 tests passing (476 Rust + 950 Python).**
 
 ### Performance Optimization Journey
 

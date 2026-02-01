@@ -18,7 +18,18 @@ from typing import TYPE_CHECKING, Optional, Union, List, Dict, Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from rhizo.exceptions import validate_table_name
+from rhizo.exceptions import (
+    validate_table_name,
+    SchemaEvolutionError,
+    PrimaryKeyViolationError,
+)
+from rhizo.table_meta import TableMeta, TableMetaStore
+from rhizo.schema_utils import (
+    SCHEMA_METADATA_KEY,
+    serialize_schema,
+    deserialize_schema,
+    compare_schemas,
+)
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -97,6 +108,7 @@ class TableWriter:
         use_native_parquet: bool = True,
         max_table_size_bytes: int = DEFAULT_MAX_TABLE_SIZE_BYTES,
         max_columns: int = DEFAULT_MAX_COLUMNS,
+        catalog_path: Optional[str] = None,
     ):
         """
         Initialize the TableWriter.
@@ -112,6 +124,8 @@ class TableWriter:
                                   Prevents OOM attacks from oversized inputs.
             max_columns: Maximum number of columns (default 1000).
                         Prevents schema explosion attacks.
+            catalog_path: Path to catalog directory for table metadata.
+                         Enables schema evolution and primary key enforcement.
         """
         self.store = store
         self.catalog = catalog
@@ -120,6 +134,7 @@ class TableWriter:
         self.use_native_parquet = use_native_parquet and _NATIVE_PARQUET_AVAILABLE
         self.max_table_size_bytes = max_table_size_bytes
         self.max_columns = max_columns
+        self._meta_store = TableMetaStore(catalog_path) if catalog_path else None
 
         # Initialize native encoder if available and requested
         self._native_encoder = None
@@ -131,6 +146,9 @@ class TableWriter:
         table_name: str,
         data: Union["pd.DataFrame", pa.Table],
         metadata: Optional[Dict[str, str]] = None,
+        *,
+        primary_key: Optional[List[str]] = None,
+        schema_mode: Optional[str] = None,
     ) -> WriteResult:
         """
         Write data as a new version of the specified table.
@@ -139,12 +157,18 @@ class TableWriter:
             table_name: Name of the table to write
             data: DataFrame or Arrow Table to write
             metadata: Optional key-value metadata for this version
+            primary_key: Columns that form the primary key (set once, immutable).
+                        Enforces uniqueness at write time.
+            schema_mode: Schema evolution mode override for this write.
+                        "additive" (default) or "flexible".
 
         Returns:
             WriteResult with version info and statistics
 
         Raises:
             ValueError: If data is empty, invalid, or exceeds size limits
+            SchemaEvolutionError: If schema change violates evolution policy
+            PrimaryKeyViolationError: If data contains duplicate key values
         """
         table_name = validate_table_name(table_name)
 
@@ -167,6 +191,15 @@ class TableWriter:
                 f"Column count ({len(table.column_names)}) exceeds maximum "
                 f"({self.max_columns}). Reduce columns or increase max_columns."
             )
+
+        # Schema evolution and primary key checks
+        version_metadata = dict(metadata) if metadata else {}
+        table_meta = self._validate_schema_and_pk(
+            table_name, table, primary_key, schema_mode
+        )
+
+        # Store serialized schema in version metadata
+        version_metadata[SCHEMA_METADATA_KEY] = serialize_schema(table.schema)
 
         # Determine chunking strategy
         chunks = self._chunk_table(table)
@@ -188,9 +221,14 @@ class TableWriter:
         else:
             chunk_hashes = self.store.put_batch(parquet_chunks)
 
-        # Commit with catalog-assigned version (atomic read-increment-write
-        # prevents race where concurrent writers compute the same version)
-        committed_version = self.catalog.commit_next(table_name, chunk_hashes)
+        # Commit with metadata (schema info attached to version)
+        committed_version = self.catalog.commit_next_with_meta(
+            table_name, chunk_hashes, version_metadata
+        )
+
+        # Save table meta if PK was newly set
+        if table_meta and self._meta_store:
+            self._meta_store.save(table_name, table_meta)
 
         return WriteResult(
             table_name=table_name,
@@ -205,6 +243,9 @@ class TableWriter:
         self,
         table_name: str,
         data: Union["pd.DataFrame", pa.Table],
+        *,
+        primary_key: Optional[List[str]] = None,
+        schema_mode: Optional[str] = None,
     ) -> ChunkWriteResult:
         """
         Write data chunks without committing to catalog.
@@ -216,12 +257,16 @@ class TableWriter:
         Args:
             table_name: Name of the table to write
             data: DataFrame or Arrow Table to write
+            primary_key: Columns that form the primary key
+            schema_mode: Schema evolution mode override
 
         Returns:
             ChunkWriteResult with chunk info and the version that will be assigned
 
         Raises:
             ValueError: If data is empty, invalid, or exceeds size limits
+            SchemaEvolutionError: If schema change violates evolution policy
+            PrimaryKeyViolationError: If data contains duplicate key values
         """
         table_name = validate_table_name(table_name)
 
@@ -244,6 +289,9 @@ class TableWriter:
                 f"Column count ({len(table.column_names)}) exceeds maximum "
                 f"({self.max_columns}). Reduce columns or increase max_columns."
             )
+
+        # Schema evolution and primary key checks
+        self._validate_schema_and_pk(table_name, table, primary_key, schema_mode)
 
         # Determine chunking strategy
         chunks = self._chunk_table(table)
@@ -365,6 +413,112 @@ class TableWriter:
             write_statistics=True,  # Enables query optimization
         )
         return buffer.getvalue()
+
+    def _validate_schema_and_pk(
+        self,
+        table_name: str,
+        table: pa.Table,
+        primary_key: Optional[List[str]],
+        schema_mode: Optional[str],
+    ) -> Optional[TableMeta]:
+        """Validate schema evolution and primary key constraints.
+
+        Returns TableMeta if it was created or updated (caller should save),
+        or None if no meta changes needed.
+        """
+        if not self._meta_store:
+            return None
+
+        meta = self._meta_store.load(table_name)
+        meta_changed = False
+
+        # Handle primary key
+        if primary_key is not None:
+            if meta.primary_key is not None and meta.primary_key != primary_key:
+                raise ValueError(
+                    f"Primary key already set to {meta.primary_key} for '{table_name}'. "
+                    f"Primary keys are immutable once set."
+                )
+            self._validate_pk_columns(primary_key, table)
+            meta.primary_key = primary_key
+            meta_changed = True
+
+        # Handle schema mode
+        if schema_mode is not None:
+            if schema_mode not in ("additive", "flexible"):
+                raise ValueError(
+                    f"Invalid schema_mode '{schema_mode}': must be 'additive' or 'flexible'"
+                )
+            meta.schema_mode = schema_mode
+            meta_changed = True
+
+        # Resolve effective schema mode
+        effective_mode = schema_mode or meta.schema_mode
+
+        # Schema evolution check: compare against latest version's schema
+        existing_schema = self._get_latest_schema(table_name)
+        if existing_schema is not None:
+            result = compare_schemas(existing_schema, table.schema, effective_mode)
+            if not result.compatible:
+                raise SchemaEvolutionError(table_name, result.error_message)
+
+        # Primary key uniqueness check
+        effective_pk = meta.primary_key
+        if effective_pk:
+            self._check_uniqueness(table_name, table, effective_pk)
+
+        return meta if meta_changed else None
+
+    def _get_latest_schema(self, table_name: str) -> Optional[pa.Schema]:
+        """Get the schema from the latest version, or None if no versions exist."""
+        try:
+            version = self.catalog.get_version(table_name, None)
+            schema_json = version.metadata.get(SCHEMA_METADATA_KEY)
+            if schema_json:
+                return deserialize_schema(schema_json)
+            return None
+        except (OSError, Exception):
+            return None
+
+    @staticmethod
+    def _validate_pk_columns(pk_columns: List[str], table: pa.Table) -> None:
+        """Validate that all PK columns exist in the table."""
+        table_cols = set(table.column_names)
+        missing = [c for c in pk_columns if c not in table_cols]
+        if missing:
+            raise ValueError(
+                f"Primary key columns not found in data: {missing}. "
+                f"Available columns: {sorted(table_cols)}"
+            )
+
+    @staticmethod
+    def _check_uniqueness(
+        table_name: str,
+        table: pa.Table,
+        pk_columns: List[str],
+    ) -> None:
+        """Check that the primary key columns have no duplicate values.
+
+        Uses a GROUP BY / HAVING approach to correctly handle NULLs.
+        NULLs in PK columns are allowed but treated as distinct values
+        (two NULLs do not conflict).
+        """
+        import duckdb
+
+        con = duckdb.connect()
+        con.register("__pk_check", table)
+        cols = ", ".join(f'"{c}"' for c in pk_columns)
+        result = con.execute(
+            f"SELECT COUNT(*) FROM ("
+            f"  SELECT {cols} FROM __pk_check "
+            f"  GROUP BY {cols} HAVING COUNT(*) > 1"
+            f")"
+        ).fetchone()
+        dup_groups = result[0]
+        if dup_groups > 0:
+            raise PrimaryKeyViolationError(
+                table_name, pk_columns, dup_groups
+            )
 
     def _get_next_version(self, table_name: str) -> int:
         """Get the next version number for a table."""

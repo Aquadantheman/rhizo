@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use fs2::FileExt;
@@ -120,6 +121,36 @@ impl FileCatalog {
         // Step 3: Remove intent on success (crash here is safe — intent will
         // be found on recovery but the version is already committed, so
         // recover_pending_commits filters it out)
+        if result.is_ok() {
+            self.remove_pending_intent(&intent_id);
+        }
+
+        result
+    }
+
+    /// Auto-versioned commit with metadata and optional schema hash.
+    ///
+    /// Same crash-safety guarantees as `commit_next_version`, but allows
+    /// attaching arbitrary metadata (e.g. serialized Arrow schema) and an
+    /// optional schema hash to the committed version.
+    pub fn commit_next_version_with_meta(
+        &self,
+        table_name: &str,
+        chunk_hashes: Vec<String>,
+        metadata: HashMap<String, String>,
+        schema_hash: Option<String>,
+    ) -> Result<u64, CatalogError> {
+        let intent_id = self.write_pending_intent(table_name, &chunk_hashes)?;
+
+        let result = {
+            let _lock = self.acquire_table_lock(table_name)?;
+            let next = self.get_latest_version_num(table_name)? + 1;
+            let mut version = TableVersion::new(table_name, next, chunk_hashes);
+            version.metadata = metadata;
+            version.schema_hash = schema_hash;
+            self.commit_inner(version)
+        };
+
         if result.is_ok() {
             self.remove_pending_intent(&intent_id);
         }

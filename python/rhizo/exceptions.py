@@ -55,6 +55,36 @@ class EmptyResultError(RhizoError, ValueError):
         super().__init__(message)
 
 
+class SchemaEvolutionError(RhizoError, ValueError):
+    """
+    Raised when a schema change violates the table's evolution policy.
+
+    Inherits from ValueError for backwards compatibility.
+    """
+
+    def __init__(self, table_name: str, message: str):
+        self.table_name = table_name
+        super().__init__(f"Schema evolution error on '{table_name}': {message}")
+
+
+class PrimaryKeyViolationError(RhizoError, ValueError):
+    """
+    Raised when a write would create duplicate primary key values.
+
+    Inherits from ValueError for backwards compatibility.
+    """
+
+    def __init__(self, table_name: str, key_columns: list, duplicate_count: int):
+        self.table_name = table_name
+        self.key_columns = key_columns
+        self.duplicate_count = duplicate_count
+        keys = ", ".join(key_columns)
+        super().__init__(
+            f"Primary key violation on '{table_name}': "
+            f"{duplicate_count} duplicate(s) in columns ({keys})"
+        )
+
+
 class SizeLimitExceededError(RhizoError, ValueError):
     """
     Raised when input data exceeds configured size limits.

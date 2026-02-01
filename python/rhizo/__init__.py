@@ -36,6 +36,8 @@ from .subscriber import Subscriber, ChangeEvent
 from .cache import CacheManager, CacheKey, CacheStats
 from .diff import DiffEngine, DiffResult, SchemaDiff, RowDiff
 from .gc import GCPolicy, GCResult, GarbageCollector, AutoGC
+from .table_meta import TableMeta, TableMetaStore
+from .schema_utils import serialize_schema, deserialize_schema, compare_schemas, SchemaComparisonResult
 from .olap_engine import OLAPEngine, is_datafusion_available
 from .metrics import (
     AlgebraicSignature,
@@ -51,6 +53,8 @@ from .exceptions import (
     VersionNotFoundError,
     EmptyResultError,
     SizeLimitExceededError,
+    SchemaEvolutionError,
+    PrimaryKeyViolationError,
 )
 
 # Re-export low-level types from _rhizo for convenience
@@ -191,12 +195,21 @@ __all__ = [
     "GCResult",
     "GarbageCollector",
     "AutoGC",
+    # Schema & Primary Key
+    "TableMeta",
+    "TableMetaStore",
+    "SchemaComparisonResult",
+    "serialize_schema",
+    "deserialize_schema",
+    "compare_schemas",
     # Exceptions
     "RhizoError",
     "TableNotFoundError",
     "VersionNotFoundError",
     "EmptyResultError",
     "SizeLimitExceededError",
+    "SchemaEvolutionError",
+    "PrimaryKeyViolationError",
     # Low-level types
     "PyChunkStore",
     "PyCatalog",

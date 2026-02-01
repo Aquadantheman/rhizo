@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**1,313 tests passing (476 Rust + 837 Python)**
+**1,426 tests passing (476 Rust + 950 Python)**
 
 Rhizo is feature-complete for single-node deployments with full ACID transactions, time travel, branching, and OLAP queries.
 
@@ -18,6 +18,7 @@ Rhizo is feature-complete for single-node deployments with full ACID transaction
 | Phase P: Performance | Complete | Native Rust Parquet, parallel I/O, Arrow cache |
 | Phase DF: OLAP | Complete | DataFusion engine, 32x faster than DuckDB |
 | Phase CF: Coordination-Free | Complete | Algebraic transactions, 59x measured vs localhost 2PC |
+| Phase SE: Schema & Keys | Complete | Schema evolution, primary key constraints |
 
 ---
 
@@ -75,6 +76,16 @@ Rhizo is feature-complete for single-node deployments with full ACID transaction
 - **get_changes()**: Query changes since a checkpoint
 - **subscribe()**: Continuous change notifications
 - **Background processing**: Event-driven pipelines
+
+### Schema Evolution & Primary Keys
+- **Schema evolution**: Additive-only by default (new columns OK, removals/type changes error)
+- **Flexible mode**: `schema_mode="flexible"` allows any schema change
+- **Primary keys**: `primary_key=["id"]` enforces uniqueness at write time via DuckDB
+- **Immutable PK**: Once set, primary key cannot be changed
+- **Schema API**: `db.schema()`, `db.schema_history()`, `db.primary_key()`, `db.set_primary_key()`, `db.set_schema_mode()`
+- **Diff auto-resolve**: `db.diff()` auto-uses PK as key_columns
+- **Table metadata**: `_table_meta.json` per table for persistent configuration
+- **Backwards compatible**: Existing databases work without changes
 
 ---
 
